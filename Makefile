@@ -22,8 +22,6 @@ BUILD_DIR = build
 C_SOURCES =  \
 src/main.c \
 src/audio_play.c \
-src/audio_record.c \
-src/mems.c \
 src/stm32f4xx_it.c \
 src/system_stm32f4xx.c \
 stm32/hal/Src/stm32f4xx_hal.c \
@@ -37,13 +35,12 @@ stm32/hal/Src/stm32f4xx_hal_gpio.c \
 stm32/hal/Src/stm32f4xx_hal_pcd.c \
 stm32/hal/Src/stm32f4xx_hal_pcd_ex.c \
 stm32/hal/Src/stm32f4xx_hal_rcc.c \
-stm32/hal/Src/stm32f4xx_hal_tim.c \
+stm32/hal/Src/stm32f4xx_hal_uart.c \
+stm32/hal/Src/stm32f4xx_hal_usart.c \
 stm32/hal/Src/stm32f4xx_hal_spi.c \
 board/STM32F401-Discovery/stm32f401_discovery.c \
-board/STM32F401-Discovery/stm32f401_discovery_accelerometer.c \
 board/STM32F401-Discovery/stm32f401_discovery_audio.c \
 board/cs43l22/cs43l22.c \
-board/lsm303dlhc/lsm303dlhc.c \
 
 # C includes
 C_INCLUDES =  \
@@ -53,7 +50,6 @@ C_INCLUDES =  \
 -Istm32/cmsis \
 -Istm32/hal/Inc \
 -Iboard/STM32F401-Discovery/ \
--Iboard/lsm303dlhc/ \
 -Iboard/cs43l22 \
 
 #-IDrivers/STM32F4xx_HAL_Driver/Inc/Legacy \

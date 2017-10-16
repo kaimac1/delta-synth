@@ -40,7 +40,7 @@
 #define __CS43L22_H
 
 /* Includes ------------------------------------------------------------------*/
-#include "../common/audio.h"
+#include "audio.h"
 
 /** @addtogroup BSP
   * @{

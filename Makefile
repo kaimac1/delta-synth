@@ -38,8 +38,8 @@ stm32/hal/Src/stm32f4xx_hal_rcc.c \
 stm32/hal/Src/stm32f4xx_hal_uart.c \
 stm32/hal/Src/stm32f4xx_hal_usart.c \
 stm32/hal/Src/stm32f4xx_hal_spi.c \
-board/STM32F401-Discovery/stm32f401_discovery.c \
-board/STM32F401-Discovery/stm32f401_discovery_audio.c \
+board/stm32f401_discovery.c \
+board/stm32f401_discovery_audio.c \
 board/cs43l22/cs43l22.c \
 
 # C includes
@@ -49,7 +49,7 @@ C_INCLUDES =  \
 -Istm32 \
 -Istm32/cmsis \
 -Istm32/hal/Inc \
--Iboard/STM32F401-Discovery/ \
+-Iboard \
 -Iboard/cs43l22 \
 
 #-IDrivers/STM32F4xx_HAL_Driver/Inc/Legacy \
@@ -115,7 +115,7 @@ LDSCRIPT = STM32F401VCTx_FLASH.ld
 # libraries
 LIBS = -lc -lm -lnosys
 LIBDIR = lib/libPDMFilter_CM4F_GCC.a
-LDFLAGS = $(MCU) -specs=nano.specs -T$(LDSCRIPT) $(LIBDIR) $(LIBS) -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--cref -Wl,--gc-sections
+LDFLAGS = $(MCU) -specs=nano.specs -u _printf_float -T$(LDSCRIPT) $(LIBDIR) $(LIBS) -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--cref -Wl,--gc-sections
 
 # default action: build all
 all: $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).hex $(BUILD_DIR)/$(TARGET).bin

@@ -185,7 +185,7 @@ void EXTI0_IRQHandler(void)
   */
 void EXTI4_IRQHandler(void)
 {
-  HAL_GPIO_EXTI_IRQHandler(ACCELERO_INT1_PIN);
+  //HAL_GPIO_EXTI_IRQHandler(ACCELERO_INT1_PIN);
 }
 
 /**

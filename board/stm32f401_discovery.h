@@ -202,34 +202,6 @@ typedef enum
    conditions (interrupts routines ...). */   
 #define SPIx_TIMEOUT_MAX                        ((uint32_t)0x1000)
 
-/*################################ GYROSCOPE #################################*/
-/* Read/Write command */
-#define READWRITE_CMD                           ((uint8_t)0x80) 
-/* Multiple byte read/write command */ 
-#define MULTIPLEBYTE_CMD                        ((uint8_t)0x40)
-/* Dummy Byte Send by the SPI Master device in order to generate the Clock to the Slave device */
-#define DUMMY_BYTE                              ((uint8_t)0x00)
-
-/* Chip Select macro definition */
-#define GYRO_CS_LOW()       HAL_GPIO_WritePin(GYRO_CS_GPIO_PORT, GYRO_CS_PIN, GPIO_PIN_RESET)
-#define GYRO_CS_HIGH()      HAL_GPIO_WritePin(GYRO_CS_GPIO_PORT, GYRO_CS_PIN, GPIO_PIN_SET)
-
-/**
-  * @brief  GYRO SPI Interface pins
-  */
-#define GYRO_CS_GPIO_PORT                       GPIOE                       /* GPIOE */
-#define GYRO_CS_GPIO_CLK_ENABLE()               __HAL_RCC_GPIOE_CLK_ENABLE()
-#define GYRO_CS_GPIO_CLK_DISABLE()              __HAL_RCC_GPIOE_CLK_DISABLE()
-#define GYRO_CS_PIN                             GPIO_PIN_3                  /* PE.03 */
-
-#define GYRO_INT_GPIO_PORT                      GPIOE                       /* GPIOE */
-#define GYRO_INT_GPIO_CLK_ENABLE()              __HAL_RCC_GPIOE_CLK_ENABLE()
-#define GYRO_INT_GPIO_CLK_DISABLE()             __HAL_RCC_GPIOE_CLK_DISABLE()
-#define GYRO_INT1_PIN                           GPIO_PIN_0                  /* PE.00 */
-#define GYRO_INT1_EXTI_IRQn                     EXTI0_IRQn 
-#define GYRO_INT2_PIN                           GPIO_PIN_1                  /* PE.01 */
-#define GYRO_INT2_EXTI_IRQn                     EXTI1_IRQn 
-
 /*################################### AUDIO ##################################*/
 /**
   * @brief  AUDIO I2C Interface pins
@@ -249,37 +221,7 @@ typedef enum
   * @}
   */ 
 
-/*############################### ACCELEROMETER ##############################*/
-/**
-  * @brief  ACCELERO I2C1 Interface pins
-  */
-#define ACCELERO_DRDY_GPIO_PORT                 GPIOE                       /* GPIOE */
-#define ACCELERO_DRDY_GPIO_CLK_ENABLE()         __HAL_RCC_GPIOE_CLK_ENABLE() 
-#define ACCELERO_DRDY_GPIO_CLK_DISABLE()        __HAL_RCC_GPIOE_CLK_DISABLE() 
-#define ACCELERO_DRDY_PIN                       GPIO_PIN_2                  /* PE.02 */
-#define ACCELERO_DRDY_EXTI_IRQn                 TAMP_STAMP_IRQn
 
-#define ACCELERO_INT_GPIO_PORT                  GPIOE                       /* GPIOE */
-#define ACCELERO_INT_GPIO_CLK_ENABLE()          __HAL_RCC_GPIOE_CLK_ENABLE()
-#define ACCELERO_INT_GPIO_CLK_DISABLE()         __HAL_RCC_GPIOE_CLK_DISABLE()
-#define ACCELERO_INT1_PIN                       GPIO_PIN_4                  /* PE.04 */
-#define ACCELERO_INT1_EXTI_IRQn                 EXTI4_IRQn 
-#define ACCELERO_INT2_PIN                       GPIO_PIN_5                  /* PE.05 */
-#define ACCELERO_INT2_EXTI_IRQn                 EXTI9_5_IRQn 
-/**
-  * @}
-  */ 
-
-/** @defgroup STM32F401_DISCOVERY_LOW_LEVEL_Exported_Macros STM32F401 DISCOVERY LOW LEVEL Exported Macros
-  * @{
-  */  
-/**
-  * @}
-  */ 
-
-/** @defgroup STM32F401_DISCOVERY_LOW_LEVEL_Exported_Functions STM32F401 DISCOVERY LOW LEVEL Exported Functions
-  * @{
-  */
 uint32_t BSP_GetVersion(void);  
 void     BSP_LED_Init(Led_TypeDef Led);
 void     BSP_LED_On(Led_TypeDef Led);

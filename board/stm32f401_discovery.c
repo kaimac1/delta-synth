@@ -1,72 +1,5 @@
-/**
-  ******************************************************************************
-  * @file    stm32f401_discovery.c
-  * @author  MCD Application Team
-  * @version V2.2.2
-  * @date    27-January-2017
-  * @brief   This file provides set of firmware functions to manage LEDs and
-  *          push-button available on STM32F401-Discovery Kit from STMicroelectronics.
-  ******************************************************************************
-  * @attention
-  *
-  * <h2><center>&copy; COPYRIGHT(c) 2017 STMicroelectronics</center></h2>
-  *
-  * Redistribution and use in source and binary forms, with or without modification,
-  * are permitted provided that the following conditions are met:
-  *   1. Redistributions of source code must retain the above copyright notice,
-  *      this list of conditions and the following disclaimer.
-  *   2. Redistributions in binary form must reproduce the above copyright notice,
-  *      this list of conditions and the following disclaimer in the documentation
-  *      and/or other materials provided with the distribution.
-  *   3. Neither the name of STMicroelectronics nor the names of its contributors
-  *      may be used to endorse or promote products derived from this software
-  *      without specific prior written permission.
-  *
-  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-  * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-  * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-  * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-  *
-  ******************************************************************************
-  */ 
-  
-/* Includes ------------------------------------------------------------------*/
 #include "stm32f401_discovery.h"
 
-/** @defgroup BSP BSP
-  * @{
-  */ 
-
-/** @defgroup STM32F401_DISCOVERY STM32F401 DISCOVERY
-  * @{
-  */   
-    
-/** @defgroup STM32F401_DISCOVERY_LOW_LEVEL STM32F401 DISCOVERY LOW LEVEL
-  * @brief This file provides set of firmware functions to manage Leds and push-button
-  *        available on STM32F401-Discovery Kit from STMicroelectronics.
-  * @{
-  */ 
-
-/** @defgroup STM32F401_DISCOVERY_LOW_LEVEL_Private_TypesDefinitions STM32F401 DISCOVERY LOW LEVEL Private TypesDefinitions
-  * @{
-  */ 
-/**
-  * @}
-  */ 
-
-/** @defgroup STM32F401_DISCOVERY_LOW_LEVEL_Private_Defines STM32F401 DISCOVERY LOW LEVEL Private Defines
-  * @{
-  */ 
-  
-/**
-  * @brief STM32F401 DISCO BSP Driver version number V2.2.2
-  */
 #define __STM32F401_DISCO_BSP_VERSION_MAIN   (0x02) /*!< [31:24] main version */
 #define __STM32F401_DISCO_BSP_VERSION_SUB1   (0x02) /*!< [23:16] sub1 version */
 #define __STM32F401_DISCO_BSP_VERSION_SUB2   (0x02) /*!< [15:8]  sub2 version */
@@ -75,20 +8,7 @@
                                              |(__STM32F401_DISCO_BSP_VERSION_SUB1 << 16)\
                                              |(__STM32F401_DISCO_BSP_VERSION_SUB2 << 8 )\
                                              |(__STM32F401_DISCO_BSP_VERSION_RC))
-/**
-  * @}
-  */ 
 
-/** @defgroup STM32F401_DISCOVERY_LOW_LEVEL_Private_Macros STM32F401 DISCOVERY LOW LEVEL Private Macros
-  * @{
-  */ 
-/**
-  * @}
-  */ 
-
-/** @defgroup STM32F401_DISCOVERY_LOW_LEVEL_Private_Variables STM32F401 DISCOVERY LOW LEVEL Private Variables
-  * @{
-  */ 
 GPIO_TypeDef* GPIO_PORT[LEDn] = {LED4_GPIO_PORT, 
                                  LED3_GPIO_PORT, 
                                  LED5_GPIO_PORT,
@@ -108,13 +28,8 @@ uint32_t SpixTimeout = SPIx_TIMEOUT_MAX;    /*<! Value of Timeout when SPI commu
 
 static I2C_HandleTypeDef I2cHandle;
 static SPI_HandleTypeDef SpiHandle;
-/**
-  * @}
-  */ 
 
-/** @defgroup STM32F401_DISCOVERY_LOW_LEVEL_Private_FunctionPrototypes STM32F401 DISCOVERY LOW LEVEL Private FunctionPrototypes
-  * @{
-  */
+
 /* I2Cx bus function */
 static void    I2Cx_Init(void);
 static void    I2Cx_WriteData(uint16_t Addr, uint8_t Reg, uint8_t Value);
@@ -128,29 +43,12 @@ static uint8_t SPIx_WriteRead(uint8_t byte);
 static void    SPIx_Error (void);
 static void    SPIx_MspInit(SPI_HandleTypeDef *hspi);
 
-/* Link function for GYRO peripheral */
-void GYRO_IO_Init(void);
-void GYRO_IO_Write(uint8_t* pBuffer, uint8_t WriteAddr, uint16_t NumByteToWrite);
-void GYRO_IO_Read(uint8_t* pBuffer, uint8_t ReadAddr, uint16_t NumByteToRead);
-
 /* Link functions for AUDIO */
 void    AUDIO_IO_Init(void);
 void    AUDIO_IO_DeInit(void);
 void    AUDIO_IO_Write(uint8_t Addr, uint8_t Reg, uint8_t Value);
 uint8_t AUDIO_IO_Read(uint8_t Addr, uint8_t Reg);
 
-/* Link function for COMPASS / ACCELERO peripheral */
-void    COMPASSACCELERO_IO_Init(void);
-void    COMPASSACCELERO_IO_ITConfig(void);
-void    COMPASSACCELERO_IO_Write(uint16_t DeviceAddr, uint8_t RegisterAddr, uint8_t Value);
-uint8_t COMPASSACCELERO_IO_Read(uint16_t DeviceAddr, uint8_t RegisterAddr);
-/**
-  * @}
-  */ 
-
-/** @defgroup STM32F401_DISCOVERY_LOW_LEVEL_Private_Functions STM32F401 DISCOVERY LOW LEVEL Private Functions
-  * @{
-  */ 
   
 /**
   * @brief  This method returns the STM32F401 DISCO BSP Driver revision
@@ -492,110 +390,6 @@ static void SPIx_MspInit(SPI_HandleTypeDef *hspi)
   HAL_GPIO_Init(DISCOVERY_SPIx_GPIO_PORT, &GPIO_InitStructure);
 }
 
-/*******************************************************************************
-                            LINK OPERATIONS
-*******************************************************************************/
-
-/********************************* LINK GYROSCOPE *****************************/
-/**
-  * @brief  Configures the GYRO SPI interface.
-  */
-void GYRO_IO_Init(void)
-{
-  GPIO_InitTypeDef GPIO_InitStructure;
-  
-  /* Configure the Gyroscope Control pins ------------------------------------*/
-  /* Enable CS GPIO clock and  Configure GPIO PIN for Gyroscope Chip select */  
-  GYRO_CS_GPIO_CLK_ENABLE();  
-  GPIO_InitStructure.Pin = GYRO_CS_PIN;
-  GPIO_InitStructure.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStructure.Pull  = GPIO_NOPULL;
-  GPIO_InitStructure.Speed = GPIO_SPEED_MEDIUM;
-  HAL_GPIO_Init(GYRO_CS_GPIO_PORT, &GPIO_InitStructure);
-
-  /* Deselect : Chip Select high */
-  GYRO_CS_HIGH();
-
-  /* Enable INT1, INT2 GPIO clock and Configure GPIO PINs to detect Interrupts */
-  GYRO_INT_GPIO_CLK_ENABLE();
-  GPIO_InitStructure.Pin = GYRO_INT1_PIN | GYRO_INT2_PIN;
-  GPIO_InitStructure.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStructure.Speed = GPIO_SPEED_FAST;
-  GPIO_InitStructure.Pull= GPIO_NOPULL;
-  HAL_GPIO_Init(GYRO_INT_GPIO_PORT, &GPIO_InitStructure);
-  
-  SPIx_Init();
-}
-
-/**
-  * @brief  Writes one byte to the GYRO.
-  * @param  pBuffer: pointer to the buffer  containing the data to be written to the GYRO.
-  * @param  WriteAddr : GYRO's internal address to write to.
-  * @param  NumByteToWrite: Number of bytes to write.
-  */
-void GYRO_IO_Write(uint8_t* pBuffer, uint8_t WriteAddr, uint16_t NumByteToWrite)
-{
-  /* Configure the MS bit: 
-     - When 0, the address will remain unchanged in multiple read/write commands.
-     - When 1, the address will be auto incremented in multiple read/write commands.
-  */
-  if(NumByteToWrite > 0x01)
-  {
-    WriteAddr |= (uint8_t)MULTIPLEBYTE_CMD;
-  }
-  /* Set chip select Low at the start of the transmission */
-  GYRO_CS_LOW();
-  
-  /* Send the Address of the indexed register */
-  SPIx_WriteRead(WriteAddr);
-  
-  /* Send the data that will be written into the device (MSB First) */
-  while(NumByteToWrite >= 0x01)
-  {
-    SPIx_WriteRead(*pBuffer);
-    NumByteToWrite--;
-    pBuffer++;
-  }
-  
-  /* Set chip select High at the end of the transmission */ 
-  GYRO_CS_HIGH();
-}
-
-/**
-  * @brief  Reads a block of data from the GYRO.
-  * @param  pBuffer: pointer to the buffer that receives the data read from the GYRO.
-  * @param  ReadAddr: GYRO's internal address to read from.
-  * @param  NumByteToRead: Number of bytes to read from the GYRO.
-  */
-void GYRO_IO_Read(uint8_t* pBuffer, uint8_t ReadAddr, uint16_t NumByteToRead)
-{  
-  if(NumByteToRead > 0x01)
-  {
-    ReadAddr |= (uint8_t)(READWRITE_CMD | MULTIPLEBYTE_CMD);
-  }
-  else
-  {
-    ReadAddr |= (uint8_t)READWRITE_CMD;
-  }
-  
-  /* Set chip select Low at the start of the transmission */
-  GYRO_CS_LOW();
-  
-  /* Send the Address of the indexed register */
-  SPIx_WriteRead(ReadAddr);
-  
-  /* Receive the data that will be read from the device (MSB First) */
-  while(NumByteToRead > 0x00)
-  {
-    /* Send dummy byte (0x00) to generate the SPI clock to GYRO (Slave device) */
-    *pBuffer = SPIx_WriteRead(DUMMY_BYTE);
-    NumByteToRead--;
-    pBuffer++;
-  }
-  
-  /* Set chip select High at the end of the transmission */ 
-  GYRO_CS_HIGH();
-}  
 
 /********************************* LINK AUDIO *********************************/
 
@@ -661,88 +455,3 @@ uint8_t AUDIO_IO_Read (uint8_t Addr, uint8_t Reg)
   return I2Cx_ReadData(Addr, Reg);
 }
 
-/****************************** LINK ACCELEROMETER ****************************/
-
-/**
-  * @brief  Configures COMPASS / ACCELERO I2C interface.
-  */
-void COMPASSACCELERO_IO_Init(void)
-{
-  GPIO_InitTypeDef GPIO_InitStructure;
-  
-  /* Enable DRDY clock */
-  ACCELERO_DRDY_GPIO_CLK_ENABLE();
-  
-  /* MEMS DRDY pin configuration */
-  GPIO_InitStructure.Pin = ACCELERO_DRDY_PIN;
-  GPIO_InitStructure.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStructure.Pull  = GPIO_NOPULL;
-  GPIO_InitStructure.Speed = GPIO_SPEED_FAST;
-  HAL_GPIO_Init(ACCELERO_DRDY_GPIO_PORT, &GPIO_InitStructure);
-  
-  I2Cx_Init();
-}
-
-/**
-  * @brief  Configures COMPASS / ACCELERO click IT.
-  */
-void COMPASSACCELERO_IO_ITConfig(void)
-{
-  GPIO_InitTypeDef GPIO_InitStructure;
-  
-  /* Enable INT1 and INT2 GPIO clock */
-  ACCELERO_INT_GPIO_CLK_ENABLE();
-  
-  /* Configure GPIO PINs to detect Interrupts */
-  GPIO_InitStructure.Pin = ACCELERO_INT1_PIN | ACCELERO_INT2_PIN;
-  GPIO_InitStructure.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStructure.Speed = GPIO_SPEED_FAST;
-  GPIO_InitStructure.Pull  = GPIO_NOPULL;
-  HAL_GPIO_Init(ACCELERO_INT_GPIO_PORT, &GPIO_InitStructure);
-  
-  /* Enable and set COMPASS / ACCELERO Interrupt to the highest priority */
-  HAL_NVIC_SetPriority(ACCELERO_INT1_EXTI_IRQn, 0x00, 0x00);
-  HAL_NVIC_EnableIRQ(ACCELERO_INT1_EXTI_IRQn);
-}
-
-/**
-  * @brief  Writes one byte to the COMPASS / ACCELERO.
-  * @param  DeviceAddr: the slave address to be programmed
-  * @param  RegisterAddr: the COMPASS / ACCELERO register to be written
-  * @param  Value: Data to be written
- */
-void COMPASSACCELERO_IO_Write(uint16_t DeviceAddr, uint8_t RegisterAddr, uint8_t Value)
-{
-  /* Call I2Cx Read data bus function */
-  I2Cx_WriteData(DeviceAddr, RegisterAddr, Value);
-}
-
-/**
-  * @brief  Reads a block of data from the COMPASS / ACCELERO.
-  * @param  DeviceAddr: the slave address to be programmed(ACC_I2C_ADDRESS or MAG_I2C_ADDRESS).
-  * @param  RegisterAddr: the COMPASS / ACCELERO internal address register to read from
-  * @retval COMPASS / ACCELERO register value
-  */
-uint8_t COMPASSACCELERO_IO_Read(uint16_t DeviceAddr, uint8_t RegisterAddr)
-{
-  /* Call I2Cx Read data bus function */   
-  return I2Cx_ReadData(DeviceAddr, RegisterAddr);
-}
-
-/**
-  * @}
-  */ 
-
-/**
-  * @}
-  */ 
-
-/**
-  * @}
-  */ 
-
-/**
-  * @}
-  */   
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

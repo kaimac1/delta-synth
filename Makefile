@@ -21,6 +21,7 @@ BUILD_DIR = build
 # C sources
 C_SOURCES =  \
 src/main.c \
+src/uart.c \
 src/audio_play.c \
 src/stm32f4xx_it.c \
 src/system_stm32f4xx.c \

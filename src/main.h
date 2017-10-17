@@ -7,8 +7,4 @@
 #include "audio_play.h"
 #include <stdio.h>
 
-/* Exported functions ------------------------------------------------------- */
-void Toggle_Leds(void);
-void Error_Handler(void);
-
 #endif /* __MAIN_H */

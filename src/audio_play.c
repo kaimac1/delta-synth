@@ -4,7 +4,7 @@
 
 extern __IO uint8_t UserPressButton;
 
-#define OUT_BUFFER_SIZE 0x1000 // supposed to be a multiple of 4096???
+#define OUT_BUFFER_SIZE 1024
 uint16_t out_buffer_1[OUT_BUFFER_SIZE];
 uint16_t out_buffer_2[OUT_BUFFER_SIZE];
 
@@ -16,7 +16,7 @@ uint16_t *out_buffer = out_buffer_1;
 uint16_t sine_table[SINE_TABLE_SIZE];
 
 uint32_t nco_phase;
-uint32_t freq = 0.02553125 * UINT32_MAX;
+volatile uint32_t freq = 0.02553125 * UINT32_MAX;
 
 void swap_buffers(void) {
 
@@ -30,7 +30,6 @@ void swap_buffers(void) {
 void AudioPlay_Test(void) {  
 
     __IO uint8_t volume = 50; // 0 - 100
-    uint32_t sample_rate = 22050;
 
     // fill sin table
     for (int i=0; i<SINE_TABLE_SIZE; i++) {
@@ -47,22 +46,13 @@ void AudioPlay_Test(void) {
         out_buffer[i+1] = sl; // right
     }
 
-    if (BSP_AUDIO_OUT_Init(OUTPUT_DEVICE_AUTO, volume, sample_rate) != 0) {
+    if (BSP_AUDIO_OUT_Init(OUTPUT_DEVICE_AUTO, volume, SAMPLE_RATE) != 0) {
         printf("init failed\r\n");
         return;
     }
 
     BSP_AUDIO_OUT_Play(out_buffer, OUT_BUFFER_SIZE * 2);
 
-
-    UserPressButton = 0;  
-    while(!UserPressButton);
-  
-    if (BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW) != AUDIO_OK) {
-        printf("stop error\r\n");
-    }
-
-  printf("stopped\r\n");
 }
 
 void BSP_AUDIO_OUT_TransferComplete_CallBack() {
@@ -81,12 +71,13 @@ void BSP_AUDIO_OUT_TransferComplete_CallBack() {
         out_buffer[i+1] = sl; // right
     }
 
-    printf("done %d\r\n", nco_phase);
+    printf("done\r\n");
 
 
 
 }
 
 void BSP_AUDIO_OUT_Error_CallBack(void) {
-    Error_Handler();
+    // printf("outerr");
+    // Error_Handler();
 }

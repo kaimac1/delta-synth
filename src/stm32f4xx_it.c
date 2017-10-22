@@ -38,13 +38,6 @@ void SysTick_Handler(void) {
 
 
 
-void EXTI0_IRQHandler(void) {
-  HAL_GPIO_EXTI_IRQHandler(KEY_BUTTON_PIN);
-}
-
-void EXTI4_IRQHandler(void) {
-  //HAL_GPIO_EXTI_IRQHandler(ACCELERO_INT1_PIN);
-}
 
 void I2S3_IRQHandler(void) { 
   HAL_DMA_IRQHandler(hAudioOutI2s.hdmatx);

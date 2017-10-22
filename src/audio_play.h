@@ -1,12 +1,24 @@
-#ifndef __AUDIO_PLAY_H
-#define __AUDIO_PLAY_H
-
+#pragma once
 #include "main.h"
 
-#define SAMPLE_RATE 22050
+#define SAMPLE_RATE 44100
+
+typedef enum {
+    WAVE_SINE,
+    WAVE_SQUARE,
+    WAVE_SAW
+} WaveformType;
+
+
+typedef struct {
+    uint32_t freq;
+    WaveformType osc_wave;
+} SynthConfig;
+
+extern SynthConfig cfg;
+extern SynthConfig cfgnew;
+
 
 void AudioPlay_Test(void);
 
-extern volatile uint32_t freq;
 
-#endif /* __AUDIO_PLAY_H */

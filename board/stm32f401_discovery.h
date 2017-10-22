@@ -1,42 +1,3 @@
-/** 
-  ******************************************************************************
-  * @file    stm32f401_discovery.h
-  * @author  MCD Application Team
-  * @version V2.2.2
-  * @date    27-January-2017
-  * @brief   This file contains definitions for STM32F401-Discovery Kit's Leds and 
-  *          push-button hardware resources.
-  ******************************************************************************
-  * @attention
-  *
-  * <h2><center>&copy; COPYRIGHT(c) 2017 STMicroelectronics</center></h2>
-  *
-  * Redistribution and use in source and binary forms, with or without modification,
-  * are permitted provided that the following conditions are met:
-  *   1. Redistributions of source code must retain the above copyright notice,
-  *      this list of conditions and the following disclaimer.
-  *   2. Redistributions in binary form must reproduce the above copyright notice,
-  *      this list of conditions and the following disclaimer in the documentation
-  *      and/or other materials provided with the distribution.
-  *   3. Neither the name of STMicroelectronics nor the names of its contributors
-  *      may be used to endorse or promote products derived from this software
-  *      without specific prior written permission.
-  *
-  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-  * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-  * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-  * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-  *
-  ******************************************************************************  
-  */ 
-  
-/* Define to prevent recursive inclusion -------------------------------------*/
 #ifndef __STM32F401_DISCOVERY_H
 #define __STM32F401_DISCOVERY_H
 
@@ -44,24 +5,8 @@
  extern "C" {
 #endif
                                               
-/* Includes ------------------------------------------------------------------*/
 #include "stm32f4xx_hal.h"
    
-/** @addtogroup BSP
-  * @{
-  */
-  
-/** @addtogroup STM32F401_DISCOVERY
-  * @{
-  */
-      
-/** @addtogroup STM32F401_DISCOVERY_LOW_LEVEL
-  * @{
-  */ 
-
-/** @defgroup STM32F401_DISCOVERY_LOW_LEVEL_Exported_Types STM32F401 DISCOVERY LOW LEVEL Exported Types
-  * @{
-  */
 typedef enum 
 {
   LED4 = 0,
@@ -70,27 +15,6 @@ typedef enum
   LED6 = 3
 }Led_TypeDef;
 
-typedef enum 
-{  
-  BUTTON_KEY = 0,
-}Button_TypeDef;
-
-typedef enum 
-{  
-  BUTTON_MODE_GPIO = 0,
-  BUTTON_MODE_EXTI = 1
-}ButtonMode_TypeDef;     
-/**
-  * @}
-  */ 
-
-/** @defgroup STM32F401_DISCOVERY_LOW_LEVEL_Exported_Constants STM32F401 DISCOVERY LOW LEVEL Exported Constants
-  * @{
-  */ 
-
-/** 
-  * @brief Define for STM32F401_DISCOVERY board  
-  */ 
 #if !defined (USE_STM32F401_DISCO)
  #define USE_STM32F401_DISCO
 #endif
@@ -134,35 +58,6 @@ typedef enum
                                             if((__INDEX__) == 2) LED5_GPIO_CLK_DISABLE(); else \
                                             if((__INDEX__) == 3) LED6_GPIO_CLK_DISABLE(); \
                                             }while(0)
-/**
-  * @}
-  */ 
-  
-/** @defgroup STM32F401_DISCOVERY_LOW_LEVEL_BUTTON STM32F401 DISCOVERY LOW LEVEL BUTTON
-  * @{
-  */  
-#define BUTTONn                                 1  
-
-/**
- * @brief Wakeup push-button
- */
-#define KEY_BUTTON_PIN                          GPIO_PIN_0
-#define KEY_BUTTON_GPIO_PORT                    GPIOA
-#define KEY_BUTTON_GPIO_CLK_ENABLE()            __HAL_RCC_GPIOA_CLK_ENABLE()
-#define KEY_BUTTON_GPIO_CLK_DISABLE()           __HAL_RCC_GPIOA_CLK_DISABLE()
-#define KEY_BUTTON_EXTI_IRQn                    EXTI0_IRQn
-
-#define BUTTONx_GPIO_CLK_ENABLE(__INDEX__)     do{if((__INDEX__) == 0) KEY_BUTTON_GPIO_CLK_ENABLE(); \
-                                                 }while(0)
-#define BUTTONx_GPIO_CLK_DISABLE(__INDEX__)    do{if((__INDEX__) == 0) KEY_BUTTON_GPIO_CLK_DISABLE(); \
-                                                 }while(0)
-/**
-  * @}
-  */ 
-
-/** @defgroup STM32F401_DISCOVERY_LOW_LEVEL_BUS STM32F401 DISCOVERY LOW LEVEL BUS
-  * @{
-  */  
 
 /*############################### I2Cx #######################################*/
 #define DISCOVERY_I2Cx                          I2C1
@@ -185,23 +80,6 @@ typedef enum
 #define I2Cx_TIMEOUT_MAX                        0xA000 /*<! The value of the maximal timeout for I2C waiting loops */
 #define I2Cx_MAX_COMMUNICATION_FREQ             ((uint32_t) 100000)
 
-/*################################# SPI1 #####################################*/
-#define DISCOVERY_SPIx                          SPI1
-#define DISCOVERY_SPIx_CLOCK_ENABLE()           __HAL_RCC_SPI1_CLK_ENABLE()
-#define DISCOVERY_SPIx_GPIO_PORT                GPIOA                      /* GPIOA */
-#define DISCOVERY_SPIx_AF                       GPIO_AF5_SPI1
-#define DISCOVERY_SPIx_GPIO_CLK_ENABLE()        __HAL_RCC_GPIOA_CLK_ENABLE()
-#define DISCOVERY_SPIx_GPIO_CLK_DISABLE()       __HAL_RCC_GPIOA_CLK_DISABLE()
-#define DISCOVERY_SPIx_SCK_PIN                  GPIO_PIN_5                 /* PA.05 */
-#define DISCOVERY_SPIx_MISO_PIN                 GPIO_PIN_6                 /* PA.06 */
-#define DISCOVERY_SPIx_MOSI_PIN                 GPIO_PIN_7                 /* PA.07 */
-/* Maximum Timeout values for flags waiting loops. These timeouts are not based
-   on accurate values, they just guarantee that the application will not remain
-   stuck if the SPI communication is corrupted.
-   You may modify these timeout values depending on CPU frequency and application
-   conditions (interrupts routines ...). */   
-#define SPIx_TIMEOUT_MAX                        ((uint32_t)0x1000)
-
 /*################################### AUDIO ##################################*/
 /**
   * @brief  AUDIO I2C Interface pins
@@ -222,29 +100,10 @@ typedef enum
   */ 
 
 
-uint32_t BSP_GetVersion(void);  
 void     BSP_LED_Init(Led_TypeDef Led);
 void     BSP_LED_On(Led_TypeDef Led);
 void     BSP_LED_Off(Led_TypeDef Led);
 void     BSP_LED_Toggle(Led_TypeDef Led);
-void     BSP_PB_Init(Button_TypeDef Button, ButtonMode_TypeDef ButtonMode);
-uint32_t BSP_PB_GetState(Button_TypeDef Button);
-
-/**
-  * @}
-  */
-
-/**
-  * @}
-  */ 
-
-/**
-  * @}
-  */
-
-/**
-  * @}
-  */ 
 
 #ifdef __cplusplus
 }
@@ -252,4 +111,3 @@ uint32_t BSP_PB_GetState(Button_TypeDef Button);
 
 #endif /* __STM32F401_DISCOVERY_H */
 
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

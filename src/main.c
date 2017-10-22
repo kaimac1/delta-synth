@@ -1,14 +1,9 @@
 #include "main.h"
-#include "uart.h"
-
-__IO uint8_t UserPressButton = 0;
 
 static void SystemClock_Config(void);
-
 extern UART_HandleTypeDef h_uart;
 
 #define RXBUFFERSIZE 8
-
 uint32_t note[10];
 
 
@@ -21,8 +16,8 @@ int main(void) {
     BSP_LED_Init(LED5);
     BSP_LED_Init(LED6); 
     SystemClock_Config();
-    BSP_PB_Init(BUTTON_KEY, BUTTON_MODE_EXTI);
     uart_init();
+    input_init();
     printf("Running.\r\n");
 
 
@@ -40,27 +35,36 @@ int main(void) {
 
     char inchar;
 
+    int old_enc = enc_value;
+
     while (1) {        
-        if (HAL_UART_Receive(&h_uart, (uint8_t*)&inchar, 1, 1000) == HAL_OK) {
+        if (HAL_UART_Receive(&h_uart, (uint8_t*)&inchar, 1, 100) == HAL_OK) {
              printf("char = %c\r\n", inchar);
              switch (inchar) {
-                case 'z': freq = note[0]; break;
-                case 'x': freq = note[1]; break;
-                case 'c': freq = note[2]; break;
-                case 'v': freq = note[3]; break;
-                case 'b': freq = note[4]; break;
-                case 'n': freq = note[5]; break;
-                case 'm': freq = note[6]; break;
-                case ',': freq = note[7]; break;
+                case 'z': cfgnew.freq = note[0]; break;
+                case 'x': cfgnew.freq = note[1]; break;
+                case 'c': cfgnew.freq = note[2]; break;
+                case 'v': cfgnew.freq = note[3]; break;
+                case 'b': cfgnew.freq = note[4]; break;
+                case 'n': cfgnew.freq = note[5]; break;
+                case 'm': cfgnew.freq = note[6]; break;
+                case ',': cfgnew.freq = note[7]; break;
+
+
+                case 'q': cfgnew.osc_wave = WAVE_SINE; break;
+                case 'w': cfgnew.osc_wave = WAVE_SQUARE; break;
              }
         }
+
+        if (enc_value != old_enc) {
+            BSP_AUDIO_OUT_SetVolume(enc_value);
+            printf("set %d\r\n", enc_value);
+            old_enc = enc_value;
+        }
+
+        //HAL_Delay(10);
     }
   
-}
-
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle)
-{
-  BSP_LED_Toggle(LED4);
 }
 
 static void SystemClock_Config(void) {
@@ -87,13 +91,6 @@ static void SystemClock_Config(void) {
     RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;  
     RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;  
     HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2);
-}
-
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
-    if (KEY_BUTTON_PIN == GPIO_Pin) {
-        while (BSP_PB_GetState(BUTTON_KEY) != RESET);
-        UserPressButton = 1;
-    }
 }
 
 

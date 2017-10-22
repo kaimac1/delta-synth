@@ -1,6 +1,7 @@
-#include "uart.h"
+#include "board.h"
 #include "stm32f4xx_hal.h"
 #include "stm32f4xx_hal_usart.h"
+#include "stm32f4xx_ll_usart.h"
 
 UART_HandleTypeDef h_uart;
 
@@ -47,10 +48,18 @@ void USART2_IRQHandler(void) {
     HAL_UART_IRQHandler(&h_uart);
 }
 
+
+void uart_send(uint8_t *ptr, int len) {
+    for (int i=0; i<len; i++) {
+        while (!LL_USART_IsActiveFlag_TXE(USART2));
+        LL_USART_TransmitData8(USART2, *ptr++);
+    }
+}
+
 // retarget newlib
 
 int _write(int file, char * ptr, int len) {
-    HAL_UART_Transmit(&h_uart, (uint8_t*)ptr, len, 1000);
+    uart_send((uint8_t*)ptr, len);
     return len;
 }
 

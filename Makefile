@@ -21,7 +21,6 @@ BUILD_DIR = build
 # C sources
 C_SOURCES =  \
 src/main.c \
-src/uart.c \
 src/audio_play.c \
 src/stm32f4xx_it.c \
 src/system_stm32f4xx.c \
@@ -39,6 +38,9 @@ stm32/hal/Src/stm32f4xx_hal_rcc.c \
 stm32/hal/Src/stm32f4xx_hal_uart.c \
 stm32/hal/Src/stm32f4xx_hal_usart.c \
 stm32/hal/Src/stm32f4xx_hal_spi.c \
+stm32/hal/Src/stm32f4xx_ll_usart.c \
+board/uart.c \
+board/input.c \
 board/stm32f401_discovery.c \
 board/stm32f401_discovery_audio.c \
 board/cs43l22/cs43l22.c \

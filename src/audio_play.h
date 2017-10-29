@@ -11,8 +11,13 @@ typedef enum {
 
 
 typedef struct {
+	uint8_t volume;
     uint32_t freq;
+    bool key;
     WaveformType osc_wave;
+    float attack;
+    float release;
+
 } SynthConfig;
 
 extern SynthConfig cfg;

@@ -6,6 +6,10 @@
 SynthConfig cfgnew;
 SynthConfig cfg;
 
+uint32_t nco_phase;
+float env = 0.0;
+EnvState env_state;
+
 // Output buffer
 #define OUT_BUFFER_SAMPLES 512
 uint16_t out_buffer_1[OUT_BUFFER_SAMPLES];
@@ -37,10 +41,6 @@ void swap_buffers(void) {
     }
 }
 
-
-uint32_t nco_phase;
-float env = 0.0;
-
 void fill_buffer(void) {
 
     uint32_t start = HAL_GetTick();
@@ -65,10 +65,30 @@ void fill_buffer(void) {
 
         // Envelope
         if (cfg.key) {
-            env += cfg.attack;
-            if (env > 1.0) env = 1.0;
+            if (env_state == ENV_RELEASE) {
+                env_state = ENV_ATTACK;
+                env = 0.0;
+            }
+
+            if (env_state == ENV_ATTACK) {
+                env += 1.0/(cfg.attack * SAMPLE_RATE);
+                if (env > 1.0) {
+                    env = 1.0;
+                    env_state = ENV_DECAY;
+                }
+            } else if (env_state == ENV_DECAY) {
+                env -= 1.0/(cfg.decay * SAMPLE_RATE);
+                if (env < cfg.sustain) {
+                    env = cfg.sustain;
+                    env_state = ENV_SUSTAIN;
+                }
+            } else if (env_state == ENV_SUSTAIN) {
+                env = cfg.sustain;
+            }
+
         } else {
-            env -= cfg.release;
+            env_state = ENV_RELEASE;
+            env -= 1.0/(cfg.release * SAMPLE_RATE);
             if (env < 0.0) env = 0.0;
         }
 
@@ -91,8 +111,11 @@ void AudioPlay_Test(void) {
     cfg.volume = 50;
     cfg.freq = 261.13 / SAMPLE_RATE * UINT32_MAX;
     cfg.osc_wave = WAVE_SINE;
-    cfg.attack = 0.0002;
-    cfg.release = 0.0001;
+    cfg.attack = 0.0005;
+    cfg.decay = 0.005;
+    cfg.sustain = 1.0;
+    cfg.release = 0.0005;
+    env_state = ENV_RELEASE;
     memcpy(&cfgnew, &cfg, sizeof(SynthConfig));
 
     create_wave_tables();
@@ -118,6 +141,13 @@ void BSP_AUDIO_OUT_TransferComplete_CallBack(void) {
     }
 
     memcpy(&cfg, &cfgnew, sizeof(SynthConfig));
+    if (cfg.env_retrigger) {
+        cfgnew.env_retrigger = false;
+        cfg.env_retrigger = false;
+        env_state = ENV_RELEASE;
+    }
+
+
     fill_buffer();
 
 }

@@ -35,6 +35,9 @@ void midi_process_command(void) {
                 cfgnew.osc_wave = (cfgnew.osc_wave == WAVE_SINE) ? WAVE_SQUARE : WAVE_SINE;
                 break;
             }
+            if (note[command[1]] != cfg.freq) {
+                cfgnew.env_retrigger = true;
+            }
             cfgnew.freq = note[command[1]];
             cfgnew.key = true;
             break;
@@ -49,10 +52,16 @@ void midi_process_command(void) {
         // Controller
         case 0xB0:
             if (command[1] == 0x0E) {
-                cfgnew.attack = ((float)command[2] / 0x7F) * 0.001;
+                cfgnew.attack = (command[2] + 1) * 0.005;
                 printf("attack = %f\r\n", cfgnew.attack);
             } else if (command[1] == 0x0F) {
-                cfgnew.release = ((float)command[2] / 0x7F) * 0.001;
+                cfgnew.decay = (command[2] + 1) * 0.005;
+                printf("decay = %f\r\n", cfgnew.decay);                
+            } else if (command[1] == 0x10) {
+                cfgnew.sustain = (float)(command[2]) / 0x7F;
+                printf("sustain = %f\r\n", cfgnew.sustain);                
+            } else if (command[1] == 0x11) {
+                cfgnew.release = (command[2] + 1) * 0.005;
                 printf("release = %f\r\n", cfgnew.release);                
             }
 

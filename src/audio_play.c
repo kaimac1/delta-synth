@@ -3,12 +3,15 @@
 #include <string.h>
 #define PI 3.1415926
 
+#define ENV_OVERSHOOT 0.05
+
 SynthConfig cfgnew;
 SynthConfig cfg;
 
 uint32_t nco_phase;
 float env = 0.0;
 EnvState env_state;
+float env_curve;
 
 // Output buffer
 #define OUT_BUFFER_SAMPLES 512
@@ -58,7 +61,7 @@ void fill_buffer(void) {
         if (cfg.osc_wave == WAVE_SINE) {
             s = sine_table[idx]; 
         } else if (cfg.osc_wave == WAVE_SQUARE) {
-            s = (nco_phase < UINT32_MAX/2) ? 10000 : 0;
+            s = (nco_phase < UINT32_MAX/2) ? 10000 : -10000;
         } else {
             s = 0;
         }
@@ -71,13 +74,13 @@ void fill_buffer(void) {
             }
 
             if (env_state == ENV_ATTACK) {
-                env += 1.0/(cfg.attack * SAMPLE_RATE);
+                env += cfg.attack * (1 + ENV_OVERSHOOT - env);
                 if (env > 1.0) {
                     env = 1.0;
                     env_state = ENV_DECAY;
                 }
             } else if (env_state == ENV_DECAY) {
-                env -= 1.0/(cfg.decay * SAMPLE_RATE);
+                env += cfg.decay * (cfg.sustain - ENV_OVERSHOOT - env);
                 if (env < cfg.sustain) {
                     env = cfg.sustain;
                     env_state = ENV_SUSTAIN;
@@ -88,7 +91,7 @@ void fill_buffer(void) {
 
         } else {
             env_state = ENV_RELEASE;
-            env -= 1.0/(cfg.release * SAMPLE_RATE);
+            env += cfg.release * (-ENV_OVERSHOOT - env);
             if (env < 0.0) env = 0.0;
         }
 
@@ -120,6 +123,8 @@ void AudioPlay_Test(void) {
     env_state = ENV_RELEASE;
     memcpy(&cfgnew, &cfg, sizeof(SynthConfig));
 
+    env_curve = -log((1 + ENV_OVERSHOOT) / ENV_OVERSHOOT);
+
     create_wave_tables();
     fill_buffer();
 
@@ -148,6 +153,12 @@ void BSP_AUDIO_OUT_TransferComplete_CallBack(void) {
         cfg.env_retrigger = false;
         env_state = ENV_RELEASE;
     }
+
+    // convert from time to rate
+    cfg.attack  = 1.0 - exp(env_curve / (cfg.attack * SAMPLE_RATE));
+    cfg.decay   = 1.0 - exp(env_curve / (cfg.decay * SAMPLE_RATE));
+    cfg.release = 1.0 - exp(env_curve / (cfg.release * SAMPLE_RATE));
+    
 
 
     fill_buffer();

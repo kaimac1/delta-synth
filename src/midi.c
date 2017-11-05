@@ -73,30 +73,31 @@ void midi_process_command(void) {
                         // Attack
                         case CONTROLLER_1:
                             cfgnew.attack = (command[2] + 1) * 0.005;
-                            printf("attack = %f\r\n", cfgnew.attack);
+                            //printf("attack = %f\r\n", cfgnew.attack);
                             break;
 
                         // Decay
                         case CONTROLLER_2:
                             cfgnew.decay = (command[2] + 1) * 0.005;
-                            printf("decay = %f\r\n", cfgnew.decay);
+                            //printf("decay = %f\r\n", cfgnew.decay);
                             break;
 
                         // Sustain
                         case CONTROLLER_3:
                             cfgnew.sustain = (float)(command[2]) / 0x7F;
-                            printf("sustain = %f\r\n", cfgnew.sustain);
+                            //printf("sustain = %f\r\n", cfgnew.sustain);
                             break;
 
                         // Release
                         case CONTROLLER_4:
                             cfgnew.release = (command[2] + 1) * 0.005;
-                            printf("release = %f\r\n", cfgnew.release);
+                            //printf("release = %f\r\n", cfgnew.release);
                             break;
                     }
                     break;
 
             }
+            break;
 
         default:
             printf("%02x %02x %02x\r\n", command[0], command[1], command[2]);

@@ -31,8 +31,8 @@ int main(void) {
     while (1) {
         if (HAL_UART_Receive(&h_uart_debug, (uint8_t*)&inchar, 1, 100) == HAL_OK) {
             switch (inchar) {
-                case '1': ctrlcfg = CTRL_MAIN; break;
-                case '2': ctrlcfg = CTRL_ENVELOPE; break;
+                case '1': ctrlcfg = CTRL_MAIN; printf("MAIN\r\n"); break;
+                case '2': ctrlcfg = CTRL_ENVELOPE; printf("ENVELOPE\r\n"); break;
             }
         }
     }

@@ -1,6 +1,11 @@
 #include "main.h"
 #include "notes.h"
 
+#define CONTROLLER_1    0x0E
+#define CONTROLLER_2    0x0F
+#define CONTROLLER_3    0x10
+#define CONTROLLER_4    0x11
+
 void midi_process_command(void);
 
 uint8_t command[3];
@@ -51,18 +56,46 @@ void midi_process_command(void) {
 
         // Controller
         case 0xB0:
-            if (command[1] == 0x0E) {
-                cfgnew.attack = (command[2] + 1) * 0.005;
-                printf("attack = %f\r\n", cfgnew.attack);
-            } else if (command[1] == 0x0F) {
-                cfgnew.decay = (command[2] + 1) * 0.005;
-                printf("decay = %f\r\n", cfgnew.decay);                
-            } else if (command[1] == 0x10) {
-                cfgnew.sustain = (float)(command[2]) / 0x7F;
-                printf("sustain = %f\r\n", cfgnew.sustain);                
-            } else if (command[1] == 0x11) {
-                cfgnew.release = (command[2] + 1) * 0.005;
-                printf("release = %f\r\n", cfgnew.release);                
+            switch (ctrlcfg) {
+                case CTRL_MAIN:
+                    switch (command[1]) {
+                        // Master volume
+                        case CONTROLLER_1:
+                            cfgnew.volume = 100 * (float)(command[2]) / 0x7F;
+                            printf("volume = %d\r\n", cfgnew.volume);
+                            break;
+                    }
+                    break;
+
+
+                case CTRL_ENVELOPE:
+                    switch (command[1]) {
+                        // Attack
+                        case CONTROLLER_1:
+                            cfgnew.attack = (command[2] + 1) * 0.005;
+                            printf("attack = %f\r\n", cfgnew.attack);
+                            break;
+
+                        // Decay
+                        case CONTROLLER_2:
+                            cfgnew.decay = (command[2] + 1) * 0.005;
+                            printf("decay = %f\r\n", cfgnew.decay);
+                            break;
+
+                        // Sustain
+                        case CONTROLLER_3:
+                            cfgnew.sustain = (float)(command[2]) / 0x7F;
+                            printf("sustain = %f\r\n", cfgnew.sustain);
+                            break;
+
+                        // Release
+                        case CONTROLLER_4:
+                            cfgnew.release = (command[2] + 1) * 0.005;
+                            printf("release = %f\r\n", cfgnew.release);
+                            break;
+                    }
+                    break;
+
             }
 
         default:

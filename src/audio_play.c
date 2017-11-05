@@ -17,7 +17,7 @@ uint16_t out_buffer_2[OUT_BUFFER_SAMPLES];
 uint16_t *out_buffer = out_buffer_1;
 
 // Sine table
-#define SINE_TABLE_WIDTH 10 // bits
+#define SINE_TABLE_WIDTH 11 // bits
 #define SINE_TABLE_SIZE (1<<SINE_TABLE_WIDTH)
 int16_t sine_table[SINE_TABLE_SIZE];
 
@@ -92,8 +92,10 @@ void fill_buffer(void) {
             if (env < 0.0) env = 0.0;
         }
 
-        s = s * env;
+        // Filter
+        
 
+        s = s * env;
 
         out_buffer[i] = s;   // left
         out_buffer[i+1] = s; // right
@@ -101,7 +103,7 @@ void fill_buffer(void) {
 
     BSP_LED_Off(LED3);
 
-    //printf("%lu\r\n", HAL_GetTick() - start);
+    printf("%lu\r\n", HAL_GetTick() - start);
 }
 
 

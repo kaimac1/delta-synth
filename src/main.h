@@ -9,6 +9,11 @@
 #include "audio_play.h"
 #include "board.h"
 
+typedef enum {
+	CTRL_MAIN,
+	CTRL_ENVELOPE,
+} ControllerConfig;
+extern ControllerConfig ctrlcfg;
 
 
 #endif /* __MAIN_H */

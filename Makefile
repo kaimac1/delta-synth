@@ -1,29 +1,17 @@
-######################################
-# target
-######################################
-TARGET = Demo
+TARGET = synth
+DEBUG = 1
+OPT = -O1
 
-
-######################################
-# building variables
-######################################
-# debug build?
-DEBUG = 0
-# optimization
-OPT = -Og
-
-# Build path
 BUILD_DIR = build
 
 ######################################
 # source
 ######################################
-# C sources
 C_SOURCES =  \
 src/main.c \
+src/synth.c \
 src/midi.c \
 src/notes.c \
-src/audio_play.c \
 src/stm32f4xx_it.c \
 src/system_stm32f4xx.c \
 stm32/hal/Src/stm32f4xx_hal.c \
@@ -47,7 +35,6 @@ board/stm32f401_discovery.c \
 board/stm32f401_discovery_audio.c \
 board/cs43l22/cs43l22.c \
 
-# C includes
 C_INCLUDES =  \
 -Isrc \
 -Ilib \
@@ -56,8 +43,6 @@ C_INCLUDES =  \
 -Istm32/hal/Inc \
 -Iboard \
 -Iboard/cs43l22 \
-
-#-IDrivers/STM32F4xx_HAL_Driver/Inc/Legacy \
 
 # ASM sources
 ASM_SOURCES = stm32/startup_stm32f401xc.s
@@ -79,28 +64,15 @@ BIN = $(CP) -O binary -S
 #######################################
 # CFLAGS
 #######################################
-# cpu
-CPU = -mcpu=cortex-m4
-FPU = -mfpu=fpv4-sp-d16
-FLOAT-ABI = -mfloat-abi=hard
-MCU = $(CPU) -mthumb $(FPU) $(FLOAT-ABI)
-
-# macros for gcc
-# AS defines
-AS_DEFS =
+MCU = -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard
 
 # C defines
 C_DEFS =  \
 -DUSE_HAL_DRIVER \
 -DSTM32F401xC
 
-# AS includes
-AS_INCLUDES =
-
-# compile gcc flags
-ASFLAGS = $(MCU) $(AS_DEFS) $(AS_INCLUDES) $(OPT) -Wall -fdata-sections -ffunction-sections
-
-CFLAGS = $(MCU) $(C_DEFS) $(C_INCLUDES) $(OPT) -Wall -fdata-sections -ffunction-sections
+ASFLAGS = $(MCU) $(OPT) -Wall -fdata-sections -ffunction-sections
+CFLAGS = $(MCU) $(C_DEFS) $(C_INCLUDES) $(OPT) -Wall -fdata-sections -ffunction-sections -Wdouble-promotion
 
 ifeq ($(DEBUG), 1)
 CFLAGS += -g -gdwarf-2
@@ -119,22 +91,21 @@ LDSCRIPT = STM32F401VCTx_FLASH.ld
 
 # libraries
 LIBS = -lc -lm -lnosys
-LIBDIR = lib/libPDMFilter_CM4F_GCC.a
-LDFLAGS = $(MCU) -specs=nano.specs -u _printf_float -T$(LDSCRIPT) $(LIBDIR) $(LIBS) -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--cref -Wl,--gc-sections
-
-# default action: build all
-all: $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).hex $(BUILD_DIR)/$(TARGET).bin
+#LIBDIR = lib/libPDMFilter_CM4F_GCC.a
+LDFLAGS = $(MCU) -specs=nano.specs -T$(LDSCRIPT) $(LIBS) -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--cref -Wl,--gc-sections 
+# -u _printf_float
 
 
-#######################################
-# build the application
-#######################################
-# list of objects
 OBJECTS = $(addprefix $(BUILD_DIR)/,$(notdir $(C_SOURCES:.c=.o)))
-vpath %.c $(sort $(dir $(C_SOURCES)))
-# list of ASM program objects
 OBJECTS += $(addprefix $(BUILD_DIR)/,$(notdir $(ASM_SOURCES:.s=.o)))
+vpath %.c $(sort $(dir $(C_SOURCES)))
 vpath %.s $(sort $(dir $(ASM_SOURCES)))
+
+
+
+################################################################################
+
+all: $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).hex $(BUILD_DIR)/$(TARGET).bin
 
 $(BUILD_DIR)/%.o: %.c Makefile | $(BUILD_DIR)
 	@echo $<
@@ -148,35 +119,22 @@ $(BUILD_DIR)/$(TARGET).elf: $(OBJECTS) Makefile
 	@echo linking
 	@$(CC) $(OBJECTS) $(LDFLAGS) -o $@
 	@$(SZ) $@
+	@arm-none-eabi-objdump -dS $@ > $(BUILD_DIR)/$(TARGET).txt
 
 $(BUILD_DIR)/%.hex: $(BUILD_DIR)/%.elf | $(BUILD_DIR)
-	$(HEX) $< $@
+	@$(HEX) $< $@
 
 $(BUILD_DIR)/%.bin: $(BUILD_DIR)/%.elf | $(BUILD_DIR)
-	$(BIN) $< $@
+	@$(BIN) $< $@
 
 $(BUILD_DIR):
 	mkdir $@
 
-#######################################
-# clean up
-#######################################
 clean:
 	-rm -fR .dep $(BUILD_DIR)
 
-#######################################
-# dependencies
-#######################################
 -include $(shell mkdir .dep 2>/dev/null) $(wildcard .dep/*)
-
-#######################################
-# upload
-#######################################
-
-audio:
-	st-flash --format binary write art_of_gard_128K.bin 0x8020000
 
 upload: $(BUILD_DIR)/$(TARGET).hex
 	st-flash --format ihex write $(BUILD_DIR)/$(TARGET).hex
 
-# *** EOF ***

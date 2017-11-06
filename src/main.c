@@ -20,7 +20,7 @@ int main(void) {
 
     gen_note_table();
 
-    AudioPlay_Test();
+    synth_start();
 
     char inchar;
 
@@ -28,12 +28,27 @@ int main(void) {
     cfgnew.key = true;
     cfgnew.osc_wave = WAVE_SQUARE;
 
+    bool start_sweep = false;
+
     while (1) {
         if (HAL_UART_Receive(&h_uart_debug, (uint8_t*)&inchar, 1, 100) == HAL_OK) {
             switch (inchar) {
                 case '1': ctrlcfg = CTRL_MAIN; printf("MAIN\r\n"); break;
                 case '2': ctrlcfg = CTRL_ENVELOPE; printf("ENVELOPE\r\n"); break;
+
+                case 's': start_sweep = true; break;
             }
+        }
+
+        if (start_sweep) {
+            cfgnew.key = true;
+            cfgnew.freq = 20.0f / SAMPLE_RATE * UINT32_MAX;
+            while (cfgnew.freq < (15000.0f / SAMPLE_RATE * UINT32_MAX)) {
+                cfgnew.freq *= 1.001f;
+                HAL_Delay(5);
+            }
+            printf("done.\r\n");
+            start_sweep = false;
         }
     }
   

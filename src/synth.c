@@ -1,9 +1,9 @@
-#include "audio_play.h"
+#include "synth.h"
 #include <math.h>
 #include <string.h>
 #define PI 3.1415926
 
-#define ENV_OVERSHOOT 0.05
+#define ENV_OVERSHOOT 0.05f
 
 SynthConfig cfgnew;
 SynthConfig cfg;
@@ -24,6 +24,39 @@ uint16_t *out_buffer = out_buffer_1;
 #define SINE_TABLE_SIZE (1<<SINE_TABLE_WIDTH)
 int16_t sine_table[SINE_TABLE_SIZE];
 
+void fill_buffer(void);
+
+/******************************************************************************/
+// This ISR is called when the DMA transfer of one buffer (A) completes.
+// We need to immediately swap the DMA over to the other buffer (B), and start
+// refilling the buffer that was just sent (A).
+
+void BSP_AUDIO_OUT_TransferComplete_CallBack(void) {
+ 
+    BSP_AUDIO_OUT_ChangeBuffer(out_buffer, OUT_BUFFER_SAMPLES);
+    out_buffer = (out_buffer == out_buffer_1) ? out_buffer_2 : out_buffer_1;
+
+    // Copy new settings: cfgnew -> cfg
+    if (cfgnew.volume != cfg.volume) {
+        BSP_AUDIO_OUT_SetVolume(cfgnew.volume);
+    }
+    memcpy(&cfg, &cfgnew, sizeof(SynthConfig));
+    if (cfg.env_retrigger) {
+        cfgnew.env_retrigger = false;
+        cfg.env_retrigger = false;
+        env_state = ENV_RELEASE;
+    }
+
+    // TODO: move out of here
+    // convert from time to rate
+    cfg.attack  = 1.0 - exp(env_curve / (cfg.attack * SAMPLE_RATE));
+    cfg.decay   = 1.0 - exp(env_curve / (cfg.decay * SAMPLE_RATE));
+    cfg.release = 1.0 - exp(env_curve / (cfg.release * SAMPLE_RATE));
+
+    fill_buffer();
+
+}
+
 
 void create_wave_tables(void) {
 
@@ -35,14 +68,6 @@ void create_wave_tables(void) {
 }
 
 
-void swap_buffers(void) {
-
-    if (out_buffer == out_buffer_1) {
-        out_buffer = out_buffer_2;
-    } else {
-        out_buffer = out_buffer_1;
-    }
-}
 
 void fill_buffer(void) {
 
@@ -70,13 +95,13 @@ void fill_buffer(void) {
         if (cfg.key) {
             if (env_state == ENV_RELEASE) {
                 env_state = ENV_ATTACK;
-                env = 0.0;
+                env = 0.0f;
             }
 
             if (env_state == ENV_ATTACK) {
-                env += cfg.attack * (1 + ENV_OVERSHOOT - env);
-                if (env > 1.0) {
-                    env = 1.0;
+                env += cfg.attack * (1.0f + ENV_OVERSHOOT - env);
+                if (env > 1.0f) {
+                    env = 1.0f;
                     env_state = ENV_DECAY;
                 }
             } else if (env_state == ENV_DECAY) {
@@ -92,7 +117,7 @@ void fill_buffer(void) {
         } else {
             env_state = ENV_RELEASE;
             env += cfg.release * (-ENV_OVERSHOOT - env);
-            if (env < 0.0) env = 0.0;
+            if (env < 0.0f) env = 0.0f;
         }
 
         // Filter
@@ -106,11 +131,11 @@ void fill_buffer(void) {
 
     BSP_LED_Off(LED3);
 
-    printf("%lu\r\n", HAL_GetTick() - start);
+    //printf("%lu\r\n", HAL_GetTick() - start);
 }
 
 
-void AudioPlay_Test(void) {  
+void synth_start(void) {
 
     // Initial config
     cfg.volume = 50;
@@ -137,31 +162,5 @@ void AudioPlay_Test(void) {
 }
 
 
-void BSP_AUDIO_OUT_TransferComplete_CallBack(void) {
- 
-    BSP_AUDIO_OUT_ChangeBuffer(out_buffer, OUT_BUFFER_SAMPLES);
-    swap_buffers();
 
-    // Copy new settings
-    if (cfgnew.volume != cfg.volume) {
-        BSP_AUDIO_OUT_SetVolume(cfgnew.volume);
-    }
-
-    memcpy(&cfg, &cfgnew, sizeof(SynthConfig));
-    if (cfg.env_retrigger) {
-        cfgnew.env_retrigger = false;
-        cfg.env_retrigger = false;
-        env_state = ENV_RELEASE;
-    }
-
-    // convert from time to rate
-    cfg.attack  = 1.0 - exp(env_curve / (cfg.attack * SAMPLE_RATE));
-    cfg.decay   = 1.0 - exp(env_curve / (cfg.decay * SAMPLE_RATE));
-    cfg.release = 1.0 - exp(env_curve / (cfg.release * SAMPLE_RATE));
-    
-
-
-    fill_buffer();
-
-}
 

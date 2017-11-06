@@ -36,6 +36,6 @@ extern SynthConfig cfg;
 extern SynthConfig cfgnew;
 
 
-void AudioPlay_Test(void);
+void synth_start(void);
 
 

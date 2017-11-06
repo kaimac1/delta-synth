@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include "stm32f401_discovery.h"
 #include "stm32f401_discovery_audio.h"
-#include "audio_play.h"
+#include "synth.h"
 #include "board.h"
 
 typedef enum {

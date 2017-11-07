@@ -1,7 +1,7 @@
 #include "synth.h"
 #include <math.h>
 #include <string.h>
-#define PI 3.1415926
+#define PI 3.1415926f
 
 #define ENV_OVERSHOOT 0.05f
 
@@ -26,6 +26,10 @@ int16_t sine_table[SINE_TABLE_SIZE];
 
 void fill_buffer(void);
 
+
+// filter state
+float z1, z2, z3, z4;
+
 /******************************************************************************/
 // This ISR is called when the DMA transfer of one buffer (A) completes.
 // We need to immediately swap the DMA over to the other buffer (B), and start
@@ -49,7 +53,7 @@ void BSP_AUDIO_OUT_TransferComplete_CallBack(void) {
 
     // TODO: move out of here
     // convert from time to rate
-    cfg.attack  = 1.0 - exp(env_curve / (cfg.attack * SAMPLE_RATE));
+    //cfg.attack  = 1.0 - exp(env_curve / (cfg.attack * SAMPLE_RATE));
     cfg.decay   = 1.0 - exp(env_curve / (cfg.decay * SAMPLE_RATE));
     cfg.release = 1.0 - exp(env_curve / (cfg.release * SAMPLE_RATE));
 
@@ -99,7 +103,8 @@ void fill_buffer(void) {
             }
 
             if (env_state == ENV_ATTACK) {
-                env += cfg.attack * (1.0f + ENV_OVERSHOOT - env);
+                env += 1.0f/(cfg.attack * SAMPLE_RATE);
+                //env += cfg.attack * (1.0f + ENV_OVERSHOOT - env);
                 if (env > 1.0f) {
                     env = 1.0f;
                     env_state = ENV_DECAY;
@@ -120,10 +125,40 @@ void fill_buffer(void) {
             if (env < 0.0f) env = 0.0f;
         }
 
-        // Filter
-        
-
         s = s * env;
+
+        // Filter
+        float fc = cfg.cutoff + cfg.env_mod * env;
+        float a = PI * fc/SAMPLE_RATE;
+        float g = a/(1.0f + a);
+
+        float bigG = g*g*g*g;
+        float bigS = g*g*g*z1 + g*g*z2 + g*z3 + z4;
+        bigS = bigS / (1.0f + a);
+
+        float v;
+        // zero-delay resonance feedback
+        s = (s - cfg.resonance*bigS)/(1.0f + cfg.resonance*bigG);
+        
+        // 4x 1-pole filters
+        v = (s - z1) * g;
+        s = v + z1;
+        z1 = s + v;
+
+        v = (s - z2) * g;
+        s = v + z2;
+        z2 = s + v;
+
+        v = (s - z3) * g;
+        s = v + z3;
+        z3 = s + v;
+
+        v = (s - z4) * g;
+        s = v + z4;
+        z4 = s + v;
+
+
+        
 
         out_buffer[i] = s;   // left
         out_buffer[i+1] = s; // right
@@ -145,6 +180,9 @@ void synth_start(void) {
     cfg.decay = 0.005;
     cfg.sustain = 1.0;
     cfg.release = 0.0005;
+    cfg.cutoff = 2000.0;
+    cfg.resonance = 0.0;
+    cfg.env_mod = 0.0;
     env_state = ENV_RELEASE;
     memcpy(&cfgnew, &cfg, sizeof(SynthConfig));
 

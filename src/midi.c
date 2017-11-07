@@ -96,6 +96,28 @@ void midi_process_command(void) {
                     }
                     break;
 
+                case CTRL_FILTER:
+                    switch (command[1]) {
+                        // Cutoff
+                        case CONTROLLER_1:
+                            cfgnew.cutoff = 10000.0f * (float)(command[2]) / 0x7F;
+                            //printf("fc = %.1f\r\n", cfgnew.cutoff);
+                            break;
+
+                        // Resonance
+                        case CONTROLLER_2:
+                            cfgnew.resonance = 3.99f * (float)(command[2]) / 0x7F;
+                            //printf("k = %.3f\r\n", cfgnew.resonance);
+                            break;
+
+                        // Env mod
+                        case CONTROLLER_3:
+                            cfgnew.env_mod = 5000.0f * (float)(command[2]) / 0x7F;
+                            //printf("envmod = %.1f\r\n", cfgnew.envmod);
+                            break;
+                    }
+                    break;                    
+
             }
             break;
 

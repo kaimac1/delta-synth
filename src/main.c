@@ -35,6 +35,7 @@ int main(void) {
             switch (inchar) {
                 case '1': ctrlcfg = CTRL_MAIN; printf("MAIN\r\n"); break;
                 case '2': ctrlcfg = CTRL_ENVELOPE; printf("ENVELOPE\r\n"); break;
+                case '3': ctrlcfg = CTRL_FILTER; printf("FILTER\r\n"); break;
 
                 case 's': start_sweep = true; break;
             }

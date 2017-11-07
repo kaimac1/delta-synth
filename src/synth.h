@@ -30,6 +30,11 @@ typedef struct {
     float release;	// seconds
     bool env_retrigger;
 
+    // Filter
+    float cutoff;
+    float resonance;
+    float env_mod;
+
 } SynthConfig;
 
 extern SynthConfig cfg;

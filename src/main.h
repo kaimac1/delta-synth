@@ -12,6 +12,7 @@
 typedef enum {
 	CTRL_MAIN,
 	CTRL_ENVELOPE,
+	CTRL_FILTER
 } ControllerConfig;
 extern ControllerConfig ctrlcfg;
 

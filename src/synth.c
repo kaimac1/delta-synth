@@ -71,10 +71,8 @@ void create_wave_tables(void) {
     }
 }
 
-float polyblep(float t) {
+inline float polyblep(float t) {
     float dt = (float)cfg.freq / UINT32_MAX; // 0-1
-    float integ;
-    t = modff(t, &integ);
     if (t < dt) {
         t /= dt;
         return t + t - t*t - 1.0f;
@@ -98,14 +96,13 @@ void fill_buffer(void) {
     cfg.release = 1.0 - exp(env_curve / (cfg.release * SAMPLE_RATE));    
     
     float s;
-    float integ;
 
     for (int i=0; i<OUT_BUFFER_SAMPLES; i += 2) {
         
         // Oscillator
         nco_phase += cfg.freq;
         float phase = (float)nco_phase / UINT32_MAX;
-        s = 2.0f * modff(phase, &integ) - 1.0f;
+        s = 2.0f * phase - 1.0f;
         s -= polyblep(phase);
 
         // Envelope

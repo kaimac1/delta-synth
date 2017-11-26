@@ -28,6 +28,7 @@ stm32/hal/Src/stm32f4xx_hal_rcc.c \
 stm32/hal/Src/stm32f4xx_hal_uart.c \
 stm32/hal/Src/stm32f4xx_hal_usart.c \
 stm32/hal/Src/stm32f4xx_hal_spi.c \
+stm32/hal/Src/stm32f4xx_ll_tim.c \
 stm32/hal/Src/stm32f4xx_ll_usart.c \
 board/uart.c \
 board/input.c \
@@ -69,6 +70,7 @@ MCU = -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard
 # C defines
 C_DEFS =  \
 -DUSE_HAL_DRIVER \
+-DUSE_FULL_LL_DRIVER \
 -DSTM32F401xC
 
 ASFLAGS = $(MCU) $(OPT) -Wall -fdata-sections -ffunction-sections
@@ -92,8 +94,7 @@ LDSCRIPT = STM32F401VCTx_FLASH.ld
 # libraries
 LIBS = -lc -lm -lnosys
 #LIBDIR = lib/libPDMFilter_CM4F_GCC.a
-LDFLAGS = $(MCU) -specs=nano.specs -T$(LDSCRIPT) $(LIBS) -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--cref -Wl,--gc-sections 
-# -u _printf_float
+LDFLAGS = $(MCU) -specs=nano.specs -T$(LDSCRIPT) $(LIBS) -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--cref -Wl,--gc-sections  -u _printf_float
 
 
 OBJECTS = $(addprefix $(BUILD_DIR)/,$(notdir $(C_SOURCES:.c=.o)))

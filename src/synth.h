@@ -40,6 +40,7 @@ typedef struct {
 extern SynthConfig cfg;
 extern SynthConfig cfgnew;
 
+extern uint32_t loop_time;
 
 void synth_start(void);
 

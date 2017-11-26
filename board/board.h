@@ -1,5 +1,6 @@
 #pragma once
 #include "main.h"
+#include "stm32f401_discovery.h"
 
 extern UART_HandleTypeDef h_uart_debug;
 extern UART_HandleTypeDef h_uart_midi;

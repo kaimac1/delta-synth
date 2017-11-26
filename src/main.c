@@ -1,9 +1,16 @@
 #include "main.h"
 #include "notes.h"
+#include "stm32f401_discovery.h"
+#include "stm32f401_discovery_audio.h"
+#include "board.h"
+#include "synth.h"
+
+#include "stm32f4xx_ll_tim.h"
 
 void SystemClock_Config(void);
 
 ControllerConfig ctrlcfg;
+
 
 /******************************************************************************/
 int main(void) { 
@@ -20,13 +27,26 @@ int main(void) {
 
     gen_note_table();
 
+    __HAL_RCC_TIM2_CLK_ENABLE();
+    LL_TIM_InitTypeDef tim;
+    tim.Prescaler = (SystemCoreClock / 1000000) - 1;
+    tim.CounterMode = LL_TIM_COUNTERMODE_UP;
+    tim.Autoreload = UINT32_MAX;
+    tim.ClockDivision = 0;
+    tim.RepetitionCounter = 0;
+    LL_TIM_Init(TIM2, &tim);
+    LL_TIM_EnableCounter(TIM2);
+
+
+
+
     synth_start();
 
     char inchar;
 
     cfgnew.freq = note[69];
     cfgnew.key = true;
-    cfgnew.osc_wave = WAVE_SQUARE;
+    cfgnew.osc_wave = WAVE_SAW;
 
     bool start_sweep = false;
 
@@ -40,6 +60,7 @@ int main(void) {
                 case 's': start_sweep = true; break;
             }
         }
+        printf("%d\r\n", loop_time);
 
         if (start_sweep) {
             cfgnew.key = true;

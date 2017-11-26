@@ -1,5 +1,6 @@
 #include "main.h"
 #include "notes.h"
+#include "synth.h"
 
 #define CONTROLLER_1    0x0E
 #define CONTROLLER_2    0x0F
@@ -36,10 +37,10 @@ void midi_process_command(void) {
 
         // Note on
         case 0x90:
-            if (command[1] == 36) { // pad 1 - toggle waveform
-                cfgnew.osc_wave = (cfgnew.osc_wave == WAVE_SINE) ? WAVE_SQUARE : WAVE_SINE;
-                break;
-            }
+            // if (command[1] == 36) { // pad 1 - toggle waveform
+            //     cfgnew.osc_wave = (cfgnew.osc_wave == WAVE_SINE) ? WAVE_SQUARE : WAVE_SINE;
+            //     break;
+            // }
             if (note[command[1]] != cfg.freq) {
                 cfgnew.env_retrigger = true;
             }

@@ -1,5 +1,7 @@
 #include "main.h"
 #include "stm32f4xx_it.h"
+#include "stm32f401_discovery.h"
+#include "stm32f401_discovery_audio.h"
 
 extern I2S_HandleTypeDef       hAudioOutI2s;
 extern I2S_HandleTypeDef       hAudioInI2s;

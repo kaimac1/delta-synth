@@ -1,6 +1,10 @@
 #include "synth.h"
+#include "board.h"
+#include "stm32f401_discovery.h"
+#include "stm32f401_discovery_audio.h"
 #include <math.h>
 #include <string.h>
+#include "stm32f4xx_ll_tim.h"
 #define PI 3.1415926f
 
 #define ENV_OVERSHOOT 0.05f
@@ -12,6 +16,8 @@ uint32_t nco_phase;
 float env = 0.0;
 EnvState env_state;
 float env_curve;
+
+uint32_t loop_time;
 
 // Output buffer
 #define OUT_BUFFER_SAMPLES 512
@@ -51,12 +57,6 @@ void BSP_AUDIO_OUT_TransferComplete_CallBack(void) {
         env_state = ENV_RELEASE;
     }
 
-    // TODO: move out of here
-    // convert from time to rate
-    //cfg.attack  = 1.0 - exp(env_curve / (cfg.attack * SAMPLE_RATE));
-    cfg.decay   = 1.0 - exp(env_curve / (cfg.decay * SAMPLE_RATE));
-    cfg.release = 1.0 - exp(env_curve / (cfg.release * SAMPLE_RATE));
-
     fill_buffer();
 
 }
@@ -71,29 +71,42 @@ void create_wave_tables(void) {
     }
 }
 
+float polyblep(float t) {
+    float dt = (float)cfg.freq / UINT32_MAX; // 0-1
+    float integ;
+    t = modff(t, &integ);
+    if (t < dt) {
+        t /= dt;
+        return t + t - t*t - 1.0f;
+    } else if (t > 1.0f - dt) {
+        t = (t - 1.0f)/dt;
+        return t*t + t + t + 1.0f;
+    } else {
+        return 0.0f;
+    }
+}
 
 
 void fill_buffer(void) {
 
-    uint32_t start = HAL_GetTick();
-    int16_t s;
-    int idx;
+    uint32_t start = LL_TIM_GetCounter(TIM2);
 
-    BSP_LED_On(LED3);
+    // TODO: move out of here
+    // convert from time to rate
+    //cfg.attack  = 1.0 - exp(env_curve / (cfg.attack * SAMPLE_RATE));
+    cfg.decay   = 1.0 - exp(env_curve / (cfg.decay * SAMPLE_RATE));
+    cfg.release = 1.0 - exp(env_curve / (cfg.release * SAMPLE_RATE));    
+    
+    float s;
+    float integ;
 
     for (int i=0; i<OUT_BUFFER_SAMPLES; i += 2) {
         
         // Oscillator
         nco_phase += cfg.freq;
-        idx = nco_phase >> (32 - SINE_TABLE_WIDTH);
-
-        if (cfg.osc_wave == WAVE_SINE) {
-            s = sine_table[idx]; 
-        } else if (cfg.osc_wave == WAVE_SQUARE) {
-            s = (nco_phase < UINT32_MAX/2) ? 10000 : -10000;
-        } else {
-            s = 0;
-        }
+        float phase = (float)nco_phase / UINT32_MAX;
+        s = 2.0f * modff(phase, &integ) - 1.0f;
+        s -= polyblep(phase);
 
         // Envelope
         if (cfg.key) {
@@ -158,15 +171,14 @@ void fill_buffer(void) {
         z4 = s + v;
 
 
-        
+        int16_t s16 = s * 10000;
 
-        out_buffer[i] = s;   // left
-        out_buffer[i+1] = s; // right
+        out_buffer[i] = s16;   // left
+        out_buffer[i+1] = s16; // right
     }
 
-    BSP_LED_Off(LED3);
+    loop_time = LL_TIM_GetCounter(TIM2) - start;
 
-    //printf("%lu\r\n", HAL_GetTick() - start);
 }
 
 
@@ -180,7 +192,7 @@ void synth_start(void) {
     cfg.decay = 0.005;
     cfg.sustain = 1.0;
     cfg.release = 0.0005;
-    cfg.cutoff = 2000.0;
+    cfg.cutoff = 10000.0;
     cfg.resonance = 0.0;
     cfg.env_mod = 0.0;
     env_state = ENV_RELEASE;

@@ -1,13 +1,8 @@
-#ifndef __MAIN_H
-#define __MAIN_H
+#pragma once
 
-/* Includes ------------------------------------------------------------------*/
+#include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include "stm32f401_discovery.h"
-#include "stm32f401_discovery_audio.h"
-#include "synth.h"
-#include "board.h"
 
 typedef enum {
 	CTRL_MAIN,
@@ -16,5 +11,3 @@ typedef enum {
 } ControllerConfig;
 extern ControllerConfig ctrlcfg;
 
-
-#endif /* __MAIN_H */

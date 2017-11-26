@@ -1,4 +1,5 @@
 #include "main.h"
+#include "synth.h"
 
 uint32_t note[128];
 

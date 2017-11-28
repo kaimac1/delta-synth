@@ -1,6 +1,7 @@
 #include "main.h"
 #include "notes.h"
 #include "synth.h"
+#include <math.h>
 
 #define CONTROLLER_1    0x0E
 #define CONTROLLER_2    0x0F
@@ -74,12 +75,13 @@ void midi_process_command(void) {
                         // Attack
                         case CONTROLLER_1:
                             cfgnew.attack = (command[2] + 1) * 0.005;
+                            //cfg.attack  = 1.0 - exp(env_curve / (cfg.attack * SAMPLE_RATE));
                             //printf("attack = %f\r\n", cfgnew.attack);
                             break;
 
                         // Decay
                         case CONTROLLER_2:
-                            cfgnew.decay = (command[2] + 1) * 0.005;
+                            cfgnew.decay   = 1.0 - exp(cfgnew.env_curve / ((command[2] + 1) * 0.005f * SAMPLE_RATE));
                             //printf("decay = %f\r\n", cfgnew.decay);
                             break;
 
@@ -91,7 +93,7 @@ void midi_process_command(void) {
 
                         // Release
                         case CONTROLLER_4:
-                            cfgnew.release = (command[2] + 1) * 0.005;
+                            cfgnew.release = 1.0 - exp(cfgnew.env_curve / ((command[2] + 1) * 0.005f * SAMPLE_RATE));
                             //printf("release = %f\r\n", cfgnew.release);
                             break;
                     }

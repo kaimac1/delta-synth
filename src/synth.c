@@ -15,8 +15,8 @@ SynthConfig cfg;
 uint32_t nco_phase;
 float env = 0.0;
 EnvState env_state;
-float env_curve;
 
+uint32_t start_time;
 uint32_t loop_time;
 
 // Output buffer
@@ -46,6 +46,8 @@ void BSP_AUDIO_OUT_TransferComplete_CallBack(void) {
     BSP_AUDIO_OUT_ChangeBuffer(out_buffer, OUT_BUFFER_SAMPLES);
     out_buffer = (out_buffer == out_buffer_1) ? out_buffer_2 : out_buffer_1;
 
+    start_time = LL_TIM_GetCounter(TIM2);
+
     // Copy new settings: cfgnew -> cfg
     if (cfgnew.volume != cfg.volume) {
         BSP_AUDIO_OUT_SetVolume(cfgnew.volume);
@@ -58,6 +60,7 @@ void BSP_AUDIO_OUT_TransferComplete_CallBack(void) {
     }
 
     fill_buffer();
+    loop_time = LL_TIM_GetCounter(TIM2) - start_time;
 
 }
 
@@ -87,14 +90,6 @@ inline float polyblep(float t) {
 
 void fill_buffer(void) {
 
-    uint32_t start = LL_TIM_GetCounter(TIM2);
-
-    // TODO: move out of here
-    // convert from time to rate
-    //cfg.attack  = 1.0 - exp(env_curve / (cfg.attack * SAMPLE_RATE));
-    cfg.decay   = 1.0 - exp(env_curve / (cfg.decay * SAMPLE_RATE));
-    cfg.release = 1.0 - exp(env_curve / (cfg.release * SAMPLE_RATE));    
-    
     float s;
 
     for (int i=0; i<OUT_BUFFER_SAMPLES; i += 2) {
@@ -140,11 +135,12 @@ void fill_buffer(void) {
         // Filter
         float fc = cfg.cutoff + cfg.env_mod * env;
         float a = PI * fc/SAMPLE_RATE;
-        float g = a/(1.0f + a);
+        float ria = 1.0f / (1.0f + a);
+        float g = a * ria;
 
         float bigG = g*g*g*g;
         float bigS = g*g*g*z1 + g*g*z2 + g*z3 + z4;
-        bigS = bigS / (1.0f + a);
+        bigS = bigS * ria;
 
         float v;
         // zero-delay resonance feedback
@@ -174,15 +170,13 @@ void fill_buffer(void) {
         out_buffer[i+1] = s16; // right
     }
 
-    loop_time = LL_TIM_GetCounter(TIM2) - start;
-
 }
 
 
 void synth_start(void) {
 
     // Initial config
-    cfg.volume = 50;
+    cfg.volume = 55;
     cfg.freq = 261.13 / SAMPLE_RATE * UINT32_MAX;
     cfg.osc_wave = WAVE_SINE;
     cfg.attack = 0.0005;
@@ -192,10 +186,9 @@ void synth_start(void) {
     cfg.cutoff = 10000.0;
     cfg.resonance = 0.0;
     cfg.env_mod = 0.0;
+    cfg.env_curve = -log((1 + ENV_OVERSHOOT) / ENV_OVERSHOOT);
     env_state = ENV_RELEASE;
     memcpy(&cfgnew, &cfg, sizeof(SynthConfig));
-
-    env_curve = -log((1 + ENV_OVERSHOOT) / ENV_OVERSHOOT);
 
     create_wave_tables();
     fill_buffer();

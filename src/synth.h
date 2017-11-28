@@ -28,6 +28,7 @@ typedef struct {
     float decay;	// seconds
     float sustain;	// 0-1
     float release;	// seconds
+    float env_curve;
     bool env_retrigger;
 
     // Filter

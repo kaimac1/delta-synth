@@ -37,9 +37,6 @@ int main(void) {
     LL_TIM_Init(TIM2, &tim);
     LL_TIM_EnableCounter(TIM2);
 
-
-
-
     synth_start();
 
     char inchar;
@@ -48,30 +45,35 @@ int main(void) {
     cfgnew.key = true;
     cfgnew.osc_wave = WAVE_SAW;
 
-    bool start_sweep = false;
-
     while (1) {
         if (HAL_UART_Receive(&h_uart_debug, (uint8_t*)&inchar, 1, 100) == HAL_OK) {
             switch (inchar) {
+                // Controller pages
                 case '1': ctrlcfg = CTRL_MAIN; printf("MAIN\r\n"); break;
                 case '2': ctrlcfg = CTRL_ENVELOPE; printf("ENVELOPE\r\n"); break;
                 case '3': ctrlcfg = CTRL_FILTER; printf("FILTER\r\n"); break;
 
-                case 's': start_sweep = true; break;
-            }
-        }
-        printf("%d\r\n", loop_time);
+                // Legato
+                case 'l': cfgnew.legato ^= 1; break;
+                // arpeggio
+                case 'a':
+                    cfgnew.arp++;
+                    cfgnew.arp %= 4;
+                    printf("arp=%d\r\n", cfgnew.arp);
+                    break;
+                // sync
+                case 's':
+                    cfgnew.sync ^= 1; break;
 
-        if (start_sweep) {
-            cfgnew.key = true;
-            cfgnew.freq = 20.0f / SAMPLE_RATE * UINT32_MAX;
-            while (cfgnew.freq < (15000.0f / SAMPLE_RATE * UINT32_MAX)) {
-                cfgnew.freq *= 1.001f;
-                HAL_Delay(5);
             }
-            printf("done.\r\n");
-            start_sweep = false;
         }
+
+        // printf("***\r\n");
+        // for (int i=0; i<MAX_ARP; i++) {
+        //     printf("arp[%d] = %lu\r\n", i, cfgnew.arp_freqs[i]);
+        // }
+
+        printf("%lu\r\n", loop_time);
     }
   
 }

@@ -32,17 +32,54 @@ void midi_process_byte(uint8_t byte) {
     
 }
 
+void arp_add(uint32_t freq) {
+
+    cfgnew.busy = true;
+    for (int i=0; i<MAX_ARP; i++) {
+        if (cfgnew.arp_freqs[i] > freq) {
+            for (int j=MAX_ARP-2; j>=i; j--) {
+                cfgnew.arp_freqs[j+1] = cfgnew.arp_freqs[j];
+            }
+            cfgnew.arp_freqs[i] = freq;
+            break;
+        }
+        if (cfgnew.arp_freqs[i] == 0) {
+            cfgnew.arp_freqs[i] = freq;
+            break;
+        }
+    }
+    cfgnew.busy = false;
+
+}
+
+void arp_del(uint32_t freq) {
+
+    cfgnew.busy = true;
+    for (int i=0; i<MAX_ARP; i++) {
+        if (cfgnew.arp_freqs[i] == freq) {
+            for (int j=i; j<MAX_ARP-1; j++) {
+                cfgnew.arp_freqs[j] = cfgnew.arp_freqs[j+1];
+            }
+            cfgnew.arp_freqs[MAX_ARP-1] = 0;
+            break;
+        }
+    }
+    cfgnew.busy = false;
+
+}
+
 void midi_process_command(void) {
 
     switch(command[0]) {
 
         // Note on
         case 0x90:
-            // if (command[1] == 36) { // pad 1 - toggle waveform
-            //     cfgnew.osc_wave = (cfgnew.osc_wave == WAVE_SINE) ? WAVE_SQUARE : WAVE_SINE;
-            //     break;
-            // }
-            if (note[command[1]] != cfg.freq) {
+            if (cfgnew.arp != ARP_OFF) {
+                arp_add(note[command[1]]);
+                break;
+            }
+            // Retrigger on new note in normal mode
+            if (!cfgnew.legato && (note[command[1]] != cfg.freq)) {
                 cfgnew.env_retrigger = true;
             }
             cfgnew.freq = note[command[1]];
@@ -51,6 +88,10 @@ void midi_process_command(void) {
 
         // Note off
         case 0x80:
+            if (cfgnew.arp != ARP_OFF) {
+                arp_del(note[command[1]]);
+                break;
+            }
             if (note[command[1]] == cfgnew.freq) {
                 cfgnew.key = false;
             }
@@ -65,6 +106,16 @@ void midi_process_command(void) {
                         case CONTROLLER_1:
                             cfgnew.volume = 100 * (float)(command[2]) / 0x7F;
                             printf("volume = %d\r\n", cfgnew.volume);
+                            break;
+
+                        case CONTROLLER_2:
+                            cfgnew.tempo = 160 * (float)(command[2]) / 0x7F;
+                            printf("tempo = %d\r\n", cfgnew.tempo);
+                            break;
+
+                        case CONTROLLER_3:
+                            cfgnew.detune = 1.0f + 1.5f * (float)(command[2]) / 0x7F;
+                            printf("detune = %f\r\n", cfgnew.detune);
                             break;
                     }
                     break;
@@ -104,19 +155,16 @@ void midi_process_command(void) {
                         // Cutoff
                         case CONTROLLER_1:
                             cfgnew.cutoff = 10000.0f * (float)(command[2]) / 0x7F;
-                            //printf("fc = %.1f\r\n", cfgnew.cutoff);
                             break;
 
                         // Resonance
                         case CONTROLLER_2:
                             cfgnew.resonance = 3.99f * (float)(command[2]) / 0x7F;
-                            //printf("k = %.3f\r\n", cfgnew.resonance);
                             break;
 
                         // Env mod
                         case CONTROLLER_3:
                             cfgnew.env_mod = 5000.0f * (float)(command[2]) / 0x7F;
-                            //printf("envmod = %.1f\r\n", cfgnew.envmod);
                             break;
                     }
                     break;                    

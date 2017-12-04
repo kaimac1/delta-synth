@@ -5,6 +5,7 @@
 #include <math.h>
 #include <string.h>
 #include "stm32f4xx_ll_tim.h"
+#include "notes.h"
 #define PI 3.1415926f
 
 #define ENV_OVERSHOOT 0.05f
@@ -12,7 +13,7 @@
 SynthConfig cfgnew;
 SynthConfig cfg;
 
-uint32_t nco_phase;
+uint32_t nco1, nco2;
 float env = 0.0;
 EnvState env_state;
 
@@ -30,7 +31,11 @@ uint16_t *out_buffer = out_buffer_1;
 #define SINE_TABLE_SIZE (1<<SINE_TABLE_WIDTH)
 int16_t sine_table[SINE_TABLE_SIZE];
 
-void fill_buffer(void);
+inline void sequencer_update(void);
+inline void fill_buffer(void);
+
+uint32_t next_beat = 0;
+int arp_note = 0;
 
 
 // filter state
@@ -49,33 +54,58 @@ void BSP_AUDIO_OUT_TransferComplete_CallBack(void) {
     start_time = LL_TIM_GetCounter(TIM2);
 
     // Copy new settings: cfgnew -> cfg
-    if (cfgnew.volume != cfg.volume) {
-        BSP_AUDIO_OUT_SetVolume(cfgnew.volume);
-    }
-    memcpy(&cfg, &cfgnew, sizeof(SynthConfig));
-    if (cfg.env_retrigger) {
-        cfgnew.env_retrigger = false;
-        cfg.env_retrigger = false;
-        env_state = ENV_RELEASE;
+    if (!cfgnew.busy) {
+
+        // Volume level changed
+        if (cfgnew.volume != cfg.volume) {
+            BSP_AUDIO_OUT_SetVolume(cfgnew.volume);
+        }
+
+        // 
+
+
+        memcpy(&cfg, &cfgnew, sizeof(SynthConfig));
+        if (cfg.env_retrigger) {
+            cfgnew.env_retrigger = false;
+            cfg.env_retrigger = false;
+            env_state = ENV_RELEASE;
+        }
     }
 
+    sequencer_update();
     fill_buffer();
     loop_time = LL_TIM_GetCounter(TIM2) - start_time;
 
+    BSP_LED_Off(LED3);
+
 }
 
+inline void sequencer_update(void) {
 
-void create_wave_tables(void) {
+    if (start_time > next_beat) {
+        BSP_LED_On(LED3);
+        next_beat += 15000000/cfg.tempo;
 
-    // Sine
-    for (int i=0; i<SINE_TABLE_SIZE; i++) {
-        float arg = 2*PI*i / SINE_TABLE_SIZE;
-        sine_table[i] = (int16_t)(sin(arg) * 32768);
+
+        if (cfg.arp) {
+            env_state = ENV_RELEASE;
+            arp_note++;
+            if ((arp_note == MAX_ARP) || (cfg.arp_freqs[arp_note] == 0)) arp_note = 0;           
+        }
     }
+
+    if (cfg.arp) {
+        cfg.key = true;
+        cfg.freq = cfg.arp_freqs[arp_note];
+    }
+
+
 }
 
-inline float polyblep(float t) {
-    float dt = (float)cfg.freq / UINT32_MAX; // 0-1
+
+
+inline float polyblep(float t, float f) {
+    float dt = f / UINT32_MAX; // 0-1
     if (t < dt) {
         t /= dt;
         return t + t - t*t - 1.0f;
@@ -88,17 +118,31 @@ inline float polyblep(float t) {
 }
 
 
-void fill_buffer(void) {
+inline void fill_buffer(void) {
 
     float s;
+    float phase;
+    float s1, s2;
 
     for (int i=0; i<OUT_BUFFER_SAMPLES; i += 2) {
         
         // Oscillator
-        nco_phase += cfg.freq;
-        float phase = (float)nco_phase / UINT32_MAX;
-        s = 2.0f * phase - 1.0f;
-        s -= polyblep(phase);
+        uint32_t old_nco1 = nco1;
+        nco1 += cfg.freq;
+        if (cfg.sync && nco1 < old_nco1) nco2 = 0;
+        phase = (float)nco1 / UINT32_MAX;
+        s1 = 2.0f * phase - 1.0f;
+        s1 -= polyblep(phase, (float)cfg.freq);
+
+        uint32_t freq2 = (uint32_t)(cfg.detune * (float)(cfg.freq));
+
+        nco2 += freq2;
+        phase = (float)nco2 / UINT32_MAX;
+        s2 = 2.0f * phase - 1.0f;
+        s2 -= polyblep(phase, (float)freq2);
+
+        s = (s1 + s2) / 2.0f;
+
 
         // Envelope
         if (cfg.key) {
@@ -173,17 +217,41 @@ void fill_buffer(void) {
 }
 
 
+void create_wave_tables(void) {
+
+    // Sine
+    for (int i=0; i<SINE_TABLE_SIZE; i++) {
+        float arg = 2*PI*i / SINE_TABLE_SIZE;
+        sine_table[i] = (int16_t)(sin(arg) * 32768);
+    }
+}
+
+
 void synth_start(void) {
 
     // Initial config
-    cfg.volume = 55;
-    cfg.freq = 261.13 / SAMPLE_RATE * UINT32_MAX;
+    cfg.busy    = false;
+    cfg.volume  = 55;
     cfg.osc_wave = WAVE_SINE;
-    cfg.attack = 0.0005;
-    cfg.decay = 0.005;
+    cfg.legato  = false;
+    cfg.arp     = ARP_OFF;
+    cfg.arp_rate = 0.0f;
+    cfg.arp_freqs[0] = 0;
+    cfg.arp_freqs[1] = 0;
+    cfg.arp_freqs[2] = 0;
+    cfg.arp_freqs[3] = 0;
+    cfg.arp_freqs[4] = 0;
+
+    cfg.tempo = 120;
+    cfg.detune = 1.0f;
+    cfg.sync = false;
+
+    cfg.attack  = 0.0005;
+    cfg.decay   = 0.005;
     cfg.sustain = 1.0;
     cfg.release = 0.0005;
-    cfg.cutoff = 10000.0;
+    
+    cfg.cutoff  = 10000.0;
     cfg.resonance = 0.0;
     cfg.env_mod = 0.0;
     cfg.env_curve = -log((1 + ENV_OVERSHOOT) / ENV_OVERSHOOT);

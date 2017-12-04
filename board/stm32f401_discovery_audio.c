@@ -182,7 +182,6 @@ I2S_HandleTypeDef                 hAudioOutI2s;
 /*### RECORDER ###*/
 I2S_HandleTypeDef                 hAudioInI2s;
 
-PDMFilter_InitStruct Filter[DEFAULT_AUDIO_IN_CHANNEL_NBR];
 __IO uint16_t AudioInVolume = DEFAULT_AUDIO_IN_VOLUME;
 /**
   * @}
@@ -193,7 +192,6 @@ __IO uint16_t AudioInVolume = DEFAULT_AUDIO_IN_VOLUME;
   */ 
 static uint8_t I2S3_Init(uint32_t AudioFreq);
 static uint8_t I2S2_Init(uint32_t AudioFreq);
-static void PDMDecoder_Init(uint32_t AudioFreq, uint32_t ChnlNbr);
 /**
   * @}
   */ 
@@ -705,10 +703,7 @@ uint8_t BSP_AUDIO_IN_Init(uint32_t AudioFreq, uint32_t BitRes, uint32_t ChnlNbr)
   /* Configure PLL clock */ 
   BSP_AUDIO_IN_ClockConfig(&hAudioInI2s, AudioFreq, NULL);
   
-  /* Configure the PDM library */
-  PDMDecoder_Init(AudioFreq, ChnlNbr);
-
-  /* Configure the I2S peripheral */
+    /* Configure the I2S peripheral */
   hAudioInI2s.Instance = I2S2;
   if(HAL_I2S_GetState(&hAudioInI2s) == HAL_I2S_STATE_RESET)
   { 
@@ -798,39 +793,6 @@ uint8_t BSP_AUDIO_IN_SetVolume(uint8_t Volume)
   
   /* Return AUDIO_OK when all operations are correctly done */
   return AUDIO_OK;
-}
-
-/**
-  * @brief  Converts audio format from PDM to PCM. 
-  * @param  PDMBuf: Pointer to data PDM buffer
-  * @param  PCMBuf: Pointer to data PCM buffer
-  * @retval AUDIO_OK if correct communication, else wrong communication
-  */
-uint8_t BSP_AUDIO_IN_PDMToPCM(uint16_t *PDMBuf, uint16_t *PCMBuf)
-{
-  uint16_t AppPDM[INTERNAL_BUFF_SIZE/2];
-  uint32_t index = 0; 
-  
-  /* PDM Demux */
-  for(index = 0; index<INTERNAL_BUFF_SIZE/2; index++)
-  {
-    AppPDM[index] = HTONS(PDMBuf[index]);
-  }
-  
-  for(index = 0; index < DEFAULT_AUDIO_IN_CHANNEL_NBR; index++)
-  {
-    /* PDM to PCM filter */
-    PDM_Filter_64_LSB((uint8_t*)&AppPDM[index], (uint16_t*)&(PCMBuf[index]), AudioInVolume , (PDMFilter_InitStruct *)&Filter[index]);
-  }
-  
-  /* Duplicate samples since a single microphone in mounted on STM32F4-Discovery */
-  for(index = 0; index < PCM_OUT_SIZE; index++)
-  {
-    PCMBuf[(index<<1)+1] = PCMBuf[index<<1];
-  }
-	
-  /* Return AUDIO_OK when all operations are correctly done */
-  return AUDIO_OK; 
 }
 
 /**
@@ -1023,32 +985,6 @@ __weak void BSP_AUDIO_IN_Error_Callback(void)
 /*******************************************************************************
                             Static Functions
 *******************************************************************************/
-
-/**
-  * @brief  Initialize the PDM library.
-  * @param  AudioFreq: Audio sampling frequency
-  * @param  ChnlNbr: Number of audio channels (1: mono; 2: stereo)
-  */
-static void PDMDecoder_Init(uint32_t AudioFreq, uint32_t ChnlNbr)
-{ 
-  uint32_t i = 0;
-  
-  /* Enable CRC peripheral to unlock the PDM library */
-  __CRC_CLK_ENABLE();
-  
-  for(i = 0; i < ChnlNbr; i++)
-  {
-    /* Filter LP & HP Init */
-    Filter[i].LP_HZ = AudioFreq / 2;
-    Filter[i].HP_HZ = 10;
-    Filter[i].Fs = AudioFreq;
-		/* On STM32F401-Discovery a single microphone is mounted, samples are duplicated
-       to make stereo audio streams */
-    Filter[i].Out_MicChannels = 2;
-    Filter[i].In_MicChannels = ChnlNbr; 
-    PDM_Filter_Init((PDMFilter_InitStruct *)&Filter[i]);
-  }  
-}
 
 /**
   * @brief  Initializes the Audio Codec audio interface (I2S)

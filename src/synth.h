@@ -14,7 +14,7 @@ typedef enum {
     WAVE_SINE,
     WAVE_SQUARE,
     WAVE_SAW
-} WaveformType;
+} Wave;
 
 typedef enum {
     ARP_OFF,
@@ -26,33 +26,35 @@ typedef enum {
 #define MAX_ARP 5
 
 typedef struct {
-    bool busy;
-	uint8_t volume; // 0-100
-    uint32_t freq;
-    bool key;
-    WaveformType osc_wave;
+    bool busy;          // config being updated, don't copy
+
+    uint8_t volume;     // 0-100
     bool legato;
 
-    uint32_t arp_freqs[MAX_ARP];
-    ArpMode arp;
-    float arp_rate;
+    // Sequencer
+    ArpMode arp;        // arpeggio mode
+    uint32_t arp_freqs[MAX_ARP]; // arp notes, normalised
+    int tempo;          // bpm
 
-    int tempo;
-    float detune;
-    bool sync;
+    // Oscillators
+    uint32_t freq;      // normalised (max=fs/2)
+    Wave osc_wave;      // waveform
+    bool sync;          // osc2 sync to master?
+    float detune;       // fraction of master freq.
 
     // ADSR 
-    float attack;	// seconds
-    float decay;	// seconds
-    float sustain;	// 0-1
-    float release;	// seconds
-    float env_curve;
-    bool env_retrigger;
+    bool key;           // key down?
+    float attack;	    // seconds
+    float decay;        // seconds
+    float sustain;      // 0-1
+    float release;      // seconds
+    float env_curve;    // linearity
+    bool env_retrigger; // retrigger now?
 
     // Filter
-    float cutoff;
-    float resonance;
-    float env_mod;
+    float cutoff;       // Hz
+    float resonance;    // 0-4
+    float env_mod;      // Hz at max env
 
 } SynthConfig;
 

@@ -115,7 +115,7 @@ void midi_process_command(void) {
 
                         case CONTROLLER_3:
                             cfgnew.detune = 1.0f + 1.5f * (float)(command[2]) / 0x7F;
-                            printf("detune = %f\r\n", cfgnew.detune);
+                            //printf("detune = %f\r\n", cfgnew.detune);
                             break;
                     }
                     break;

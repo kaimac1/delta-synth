@@ -30,8 +30,12 @@ stm32/hal/Src/stm32f4xx_hal_usart.c \
 stm32/hal/Src/stm32f4xx_hal_spi.c \
 stm32/hal/Src/stm32f4xx_ll_tim.c \
 stm32/hal/Src/stm32f4xx_ll_usart.c \
+stm32/hal/Src/stm32f4xx_ll_gpio.c \
+stm32/hal/Src/stm32f4xx_ll_spi.c \
 board/uart.c \
+board/gpio.c \
 board/input.c \
+board/display.c \
 board/stm32f401_discovery.c \
 board/stm32f401_discovery_audio.c \
 board/cs43l22/cs43l22.c \

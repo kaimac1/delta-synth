@@ -1,7 +1,4 @@
-#ifndef __STM32F4xx_IT_H
-#define __STM32F4xx_IT_H
-
-#include "main.h"
+#pragma once
    
 void NMI_Handler(void);
 void HardFault_Handler(void);
@@ -16,6 +13,3 @@ void EXTI0_IRQHandler(void);
 void EXTI4_IRQHandler(void);
 void I2S3_IRQHandler(void);
 void I2S2_IRQHandler(void);
-
-
-#endif /* __STM32F4xx_IT_H */

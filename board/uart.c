@@ -11,8 +11,6 @@ void HAL_UART_MspInit(UART_HandleTypeDef *huart) {
 
     GPIO_InitTypeDef  GPIO_InitStruct;
 
-    __HAL_RCC_GPIOA_CLK_ENABLE();
-
     if (huart == &h_uart_debug) {
         __HAL_RCC_USART2_CLK_ENABLE();
 

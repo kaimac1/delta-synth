@@ -4,7 +4,6 @@
 #include "stm32f401_discovery_audio.h"
 
 extern I2S_HandleTypeDef       hAudioOutI2s;
-extern I2S_HandleTypeDef       hAudioInI2s;
 
 void NMI_Handler(void) {}
 
@@ -38,14 +37,6 @@ void SysTick_Handler(void) {
 }
 
 
-
-
-
 void I2S3_IRQHandler(void) { 
   HAL_DMA_IRQHandler(hAudioOutI2s.hdmatx);
 }
-
-void I2S2_IRQHandler(void) {
-  HAL_DMA_IRQHandler(hAudioInI2s.hdmarx);
-}
-

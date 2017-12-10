@@ -3,6 +3,9 @@
 #include "stm32f4xx_ll_gpio.h"
 #include "stm32f4xx_ll_spi.h"
 
+#define _swap_int16_t(a, b) { int16_t t = a; a = b; b = t; }
+#define abs(x) (((x) > 0) ? (x) : (-(x)))
+
 void display_reset(void);
 
 #define DISPLAY_SPI SPI1
@@ -69,17 +72,17 @@ void writeData(uint8_t c) {
     for (int i=0; i<16; i++) asm("nop");
 } 
 
-void goTo(int x, int y) {
-  if ((x >= SSD1351WIDTH) || (y >= SSD1351HEIGHT)) return;
-  
-  // set x and y coordinate
-  writeCommand(SSD1351_CMD_SETCOLUMN);
-  writeData(x);
-  writeData(SSD1351WIDTH-1);
-  writeCommand(SSD1351_CMD_SETROW);
-  writeData(y);
-  writeData(SSD1351HEIGHT-1);
-  writeCommand(SSD1351_CMD_WRITERAM);  
+
+void set_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
+
+    writeCommand(SSD1351_CMD_SETCOLUMN);
+    writeData(x);
+    writeData(x+w-1);
+    writeCommand(SSD1351_CMD_SETROW);
+    writeData(y);
+    writeData(y+h-1);
+    writeCommand(SSD1351_CMD_WRITERAM);
+
 }
 
 // uint16_t Adafruit_SSD1351::Color565(uint8_t r, uint8_t g, uint8_t b) {
@@ -93,42 +96,21 @@ void goTo(int x, int y) {
 //   return c;
 // }
 
-// void Adafruit_SSD1351::fillScreen(uint16_t fillcolor) {
-//   fillRect(0, 0, SSD1351WIDTH, SSD1351HEIGHT, fillcolor);
-// }
 
-// Draw a filled rectangle with no rotation.
 void display_fillrect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t fillcolor) {
-    // Bounds check
-    if ((x >= SSD1351WIDTH) || (y >= SSD1351HEIGHT))
-        return;
 
-    // Y bounds check
-    if (y+h > SSD1351HEIGHT)
-    {
+    if ((x >= SSD1351WIDTH) || (y >= SSD1351HEIGHT)) return;
+    if (y+h > SSD1351HEIGHT) {
         h = SSD1351HEIGHT - y - 1;
     }
-
-    // X bounds check
-    if (x+w > SSD1351WIDTH)
-    {
+    if (x+w > SSD1351WIDTH) {
         w = SSD1351WIDTH - x - 1;
     }
-  
-    writeCommand(SSD1351_CMD_SETCOLUMN);
-    writeData(x);
-    writeData(x+w-1);
-    writeCommand(SSD1351_CMD_SETROW);
-    writeData(y);
-    writeData(y+h-1);
-    writeCommand(SSD1351_CMD_WRITERAM);  
 
+    set_rect(x, y, w, h);
     LL_GPIO_SetOutputPin(DC_PORT, DC_PIN);
 
     for (uint16_t i=0; i < w*h; i++) {
-        //writeData(fillcolor >> 8);
-        //writeData(fillcolor);
-        
         DISPLAY_SPI->DR = fillcolor >> 8;
         for (int i=0; i<16; i++) asm("nop");
         DISPLAY_SPI->DR = fillcolor;
@@ -138,14 +120,7 @@ void display_fillrect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t f
 
 void display_write(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t *buffer) {
 
-    writeCommand(SSD1351_CMD_SETCOLUMN);
-    writeData(x);
-    writeData(x+w-1);
-    writeCommand(SSD1351_CMD_SETROW);
-    writeData(y);
-    writeData(y+h-1);
-    writeCommand(SSD1351_CMD_WRITERAM);  
-
+    set_rect(x, y, w, h);
     LL_GPIO_SetOutputPin(DC_PORT, DC_PIN);
 
     for (uint16_t i=0; i < w*h; i++) {
@@ -156,9 +131,57 @@ void display_write(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t *buf
         for (int i=0; i<16; i++) asm("nop");
     }
 
+}
 
+void draw_pixel(uint16_t x, uint16_t y, uint16_t col) {
+
+    set_rect(x, y, 1, 1);
+    writeData(col >> 8);
+    writeData(col);
 
 }
+
+// From Adafruit GFX library
+void draw_line(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t col) {
+
+    int16_t steep = abs(y1 - y0) > abs(x1 - x0);
+    if (steep) {
+        _swap_int16_t(x0, y0);
+        _swap_int16_t(x1, y1);
+    }
+
+    if (x0 > x1) {
+        _swap_int16_t(x0, x1);
+        _swap_int16_t(y0, y1);
+    }
+
+    int16_t dx, dy;
+    dx = x1 - x0;
+    dy = abs(y1 - y0);
+
+    int16_t err = dx / 2;
+    int16_t ystep;
+
+    if (y0 < y1) {
+        ystep = 1;
+    } else {
+        ystep = -1;
+    }
+
+    for (; x0<=x1; x0++) {
+        if (steep) {
+            draw_pixel(y0, x0, col);
+        } else {
+            draw_pixel(x0, y0, col);
+        }
+        err -= dy;
+        if (err < 0) {
+            y0 += ystep;
+            err += dx;
+        }
+    }
+}
+
 
 // // Draw a horizontal line ignoring any screen rotation.
 // void Adafruit_SSD1351::rawFastHLine(int16_t x, int16_t y, int16_t w, uint16_t color) {
@@ -217,54 +240,6 @@ void display_write(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t *buf
 //   for (uint16_t i=0; i < h; i++) {
 //     writeData(color >> 8);
 //     writeData(color);
-//   }
-// }
-
-// void Adafruit_SSD1351::drawFastVLine(int16_t x, int16_t y, int16_t h, uint16_t color) {
-//   // Transform x and y based on current rotation.
-//   switch (getRotation()) {
-//   case 0:  // No rotation
-//     rawFastVLine(x, y, h, color);
-//     break;
-//   case 1:  // Rotated 90 degrees clockwise.
-//     swap(x, y);
-//     x = WIDTH - x - h;
-//     rawFastHLine(x, y, h, color);
-//     break;
-//   case 2:  // Rotated 180 degrees clockwise.
-//     x = WIDTH - x - 1;
-//     y = HEIGHT - y - h;
-//     rawFastVLine(x, y, h, color);
-//     break;
-//   case 3:  // Rotated 270 degrees clockwise.
-//     swap(x, y);
-//     y = HEIGHT - y - 1;
-//     rawFastHLine(x, y, h, color);
-//     break;
-//   }
-// }
-
-// void Adafruit_SSD1351::drawFastHLine(int16_t x, int16_t y, int16_t w, uint16_t color) {
-//   // Transform x and y based on current rotation.
-//   switch (getRotation()) {
-//   case 0:  // No rotation.
-//     rawFastHLine(x, y, w, color);
-//     break;
-//   case 1:  // Rotated 90 degrees clockwise.
-//     swap(x, y);
-//     x = WIDTH - x - 1;
-//     rawFastVLine(x, y, w, color);
-//     break;
-//   case 2:  // Rotated 180 degrees clockwise.
-//     x = WIDTH - x - w;
-//     y = HEIGHT - y - 1;
-//     rawFastHLine(x, y, w, color);
-//     break;
-//   case 3:  // Rotated 270 degrees clockwise.
-//     swap(x, y);
-//     y = HEIGHT - y - w;
-//     rawFastVLine(x, y, w, color);
-//     break;
 //   }
 // }
 

@@ -31,6 +31,8 @@ void read_buttons(void);
 void display_init(void);
 void display_fillrect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t fillcolor);
 void display_write(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t *buffer);
+void draw_pixel(uint16_t x, uint16_t y, uint16_t col);
+void draw_line(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t col);
 
 
 

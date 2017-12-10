@@ -8,8 +8,6 @@
 #include "notes.h"
 #define PI 3.1415926f
 
-#define ENV_OVERSHOOT 0.05f
-
 SynthConfig cfgnew;
 SynthConfig cfg;
 
@@ -37,6 +35,8 @@ inline void sequencer_update(void);
 inline void fill_buffer(void);
 inline float sample_synth(void);
 inline float sample_drums(void);
+
+int etstart;
 
 /******************************************************************************/
 // This ISR is called when the DMA transfer of one buffer (A) completes.
@@ -101,13 +101,22 @@ inline void sequencer_update(void) {
 inline void fill_buffer(void) {
 
     float s;
+    EnvState old;
 
     for (int i=0; i<OUT_BUFFER_SAMPLES; i += 2) {
         
+        old = env_state;
 
         s = sample_synth();
         //s = 0.0f;
         //s += sample_drums();
+
+        if (old == ENV_ATTACK && env_state == ENV_DECAY) {
+            etstart = LL_TIM_GetCounter(TIM2);
+        }
+        if (old == ENV_DECAY && env_state == ENV_SUSTAIN) {
+            printf("took %d\r\n", LL_TIM_GetCounter(TIM2)-etstart);
+        }
 
         int16_t s16 = s * 10000;
         out_buffer[i] = s16;   // left
@@ -169,25 +178,24 @@ inline float sample_synth(void) {
         }
 
         if (env_state == ENV_ATTACK) {
-            env += 1.0f/(cfg.attack * SAMPLE_RATE);
-            //env += cfg.attack * (1.0f + ENV_OVERSHOOT - env);
+            env += cfg.attack_rate;
             if (env > 1.0f) {
                 env = 1.0f;
                 env_state = ENV_DECAY;
             }
         } else if (env_state == ENV_DECAY) {
-            env += cfg.decay * (cfg.sustain - ENV_OVERSHOOT - env);
-            if (env < cfg.sustain) {
-                env = cfg.sustain;
+            env += cfg.decay_rate * (cfg.sustain_level - ENV_OVERSHOOT - env);
+            if (env < cfg.sustain_level) {
+                env = cfg.sustain_level;
                 env_state = ENV_SUSTAIN;
             }
         } else if (env_state == ENV_SUSTAIN) {
-            env = cfg.sustain;
+            env = cfg.sustain_level;
         }
 
     } else {
         env_state = ENV_RELEASE;
-        env += cfg.release * (-ENV_OVERSHOOT - env);
+        env += cfg.release_rate * (-ENV_OVERSHOOT - env);
         if (env < 0.0f) env = 0.0f;
     }
 
@@ -266,10 +274,10 @@ void synth_start(void) {
     cfg.detune = 1.0f;
     cfg.sync = false;
 
-    cfg.attack  = 0.0005;
-    cfg.decay   = 0.005;
-    cfg.sustain = 1.0;
-    cfg.release = 0.0005;
+    cfg.attack_rate  = 0.0005;
+    cfg.decay_rate   = 0.005;
+    cfg.sustain_level = 1.0;
+    cfg.release_rate = 0.0005;
     
     cfg.cutoff  = 10000.0;
     cfg.resonance = 0.0;

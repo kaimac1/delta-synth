@@ -2,6 +2,7 @@
 #include "main.h"
 
 #define SAMPLE_RATE 44100
+#define ENV_OVERSHOOT 0.05f
 
 typedef enum {
     ENV_ATTACK,
@@ -44,12 +45,16 @@ typedef struct {
 
     // ADSR 
     bool key;           // key down?
-    float attack;	    // seconds
-    float decay;        // seconds
-    float sustain;      // 0-1
-    float release;      // seconds
+    float attack_rate;
+    float decay_rate;
+    float sustain_level;
+    float release_rate;
     float env_curve;    // linearity
     bool env_retrigger; // retrigger now?
+
+    float attack_time;
+    float decay_time;
+    float release_time;
 
     // Filter
     float cutoff;       // Hz

@@ -1,4 +1,5 @@
 #include "main.h"
+#include "midi.h"
 #include "notes.h"
 #include "stm32f401_discovery.h"
 #include "stm32f401_discovery_audio.h"
@@ -7,10 +8,14 @@
 #include "stm32f4xx_ll_tim.h"
 #include "oled.h"
 
+#include <math.h>
+
 void hardware_init(void);
 void SystemClock_Config(void);
 
-ControllerConfig ctrlcfg;
+void draw_adsr(void);
+
+ControllerConfig ctrlcfg = CTRL_ENVELOPE;
 
 /******************************************************************************/
 int main(void) { 
@@ -34,11 +39,15 @@ int main(void) {
         read_buttons();
 
         if (buttons[0] == BTN_PRESSED) {
-            printf("btn down\r\n");
-            display_fillrect(0, 0, 32, 32, 0x0FF0);
+            printf("btn down\r\n");            
         } else if (buttons[0] == BTN_RELEASED) {
             printf("btn up\r\n");
-            display_fillrect(0, 0, 32, 32, 0x0000);
+        }
+
+        if (ctrlcfg == CTRL_ENVELOPE && control_updated) {
+            control_updated = false;
+            printf("ADSR: %.3f %.3f %.3f %.3f\r\n", cfgnew.attack_time, cfgnew.decay_time, cfgnew.sustain_level, cfgnew.release_time);
+            draw_adsr();
         }
 
         // if (HAL_UART_Receive(&h_uart_debug, (uint8_t*)&inchar, 1, 100) == HAL_OK) {
@@ -81,6 +90,96 @@ int main(void) {
 
     }
   
+}
+
+void draw_adsr(void) {
+
+    display_fillrect(0, 0, 128, 128, 0x0000);
+
+    uint8_t y, yold=0;
+    uint8_t height = 64;
+
+    float dr = cfgnew.env_curve / cfgnew.decay_time;
+    float rr = cfgnew.env_curve / cfgnew.release_time;
+    float decay_time_actual   = log(ENV_OVERSHOOT / (1.0f - (cfgnew.sustain_level - ENV_OVERSHOOT))) / dr;
+    float release_time_actual = log(ENV_OVERSHOOT / (cfgnew.sustain_level + ENV_OVERSHOOT)) / rr;
+
+    float total = cfgnew.attack_time + decay_time_actual + release_time_actual;
+    float time_step = total / 128;
+
+    uint8_t attack_px = cfgnew.attack_time / time_step;
+    uint8_t decay_px  = decay_time_actual / time_step;
+    uint8_t release_px = release_time_actual / time_step;
+
+    draw_line(0, height, attack_px, 0, 0xFF00);
+
+    // Decay
+    uint8_t offs = attack_px;
+    float b = cfgnew.sustain_level - ENV_OVERSHOOT;
+    for (uint8_t x=0; x<decay_px; x++) {
+        float v = b + (1.0f-b)*exp(dr * x * time_step);
+        y = height * (1.0f-v);
+        if (x>0) draw_line(offs + x-1, yold, offs + x, y, 0x0FF0);
+        yold = y;
+    }
+    offs += decay_px;
+
+    // Release
+    b = -ENV_OVERSHOOT;
+    for (uint8_t x=0; x<release_px; x++) {
+        float v = b + (cfg.sustain_level-b)*exp(rr * x * time_step);
+        y = height * (1.0f-v);
+        if (x>0) draw_line(offs + x-1, yold, offs + x, y, 0x00FF);
+        yold = y;
+    }
+
+    // float total = 
+    // printf("total = %f\r\n", total);
+
+
+
+    // env += cfg.decay_rate * (cfg.sustain_level - ENV_OVERSHOOT - env);
+    // if (env < cfg.sustain_level) {
+    //     env = cfg.sustain_level;
+    //     env_state = ENV_SUSTAIN;
+    // }
+
+    // } else if (env_state == ENV_SUSTAIN) {
+    //     env = cfg.sustain_level;
+    // }
+
+    // } else {
+    //     env_state = ENV_RELEASE;
+    //     env += cfg.release_rate * (-ENV_OVERSHOOT - env);
+    //     if (env < 0.0f) env = 0.0f;
+    // }
+
+
+    // uint8_t size = 96;
+    // uint8_t sustain_w = 31;
+
+    // sustain_y = (1.0f - cfg.sustain_level) * size;
+
+    // if (cfg.sustain_level > 0.0f) {
+    //     total_adr = cfg.attack_time + cfg.decay_time + cfg.release_time;
+    //     attack_w  = cfg.attack_time/total_adr * 96;
+    //     decay_w   = cfg.decay_time/total_adr * 96;
+    // } else {
+    //     total_adr = cfg.attack_time + cfg.decay_time;
+    //     attack_w  = cfg.attack_time/total_adr * 128;
+    //     decay_w   = cfg.decay_time/total_adr * 128;       
+    // }
+
+    // draw_line(0, size, attack_w, 0, 0x00FF);
+    // draw_line(attack_w, 0, attack_w+decay_w, sustain_y, 0xFF00);
+    // if (cfg.sustain_level > 0.0f) {
+    //     draw_line(attack_w+decay_w, sustain_y, attack_w+decay_w+sustain_w, sustain_y, 0x0FF0);
+    //     draw_line(attack_w+decay_w+sustain_w, sustain_y, 127, size, 0xF0F0);
+    // }
+
+
+
+
 }
 
 void hardware_init(void) {

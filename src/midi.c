@@ -11,6 +11,7 @@
 void midi_process_command(void);
 
 uint8_t command[3];
+bool control_updated = false;
 
 // Called from the MIDI UART interrupt handler
 void midi_process_byte(uint8_t byte) {
@@ -70,6 +71,8 @@ void arp_del(uint32_t freq) {
 
 void midi_process_command(void) {
 
+    float value;
+
     switch(command[0]) {
 
         // Note on
@@ -99,22 +102,25 @@ void midi_process_command(void) {
 
         // Controller
         case 0xB0:
+            control_updated = true;
+            value = (float)(command[2]) / 0x7F;
+
             switch (ctrlcfg) {
                 case CTRL_MAIN:
                     switch (command[1]) {
                         // Master volume
                         case CONTROLLER_1:
-                            cfgnew.volume = 100 * (float)(command[2]) / 0x7F;
+                            cfgnew.volume = 100 * value;
                             printf("volume = %d\r\n", cfgnew.volume);
                             break;
 
                         case CONTROLLER_2:
-                            cfgnew.tempo = 160 * (float)(command[2]) / 0x7F;
+                            cfgnew.tempo = 160 * value;
                             printf("tempo = %d\r\n", cfgnew.tempo);
                             break;
 
                         case CONTROLLER_3:
-                            cfgnew.detune = 1.0f + 1.5f * (float)(command[2]) / 0x7F;
+                            cfgnew.detune = 1.0f + 1.5f * value;
                             //printf("detune = %f\r\n", cfgnew.detune);
                             break;
                     }
@@ -125,27 +131,27 @@ void midi_process_command(void) {
                     switch (command[1]) {
                         // Attack
                         case CONTROLLER_1:
-                            cfgnew.attack = (command[2] + 1) * 0.005;
-                            //cfg.attack  = 1.0 - exp(env_curve / (cfg.attack * SAMPLE_RATE));
-                            //printf("attack = %f\r\n", cfgnew.attack);
+                            cfgnew.attack_time = value + 0.001;
+                            cfgnew.attack_rate = 1.0f/(cfg.attack_time * SAMPLE_RATE);
                             break;
 
                         // Decay
                         case CONTROLLER_2:
-                            cfgnew.decay   = 1.0 - exp(cfgnew.env_curve / ((command[2] + 1) * 0.005f * SAMPLE_RATE));
-                            //printf("decay = %f\r\n", cfgnew.decay);
+                            value = value*value*value;
+                            cfgnew.decay_time = value * 5;
+                            cfgnew.decay_rate = 1.0 - exp(cfgnew.env_curve / (cfgnew.decay_time * SAMPLE_RATE));
                             break;
 
                         // Sustain
                         case CONTROLLER_3:
-                            cfgnew.sustain = (float)(command[2]) / 0x7F;
-                            //printf("sustain = %f\r\n", cfgnew.sustain);
+                            cfgnew.sustain_level = value;
                             break;
 
                         // Release
                         case CONTROLLER_4:
-                            cfgnew.release = 1.0 - exp(cfgnew.env_curve / ((command[2] + 1) * 0.005f * SAMPLE_RATE));
-                            //printf("release = %f\r\n", cfgnew.release);
+                            value = value*value*value;
+                            cfgnew.release_time = value * 5;
+                            cfgnew.release_rate = 1.0 - exp(cfgnew.env_curve / (cfgnew.release_time * SAMPLE_RATE));
                             break;
                     }
                     break;
@@ -154,17 +160,17 @@ void midi_process_command(void) {
                     switch (command[1]) {
                         // Cutoff
                         case CONTROLLER_1:
-                            cfgnew.cutoff = 10000.0f * (float)(command[2]) / 0x7F;
+                            cfgnew.cutoff = 10000.0f * value;
                             break;
 
                         // Resonance
                         case CONTROLLER_2:
-                            cfgnew.resonance = 3.99f * (float)(command[2]) / 0x7F;
+                            cfgnew.resonance = 3.99f * value;
                             break;
 
                         // Env mod
                         case CONTROLLER_3:
-                            cfgnew.env_mod = 5000.0f * (float)(command[2]) / 0x7F;
+                            cfgnew.env_mod = 5000.0f * value;
                             break;
                     }
                     break;                    

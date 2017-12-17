@@ -25,6 +25,7 @@ void display_reset(void);
 #define MOSI_PORT   GPIOB
 #define MOSI_PIN    LL_GPIO_PIN_5
 
+
 void display_init(void) {
 
     __HAL_RCC_GPIOD_CLK_ENABLE();
@@ -129,18 +130,24 @@ void draw_text(uint16_t x, uint16_t y, char* text, uint16_t colour) {
 
             // top 8 pixels
             uint8_t data = font_data[font_index[c] + px];
+            set_rect(xoffs+px, y, 1, FONT_HEIGHT);
             for (int py=0; py<FONT_HEIGHT; py++) {
                 uint16_t col = data & (1<<py);
                 col = col ? colour : 0;
-                draw_pixel(xoffs+px, y+py, col);
+                //draw_pixel(xoffs+px, y+py, col);
+                writeData(col >> 8);
+                writeData(col);                
             }
 
             // bottom 4
             data = font_data[font_index[c] + char_width + px];
+            set_rect(xoffs+px, y+8, 1, 4);
             for (int py=0; py<4; py++) {
                 uint16_t col = data & (0x10<<py);
                 col = col ? colour : 0;
-                draw_pixel(xoffs+px, y+py+8, col);
+                //draw_pixel(xoffs+px, y+py+8, col);
+                writeData(col >> 8);
+                writeData(col);                
             }
 
         }

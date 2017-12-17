@@ -128,32 +128,6 @@ void midi_process_command(void) {
 
 
                 case CTRL_ENVELOPE:
-                    switch (command[1]) {
-                        // Attack
-                        case CONTROLLER_1:
-                            cfgnew.attack_time = value + 0.001f;
-                            cfgnew.attack_rate = 1.0f/(cfg.attack_time * SAMPLE_RATE);
-                            break;
-
-                        // Decay
-                        case CONTROLLER_2:
-                            value = value*value*value;
-                            cfgnew.decay_time = value * 5;
-                            cfgnew.decay_rate = 1.0 - exp(cfgnew.env_curve / (cfgnew.decay_time * SAMPLE_RATE));
-                            break;
-
-                        // Sustain
-                        case CONTROLLER_3:
-                            cfgnew.sustain_level = value;
-                            break;
-
-                        // Release
-                        case CONTROLLER_4:
-                            value = value*value*value;
-                            cfgnew.release_time = value * 5;
-                            cfgnew.release_rate = 1.0 - exp(cfgnew.env_curve / (cfgnew.release_time * SAMPLE_RATE));
-                            break;
-                    }
                     break;
 
                 case CTRL_FILTER:

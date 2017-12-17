@@ -4,6 +4,7 @@
 #include "stm32f4xx_ll_exti.h"
 
 int enc_states[16] = {0, -1, 1, 0, 1, 0, 0, -1, -1, 0, 0, 1, 0, 1, -1, 0};
+uint8_t enc_history[NUM_ENCODERS];
 
 GPIO_TypeDef* button_ports[NUM_BUTTONS];
 uint32_t      button_pins[NUM_BUTTONS];
@@ -12,10 +13,10 @@ uint32_t      encoder_pin_a[NUM_ENCODERS];
 uint32_t      encoder_pin_b[NUM_ENCODERS];
 
 ButtonState buttons[NUM_BUTTONS];
-Encoder encoders[NUM_ENCODERS];
+EncoderState encoders[NUM_ENCODERS];
 
-void read_encoders(void);
 
+// Initialise input hardware.
 void input_init(void) {
 
     // buttons
@@ -45,7 +46,7 @@ void input_init(void) {
     for (int i=0; i<NUM_ENCODERS; i++) {
         pin_cfg_exti(encoder_ports[i], encoder_pin_a[i],  LL_GPIO_PULL_UP, LL_EXTI_TRIGGER_RISING_FALLING);
         pin_cfg_exti(encoder_ports[i], encoder_pin_b[i],  LL_GPIO_PULL_UP, LL_EXTI_TRIGGER_RISING_FALLING);
-        encoders[i].history = (pin_read(encoder_ports[i], encoder_pin_b[i]) << 1) | pin_read(encoder_ports[i], encoder_pin_a[i]);
+        enc_history[i] = (pin_read(encoder_ports[i], encoder_pin_b[i]) << 1) | pin_read(encoder_ports[i], encoder_pin_a[i]);
     }
 
     LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTE, LL_SYSCFG_EXTI_LINE7);
@@ -56,63 +57,89 @@ void input_init(void) {
     LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTE, LL_SYSCFG_EXTI_LINE12);
     LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTE, LL_SYSCFG_EXTI_LINE13);
     LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTE, LL_SYSCFG_EXTI_LINE14);
-    HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0x0F, 0x00);
+    HAL_NVIC_SetPriority(EXTI9_5_IRQn, 5, 0);
     HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
-    HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0x0F, 0x00);
+    HAL_NVIC_SetPriority(EXTI15_10_IRQn, 5, 0);
     HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
 }
 
-void read_buttons(void) {
+
+// Read each button and update its state.
+// Returns true if any buttons have changed state.
+bool read_buttons(void) {
+
+    bool changed = false;
 
     for (int i=0; i<NUM_BUTTONS; i++) {
-
         bool pressed = pin_read(button_ports[i], button_pins[i]);
 
         switch (buttons[i]) {
             case BTN_OFF:
-                if (pressed) buttons[i] = BTN_PRESSED;
+                if (pressed) {
+                    buttons[i] = BTN_PRESSED;
+                    changed = true;
+                }
                 break;
             case BTN_PRESSED:
                 buttons[i] = pressed ? BTN_HELD : BTN_RELEASED;
+                changed = true;
                 break;
             case BTN_HELD:
-                if (!pressed) buttons[i] = BTN_RELEASED;
+                if (!pressed) {
+                    buttons[i] = BTN_RELEASED;
+                    changed = true;
+                }
                 break;
             case BTN_RELEASED:
                 buttons[i] = BTN_OFF;
+                changed = true;
                 break;
         }
     }
 
-}
-
-
-
-void EXTI9_5_IRQHandler(void) {
-
-    LL_EXTI_ClearFlag_0_31(LL_EXTI_LINE_ALL);
-    read_encoders();
+    return changed;
 
 }
 
-void EXTI15_10_IRQHandler(void) {
 
-    LL_EXTI_ClearFlag_0_31(LL_EXTI_LINE_ALL);
-    read_encoders();
+// Update the delta for each encoder.
+// Returns true if any encoders have moved.
+bool read_encoders(void) {
+
+    bool changed = false;
+
+    for (int i=0; i<NUM_ENCODERS; i++) {
+        encoders[i].delta = encoders[i].value - encoders[i].last_value;
+        if (encoders[i].delta != 0) changed = true;
+        encoders[i].last_value = encoders[i].value;
+    }
+
+    return changed;
 
 }
 
-void read_encoders(void) {
+void encoder_irq(void) {
 
     for (int i=0; i<NUM_ENCODERS; i++) {
 
         int inca = pin_read(encoder_ports[i], encoder_pin_a[i]);
         int incb = pin_read(encoder_ports[i], encoder_pin_b[i]);
 
-        encoders[i].history <<= 2;
-        encoders[i].history |= ((incb << 1) | inca);
-        encoders[i].value += enc_states[encoders[i].history & 0x0F];
+        enc_history[i] <<= 2;
+        enc_history[i] |= ((incb << 1) | inca);
+        encoders[i].value += enc_states[enc_history[i] & 0x0F];
 
     }
 }
+
+void EXTI9_5_IRQHandler(void) {
+    LL_EXTI_ClearFlag_0_31(LL_EXTI_LINE_ALL);
+    encoder_irq();
+}
+
+void EXTI15_10_IRQHandler(void) {
+    LL_EXTI_ClearFlag_0_31(LL_EXTI_LINE_ALL);
+    encoder_irq();
+}
+

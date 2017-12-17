@@ -17,6 +17,18 @@ void draw_adsr(void);
 
 ControllerConfig ctrlcfg = CTRL_ENVELOPE;
 
+typedef struct {
+    int attack;
+    int decay;
+    int release;
+    int sustain;
+} InputSettings;
+InputSettings input;
+
+#define ADD_DELTA_CLAMPED(x, y) {(x) += (y); if ((x) > 127) (x) = 127; if ((x) < 0) (x) = 0;}
+
+
+
 /******************************************************************************/
 int main(void) { 
 
@@ -29,10 +41,10 @@ int main(void) {
     display_fillrect(0, 0, 128, 128, 0x0000);
     //display_write(0, 0, 128, 128, (uint16_t*)oled_test);
 
-    for (int i=0; i<8; i++) {
-        draw_text(0, i*16, "The quick brown fox ju", (3<<(i*2)));
-        //HAL_Delay(1000);
-    }
+    // for (int i=0; i<8; i++) {
+    //     draw_text(0, i*16, "The quick brown fox ju", (3<<(i*2)));
+    //     //HAL_Delay(1000);
+    // }
 
     synth_start();
 
@@ -42,24 +54,65 @@ int main(void) {
     control_updated = true;
 
     while (1) {
-        read_buttons();
+        bool evt = read_buttons();
+        if (evt) {
+            if (buttons[BUTTON_ENVELOPE] == BTN_PRESSED) {
+                printf("btn down\r\n");            
+            } else if (buttons[BUTTON_ENVELOPE] == BTN_RELEASED) {
+                printf("btn up\r\n");
+            }
 
-        if (buttons[BUTTON_ENVELOPE] == BTN_PRESSED) {
-            printf("btn down\r\n");            
-        } else if (buttons[BUTTON_ENVELOPE] == BTN_RELEASED) {
-            printf("btn up\r\n");
+            if (buttons[BUTTON_FILTER] == BTN_PRESSED) {
+                printf("filt\r\n");
+            }
         }
 
-        if (buttons[BUTTON_FILTER] == BTN_PRESSED) {
-            printf("filt\r\n");
+        evt = read_encoders();
+        if (evt) {
+            switch (ctrlcfg) {
+            case CTRL_ENVELOPE:
+
+                // Attack
+                if (encoders[ENC_RED].delta) {
+                    ADD_DELTA_CLAMPED(input.attack, encoders[ENC_RED].delta);
+                    cfgnew.attack_time = (float)input.attack/127 + 0.001f;
+                    cfgnew.attack_rate = 1.0f/(cfg.attack_time * SAMPLE_RATE);                    
+                }
+                // Decay
+                if (encoders[ENC_GREEN].delta) {
+                    ADD_DELTA_CLAMPED(input.decay, encoders[ENC_GREEN].delta);
+                    float value = (float)input.decay/127;
+                    value = value*value*value;
+                    cfgnew.decay_time = value * 5;
+                    cfgnew.decay_rate = 1.0 - exp(cfgnew.env_curve / (cfgnew.decay_time * SAMPLE_RATE));
+                }
+                // Sustain
+                if (encoders[ENC_BLUE].delta) {
+                    ADD_DELTA_CLAMPED(input.sustain, encoders[ENC_BLUE].delta);
+                    float value = (float)input.sustain/127;
+                    cfgnew.sustain_level = value;
+                }
+                // Release
+                if (encoders[ENC_WHITE].delta) {
+                    ADD_DELTA_CLAMPED(input.release, encoders[ENC_WHITE].delta);
+                    float value = (float)input.release/127;
+                    value = value*value*value;
+                    cfgnew.release_time = value * 5;
+                    cfgnew.release_rate = 1.0 - exp(cfgnew.env_curve / (cfgnew.release_time * SAMPLE_RATE));
+                }
+
+
+                control_updated = true;
+                break;
+            }
         }
 
         if (ctrlcfg == CTRL_ENVELOPE && control_updated) {
             control_updated = false;
-            //draw_adsr();
+            draw_adsr();
         }
 
-        printf("%d\t%d\t%d\t%d\r\n", encoders[0].value, encoders[1].value, encoders[2].value, encoders[3].value);
+        //printf("%d\t%d\t%d\r\n", encoders[0].value, encoders[0].last_value, encoders[0].delta);
 
         //         case '1': ctrlcfg = CTRL_MAIN; printf("MAIN\r\n"); break;
         //         case '2': ctrlcfg = CTRL_ENVELOPE; printf("ENVELOPE\r\n"); break;
@@ -76,7 +129,7 @@ int main(void) {
         //         case 's':
         //             cfgnew.sync ^= 1; break;
 
-        HAL_Delay(30);
+        HAL_Delay(2);
 
         //printf("***\r\n");
         // for (int i=0; i<MAX_ARP; i++) {
@@ -91,14 +144,24 @@ int main(void) {
 
 void draw_adsr(void) {
 
-    // TODO: fix some edge cases (attack=0)
-
     const uint8_t height = 64;
-    const uint16_t attack_col  = 0xFF00;
-    const uint16_t decay_col   = 0x0FF0;
-    const uint16_t release_col = 0x00FF;
+    const uint16_t attack_col  = 0xF800;
+    const uint16_t decay_col   = 0x07E0;
+    const uint16_t release_col = 0xFFFF;
 
-    display_fillrect(0, 0, 128, height+1, 0x0000);
+    display_fillrect(0, 64, 128, 64, 0x0000);
+    char buf[32];
+    sprintf(buf, "Attack   %.3f", cfgnew.attack_time);
+    draw_text(0, 64, buf, attack_col);
+    sprintf(buf, "Decay    %.3f", cfgnew.decay_time);
+    draw_text(0, 80, buf, decay_col);
+    sprintf(buf, "Sustain  %.3f", cfgnew.sustain_level);
+    draw_text(0, 96, buf, 0x001F);
+    sprintf(buf, "Release  %.3f", cfgnew.release_time);
+    draw_text(0, 112, buf, release_col);
+
+
+    display_fillrect(0, 0, 128, 64, 0x0000);
 
     uint8_t y, yold = 0;
     
@@ -115,10 +178,14 @@ void draw_adsr(void) {
     // Calculate time step per pixel, and divide the display into
     // attack/decay/release sections appropriately based on the total time
     float total = cfgnew.attack_time + decay_time_actual + release_time_actual;
-    float time_step = total / 128;
+    float time_step = total / 127;
     uint8_t attack_px = cfgnew.attack_time / time_step;
     uint8_t decay_px  = decay_time_actual / time_step;
     uint8_t release_px = release_time_actual / time_step;
+
+    if (decay_px == 0) {
+        decay_px++;
+    }
 
     // Attack
     draw_line(0, height, attack_px, 0, attack_col);

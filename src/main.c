@@ -29,34 +29,41 @@ int main(void) {
     display_fillrect(0, 0, 128, 128, 0x0000);
     //display_write(0, 0, 128, 128, (uint16_t*)oled_test);
 
+    for (int i=0; i<8; i++) {
+        draw_text(0, i*16, "The quick brown fox ju", (3<<(i*2)));
+        //HAL_Delay(1000);
+    }
+
     synth_start();
 
     cfgnew.freq = note[69];
     cfgnew.key = true;
     cfgnew.osc_wave = WAVE_SAW;
+    control_updated = true;
 
     while (1) {
         read_buttons();
 
-        if (buttons[0] == BTN_PRESSED) {
+        if (buttons[BUTTON_ENVELOPE] == BTN_PRESSED) {
             printf("btn down\r\n");            
-        } else if (buttons[0] == BTN_RELEASED) {
+        } else if (buttons[BUTTON_ENVELOPE] == BTN_RELEASED) {
             printf("btn up\r\n");
+        }
+
+        if (buttons[BUTTON_FILTER] == BTN_PRESSED) {
+            printf("filt\r\n");
         }
 
         if (ctrlcfg == CTRL_ENVELOPE && control_updated) {
             control_updated = false;
-            printf("ADSR: %.3f %.3f %.3f %.3f\r\n", cfgnew.attack_time, cfgnew.decay_time, cfgnew.sustain_level, cfgnew.release_time);
-            draw_adsr();
+            //draw_adsr();
         }
 
-        // if (HAL_UART_Receive(&h_uart_debug, (uint8_t*)&inchar, 1, 100) == HAL_OK) {
-        //     switch (inchar) {
-        //         // Controller pages
+        printf("%d\t%d\t%d\t%d\r\n", encoders[0].value, encoders[1].value, encoders[2].value, encoders[3].value);
+
         //         case '1': ctrlcfg = CTRL_MAIN; printf("MAIN\r\n"); break;
         //         case '2': ctrlcfg = CTRL_ENVELOPE; printf("ENVELOPE\r\n"); break;
         //         case '3': ctrlcfg = CTRL_FILTER; printf("FILTER\r\n"); break;
-
         //         // Legato
         //         case 'l': cfgnew.legato ^= 1; break;
         //         // arpeggio
@@ -69,22 +76,12 @@ int main(void) {
         //         case 's':
         //             cfgnew.sync ^= 1; break;
 
-        //     }
-        // }
-
-        // x++;
-        // if (x == 32) x = 0;
-        // uint32_t start_time = LL_TIM_GetCounter(TIM2);
-        // display_fillrect(x, x, 96, 96, 0xFF00);
-        // uint32_t disp_time = LL_TIM_GetCounter(TIM2) - start_time;
-        uint32_t disp_time = 0;
         HAL_Delay(30);
 
         //printf("***\r\n");
         // for (int i=0; i<MAX_ARP; i++) {
         //     printf("arp[%d] = %lu\r\n", i, cfgnew.arp_freqs[i]);
         // }
-
         //printf("%lu\t%lu\r\n", disp_time, loop_time);
         //printf("%d\r\n", pin_read(GPIOA, 1));
 
@@ -94,32 +91,45 @@ int main(void) {
 
 void draw_adsr(void) {
 
-    display_fillrect(0, 0, 128, 128, 0x0000);
+    // TODO: fix some edge cases (attack=0)
 
-    uint8_t y, yold=0;
-    uint8_t height = 64;
+    const uint8_t height = 64;
+    const uint16_t attack_col  = 0xFF00;
+    const uint16_t decay_col   = 0x0FF0;
+    const uint16_t release_col = 0x00FF;
 
+    display_fillrect(0, 0, 128, height+1, 0x0000);
+
+    uint8_t y, yold = 0;
+    
+    uint8_t offs;
+
+    // Calculate the actual durations for decay and release.
+    // (.decay_time and .release_time are 'nominal' values:
+    // .decay_time assumes sustain=0, .release_time assumes sustain=1)
     float dr = cfgnew.env_curve / cfgnew.decay_time;
     float rr = cfgnew.env_curve / cfgnew.release_time;
-    float decay_time_actual   = log(ENV_OVERSHOOT / (1.0f - (cfgnew.sustain_level - ENV_OVERSHOOT))) / dr;
-    float release_time_actual = log(ENV_OVERSHOOT / (cfgnew.sustain_level + ENV_OVERSHOOT)) / rr;
+    float decay_time_actual   = (float)log(ENV_OVERSHOOT / (1.0f - (cfgnew.sustain_level - ENV_OVERSHOOT))) / dr;
+    float release_time_actual = (float)log(ENV_OVERSHOOT / (cfgnew.sustain_level + ENV_OVERSHOOT)) / rr;
 
+    // Calculate time step per pixel, and divide the display into
+    // attack/decay/release sections appropriately based on the total time
     float total = cfgnew.attack_time + decay_time_actual + release_time_actual;
     float time_step = total / 128;
-
     uint8_t attack_px = cfgnew.attack_time / time_step;
     uint8_t decay_px  = decay_time_actual / time_step;
     uint8_t release_px = release_time_actual / time_step;
 
-    draw_line(0, height, attack_px, 0, 0xFF00);
+    // Attack
+    draw_line(0, height, attack_px, 0, attack_col);
 
     // Decay
-    uint8_t offs = attack_px;
+    offs = attack_px;
     float b = cfgnew.sustain_level - ENV_OVERSHOOT;
     for (uint8_t x=0; x<decay_px; x++) {
-        float v = b + (1.0f-b)*exp(dr * x * time_step);
+        float v = b + (1.0f-b) * (float)exp(dr * x * time_step);
         y = height * (1.0f-v);
-        if (x>0) draw_line(offs + x-1, yold, offs + x, y, 0x0FF0);
+        if (x>0) draw_line(offs + x-1, yold, offs + x, y, decay_col);
         yold = y;
     }
     offs += decay_px;
@@ -127,58 +137,11 @@ void draw_adsr(void) {
     // Release
     b = -ENV_OVERSHOOT;
     for (uint8_t x=0; x<release_px; x++) {
-        float v = b + (cfg.sustain_level-b)*exp(rr * x * time_step);
+        float v = b + (cfg.sustain_level-b)* (float)exp(rr * x * time_step);
         y = height * (1.0f-v);
-        if (x>0) draw_line(offs + x-1, yold, offs + x, y, 0x00FF);
+        draw_line(offs + x-1, yold, offs + x, y, release_col);
         yold = y;
     }
-
-    // float total = 
-    // printf("total = %f\r\n", total);
-
-
-
-    // env += cfg.decay_rate * (cfg.sustain_level - ENV_OVERSHOOT - env);
-    // if (env < cfg.sustain_level) {
-    //     env = cfg.sustain_level;
-    //     env_state = ENV_SUSTAIN;
-    // }
-
-    // } else if (env_state == ENV_SUSTAIN) {
-    //     env = cfg.sustain_level;
-    // }
-
-    // } else {
-    //     env_state = ENV_RELEASE;
-    //     env += cfg.release_rate * (-ENV_OVERSHOOT - env);
-    //     if (env < 0.0f) env = 0.0f;
-    // }
-
-
-    // uint8_t size = 96;
-    // uint8_t sustain_w = 31;
-
-    // sustain_y = (1.0f - cfg.sustain_level) * size;
-
-    // if (cfg.sustain_level > 0.0f) {
-    //     total_adr = cfg.attack_time + cfg.decay_time + cfg.release_time;
-    //     attack_w  = cfg.attack_time/total_adr * 96;
-    //     decay_w   = cfg.decay_time/total_adr * 96;
-    // } else {
-    //     total_adr = cfg.attack_time + cfg.decay_time;
-    //     attack_w  = cfg.attack_time/total_adr * 128;
-    //     decay_w   = cfg.decay_time/total_adr * 128;       
-    // }
-
-    // draw_line(0, size, attack_w, 0, 0x00FF);
-    // draw_line(attack_w, 0, attack_w+decay_w, sustain_y, 0xFF00);
-    // if (cfg.sustain_level > 0.0f) {
-    //     draw_line(attack_w+decay_w, sustain_y, attack_w+decay_w+sustain_w, sustain_y, 0x0FF0);
-    //     draw_line(attack_w+decay_w+sustain_w, sustain_y, 127, size, 0xF0F0);
-    // }
-
-
-
 
 }
 
@@ -190,13 +153,14 @@ void hardware_init(void) {
     __HAL_RCC_GPIOC_CLK_ENABLE();
     __HAL_RCC_GPIOD_CLK_ENABLE();
     __HAL_RCC_GPIOE_CLK_ENABLE();
+    __HAL_RCC_SYSCFG_CLK_ENABLE();
 
     SystemClock_Config();
 
-    BSP_LED_Init(LED3);
-    BSP_LED_Init(LED4); 
-    BSP_LED_Init(LED5);
-    BSP_LED_Init(LED6); 
+    // BSP_LED_Init(LED3);
+    // BSP_LED_Init(LED4); 
+    // BSP_LED_Init(LED5);
+    // BSP_LED_Init(LED6); 
     
     uart_init();
     input_init();

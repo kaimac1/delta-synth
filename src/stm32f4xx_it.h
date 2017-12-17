@@ -9,7 +9,4 @@ void SVC_Handler(void);
 void DebugMon_Handler(void);
 void PendSV_Handler(void);
 void SysTick_Handler(void);
-void EXTI0_IRQHandler(void);
-void EXTI4_IRQHandler(void);
 void I2S3_IRQHandler(void);
-void I2S2_IRQHandler(void);

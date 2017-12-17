@@ -3,6 +3,9 @@
 #include "stm32f4xx_ll_gpio.h"
 #include "stm32f4xx_ll_spi.h"
 
+#include "font.h"
+#include <string.h>
+
 #define _swap_int16_t(a, b) { int16_t t = a; a = b; b = t; }
 #define abs(x) (((x) > 0) ? (x) : (-(x)))
 
@@ -96,6 +99,59 @@ void set_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
 //   return c;
 // }
 
+uint16_t font_index[FONT_CHARS];
+
+void build_font_index(void) {
+
+    uint16_t idx = 0;
+
+    for (int i=0; i<FONT_CHARS; i++) {
+        font_index[i] = idx;
+        idx += font_widths[i]*2;
+    }
+
+}
+
+void draw_text(uint16_t x, uint16_t y, char* text, uint16_t colour) {
+
+    build_font_index();
+
+    uint16_t xoffs = x;
+    int len = strlen(text);
+
+
+    for (int i=0; i<len; i++) {
+
+        uint8_t c = text[i] - FONT_FIRST_CHAR;
+        uint8_t char_width = font_widths[c];
+
+        for (int px=0; px<char_width; px++) {
+
+            // top 8 pixels
+            uint8_t data = font_data[font_index[c] + px];
+            for (int py=0; py<FONT_HEIGHT; py++) {
+                uint16_t col = data & (1<<py);
+                col = col ? colour : 0;
+                draw_pixel(xoffs+px, y+py, col);
+            }
+
+            // bottom 4
+            data = font_data[font_index[c] + char_width + px];
+            for (int py=0; py<4; py++) {
+                uint16_t col = data & (0x10<<py);
+                col = col ? colour : 0;
+                draw_pixel(xoffs+px, y+py+8, col);
+            }
+
+        }
+
+        xoffs += char_width + 1; // 1px space between characters
+
+    }
+
+
+}
+
 
 void display_fillrect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t fillcolor) {
 
@@ -181,102 +237,6 @@ void draw_line(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t col)
         }
     }
 }
-
-
-// // Draw a horizontal line ignoring any screen rotation.
-// void Adafruit_SSD1351::rawFastHLine(int16_t x, int16_t y, int16_t w, uint16_t color) {
-//   // Bounds check
-//   if ((x >= SSD1351WIDTH) || (y >= SSD1351HEIGHT))
-//     return;
-
-//   // X bounds check
-//   if (x+w > SSD1351WIDTH)
-//   {
-//     w = SSD1351WIDTH - x - 1;
-//   }
-
-//   if (w < 0) return;
-
-//   // set location
-//   writeCommand(SSD1351_CMD_SETCOLUMN);
-//   writeData(x);
-//   writeData(x+w-1);
-//   writeCommand(SSD1351_CMD_SETROW);
-//   writeData(y);
-//   writeData(y);
-//   // fill!
-//   writeCommand(SSD1351_CMD_WRITERAM);  
-
-//   for (uint16_t i=0; i < w; i++) {
-//     writeData(color >> 8);
-//     writeData(color);
-//   }
-// }
-
-// // Draw a vertical line ignoring any screen rotation.
-// void Adafruit_SSD1351::rawFastVLine(int16_t x, int16_t y, int16_t h, uint16_t color) {
-//   // Bounds check
-//   if ((x >= SSD1351WIDTH) || (y >= SSD1351HEIGHT))
-//   return;
-
-//   // X bounds check
-//   if (y+h > SSD1351HEIGHT)
-//   {
-//     h = SSD1351HEIGHT - y - 1;
-//   }
-
-//   if (h < 0) return;
-
-//   // set location
-//   writeCommand(SSD1351_CMD_SETCOLUMN);
-//   writeData(x);
-//   writeData(x);
-//   writeCommand(SSD1351_CMD_SETROW);
-//   writeData(y);
-//   writeData(y+h-1);
-//   // fill!
-//   writeCommand(SSD1351_CMD_WRITERAM);  
-
-//   for (uint16_t i=0; i < h; i++) {
-//     writeData(color >> 8);
-//     writeData(color);
-//   }
-// }
-
-// void Adafruit_SSD1351::drawPixel(int16_t x, int16_t y, uint16_t color)
-// {
-//   // Transform x and y based on current rotation.
-//   switch (getRotation()) {
-//   // Case 0: No rotation
-//   case 1:  // Rotated 90 degrees clockwise.
-//     swap(x, y);
-//     x = WIDTH - x - 1;
-//     break;
-//   case 2:  // Rotated 180 degrees clockwise.
-//     x = WIDTH - x - 1;
-//     y = HEIGHT - y - 1;
-//     break;
-//   case 3:  // Rotated 270 degrees clockwise.
-//     swap(x, y);
-//     y = HEIGHT - y - 1;
-//     break;
-//   }
-
-//   // Bounds check.
-//   if ((x >= SSD1351WIDTH) || (y >= SSD1351HEIGHT)) return;
-//   if ((x < 0) || (y < 0)) return;
-
-//   goTo(x, y);
-  
-//   // setup for data
-//   *rsport |= rspinmask;
-//   *csport &= ~ cspinmask;
-  
-//   spiwrite(color >> 8);    
-//   spiwrite(color);
-  
-//   *csport |= cspinmask;
-// }
 
 void display_reset(void) {
 

@@ -131,7 +131,7 @@ void midi_process_command(void) {
                     switch (command[1]) {
                         // Attack
                         case CONTROLLER_1:
-                            cfgnew.attack_time = value + 0.001;
+                            cfgnew.attack_time = value + 0.001f;
                             cfgnew.attack_rate = 1.0f/(cfg.attack_time * SAMPLE_RATE);
                             break;
 

@@ -36,8 +36,6 @@ inline void fill_buffer(void);
 inline float sample_synth(void);
 inline float sample_drums(void);
 
-int etstart;
-
 /******************************************************************************/
 // This ISR is called when the DMA transfer of one buffer (A) completes.
 // We need to immediately swap the DMA over to the other buffer (B), and start
@@ -72,14 +70,14 @@ void BSP_AUDIO_OUT_TransferComplete_CallBack(void) {
     fill_buffer();
     loop_time = LL_TIM_GetCounter(TIM2) - start_time;
 
-    BSP_LED_Off(LED3);
+    //BSP_LED_Off(LED3);
 
 }
 
 inline void sequencer_update(void) {
 
     if (start_time > next_beat) {
-        BSP_LED_On(LED3);
+        //BSP_LED_On(LED3);
         next_beat += 15000000/cfg.tempo;
 
 
@@ -101,22 +99,12 @@ inline void sequencer_update(void) {
 inline void fill_buffer(void) {
 
     float s;
-    EnvState old;
 
     for (int i=0; i<OUT_BUFFER_SAMPLES; i += 2) {
         
-        old = env_state;
-
         s = sample_synth();
         //s = 0.0f;
         //s += sample_drums();
-
-        if (old == ENV_ATTACK && env_state == ENV_DECAY) {
-            etstart = LL_TIM_GetCounter(TIM2);
-        }
-        if (old == ENV_DECAY && env_state == ENV_SUSTAIN) {
-            printf("took %d\r\n", LL_TIM_GetCounter(TIM2)-etstart);
-        }
 
         int16_t s16 = s * 10000;
         out_buffer[i] = s16;   // left

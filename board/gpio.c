@@ -1,4 +1,5 @@
 #include "board.h"
+#include "stm32f4xx_ll_exti.h"
 
 // Configure pin as output
 void pin_cfg_output(GPIO_TypeDef *port, uint32_t pin) {
@@ -25,6 +26,20 @@ void pin_cfg_input(GPIO_TypeDef *port, uint32_t pin, uint32_t pull) {
     gpio.Pull       = pull;
     gpio.Pin        = pin;
     LL_GPIO_Init(port, &gpio);
+
+}
+
+// Configure pin as input + EXTI
+void pin_cfg_exti(GPIO_TypeDef *port, uint32_t pin, uint32_t pull, uint32_t edge) {
+
+    pin_cfg_input(port, pin, pull);
+
+    LL_EXTI_InitTypeDef exti;
+    exti.Line_0_31 = pin;
+    exti.LineCommand = ENABLE;
+    exti.Mode = LL_EXTI_MODE_IT;
+    exti.Trigger = edge;
+    LL_EXTI_Init(&exti);    
 
 }
 

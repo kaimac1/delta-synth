@@ -25,6 +25,7 @@ void display_reset(void);
 #define MOSI_PORT   GPIOB
 #define MOSI_PIN    LL_GPIO_PIN_5
 
+uint16_t dbuffer[128][128];
 
 void display_init(void) {
 
@@ -100,6 +101,11 @@ void set_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
 //   return c;
 // }
 
+void draw_pixel(uint16_t x, uint16_t y, uint16_t col) {
+    dbuffer[y][x] = col;
+}
+
+
 uint16_t font_index[FONT_CHARS];
 
 void build_font_index(void) {
@@ -130,24 +136,18 @@ void draw_text(uint16_t x, uint16_t y, char* text, uint16_t colour) {
 
             // top 8 pixels
             uint8_t data = font_data[font_index[c] + px];
-            set_rect(xoffs+px, y, 1, FONT_HEIGHT);
             for (int py=0; py<FONT_HEIGHT; py++) {
                 uint16_t col = data & (1<<py);
                 col = col ? colour : 0;
-                //draw_pixel(xoffs+px, y+py, col);
-                writeData(col >> 8);
-                writeData(col);                
+                draw_pixel(xoffs+px, y+py, col);
             }
 
             // bottom 4
             data = font_data[font_index[c] + char_width + px];
-            set_rect(xoffs+px, y+8, 1, 4);
             for (int py=0; py<4; py++) {
                 uint16_t col = data & (0x10<<py);
                 col = col ? colour : 0;
-                //draw_pixel(xoffs+px, y+py+8, col);
-                writeData(col >> 8);
-                writeData(col);                
+                draw_pixel(xoffs+px, y+py+8, col);
             }
 
         }
@@ -160,7 +160,7 @@ void draw_text(uint16_t x, uint16_t y, char* text, uint16_t colour) {
 }
 
 
-void display_fillrect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t fillcolor) {
+void draw_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t fillcolor) {
 
     if ((x >= SSD1351WIDTH) || (y >= SSD1351HEIGHT)) return;
     if (y+h > SSD1351HEIGHT) {
@@ -170,39 +170,13 @@ void display_fillrect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t f
         w = SSD1351WIDTH - x - 1;
     }
 
-    set_rect(x, y, w, h);
-    LL_GPIO_SetOutputPin(DC_PORT, DC_PIN);
-
-    for (uint16_t i=0; i < w*h; i++) {
-        DISPLAY_SPI->DR = fillcolor >> 8;
-        for (int i=0; i<16; i++) asm("nop");
-        DISPLAY_SPI->DR = fillcolor;
-        for (int i=0; i<16; i++) asm("nop");
+    for (int xp=x; xp<x+w; xp++) {
+        for (int yp=y; yp<y+h; yp++) {
+            dbuffer[yp][xp] = fillcolor;
+        }
     }
 }
 
-void display_write(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t *buffer) {
-
-    set_rect(x, y, w, h);
-    LL_GPIO_SetOutputPin(DC_PORT, DC_PIN);
-
-    for (uint16_t i=0; i < w*h; i++) {
-        uint16_t col = buffer[i];
-        DISPLAY_SPI->DR = col;
-        for (int i=0; i<16; i++) asm("nop");
-        DISPLAY_SPI->DR = col >> 8;
-        for (int i=0; i<16; i++) asm("nop");
-    }
-
-}
-
-void draw_pixel(uint16_t x, uint16_t y, uint16_t col) {
-
-    set_rect(x, y, 1, 1);
-    writeData(col >> 8);
-    writeData(col);
-
-}
 
 // From Adafruit GFX library
 void draw_line(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t col) {
@@ -244,6 +218,28 @@ void draw_line(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t col)
         }
     }
 }
+
+
+void display_draw(void) {
+    display_write(0, 0, 128, 128, (uint16_t*)dbuffer);
+}
+
+
+void display_write(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t *buffer) {
+
+    set_rect(x, y, w, h);
+    LL_GPIO_SetOutputPin(DC_PORT, DC_PIN);
+
+    for (uint16_t i=0; i < w*h; i++) {
+        uint16_t col = buffer[i];
+        DISPLAY_SPI->DR = col >> 8;
+        for (int i=0; i<16; i++) asm("nop");
+        DISPLAY_SPI->DR = col & 0xFF;
+        for (int i=0; i<16; i++) asm("nop");
+    }
+
+}
+
 
 void display_reset(void) {
 

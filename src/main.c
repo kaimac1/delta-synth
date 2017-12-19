@@ -38,7 +38,7 @@ int main(void) {
     printf("Running.\r\n");
     gen_note_table();
 
-    display_fillrect(0, 0, 128, 128, 0x0000);
+    //display_fillrect(0, 0, 128, 128, 0x0000);
     //display_write(0, 0, 128, 128, (uint16_t*)oled_test);
 
     // for (int i=0; i<8; i++) {
@@ -149,7 +149,8 @@ void draw_adsr(void) {
     const uint16_t decay_col   = 0x07E0;
     const uint16_t release_col = 0xFFFF;
 
-    display_fillrect(0, 64, 128, 64, 0x0000);
+    draw_rect(0, 0, 128, 128, 0x0000);
+
     char buf[32];
     sprintf(buf, "Attack   %.3f", cfgnew.attack_time);
     draw_text(0, 64, buf, attack_col);
@@ -160,8 +161,6 @@ void draw_adsr(void) {
     sprintf(buf, "Release  %.3f", cfgnew.release_time);
     draw_text(0, 112, buf, release_col);
 
-
-    display_fillrect(0, 0, 128, 64, 0x0000);
 
     uint8_t y, yold = 0;
     
@@ -210,6 +209,8 @@ void draw_adsr(void) {
         yold = y;
     }
 
+    display_draw();
+
 }
 
 void hardware_init(void) {
@@ -224,11 +225,6 @@ void hardware_init(void) {
 
     SystemClock_Config();
 
-    // BSP_LED_Init(LED3);
-    // BSP_LED_Init(LED4); 
-    // BSP_LED_Init(LED5);
-    // BSP_LED_Init(LED6); 
-    
     uart_init();
     input_init();
     display_init();    

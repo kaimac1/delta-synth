@@ -52,7 +52,6 @@ int main(void) {
     redraw = true;
 
     while (1) {
-
         bool evt = read_buttons();
         if (evt) {
             if (buttons[BUTTON_ENVELOPE] == BTN_PRESSED) {
@@ -146,15 +145,14 @@ int main(void) {
         //         // sync
         //         case 's':
         //             cfgnew.sync ^= 1; break;
-
-        HAL_Delay(2);
-
         //printf("***\r\n");
         // for (int i=0; i<MAX_ARP; i++) {
         //     printf("arp[%d] = %lu\r\n", i, cfgnew.arp_freqs[i]);
         // }
         //printf("%lu\t%lu\r\n", disp_time, loop_time);
         //printf("%d\r\n", pin_read(GPIOA, 1));
+
+        HAL_Delay(2);
 
     }
   
@@ -163,11 +161,9 @@ int main(void) {
 void draw_adsr(void) {
 
     const uint8_t height = 64;
-    float sus = cfgnew.sustain_level;
     char buf[32];
 
     draw_rect(0, 0, 128, 128, 0x0000);
-
     draw_text(0,  80,  "A", 1, COL_RED);
     draw_text(64, 80,  "D", 1, COL_GREEN);
     draw_text(0,  112, "S", 1, COL_BLUE);
@@ -180,22 +176,18 @@ void draw_adsr(void) {
     draw_text(64+12, 74, buf, 2, COL_GREEN);
     
     sprintf(buf, "%d", input.sustain);
-    //draw_text(0+12, 106, buf, 2, COL_BLUE);
-    draw_text(10, 106, buf, 2, COL_BLUE);
+    draw_text(0+12, 104, buf, 2, COL_BLUE);
     
     sprintf(buf, "%d", input.release);
-    draw_text(64+12, 106, buf, 2, COL_WHITE);
-
+    draw_text(64+12, 104, buf, 2, COL_WHITE);
 
     uint8_t y, yold = 0;
-    
     uint8_t offs;
-
-    
 
     // Calculate the actual durations for decay and release.
     // (.decay_time and .release_time are 'nominal' values:
     // .decay_time assumes sustain=0, .release_time assumes sustain=1)
+    float sus = cfgnew.sustain_level;
     float dr = cfgnew.env_curve / cfgnew.decay_time;
     float rr = cfgnew.env_curve / cfgnew.release_time;
     float decay_time_actual   = (float)log(ENV_OVERSHOOT / (1.0f - (sus - ENV_OVERSHOOT))) / dr;
@@ -247,15 +239,15 @@ void draw_filter(void) {
     char buf[32];
     
     draw_text(0, 0, "Cutoff", 1, COL_RED);
-    sprintf(buf, "%02d", input.cutoff);
+    sprintf(buf, "%d", input.cutoff);
     draw_text(0, 16, buf, 3, COL_RED);
     
     draw_text(64, 0, "Resonance", 1, COL_GREEN);
-    sprintf(buf, "%02d", input.resonance);
-    draw_text(64, 16, buf, 3, COL_GREEN);
+    sprintf(buf, "%d", input.resonance);
+    draw_text_rj(128, 16, buf, 3, COL_GREEN);
 
     draw_text(0, 64, "Env. mod.", 1, COL_BLUE);
-    sprintf(buf, "%02d", input.env_mod);
+    sprintf(buf, "%d", input.env_mod);
     draw_text(0, 80, buf, 3, COL_BLUE);
 
     display_draw();

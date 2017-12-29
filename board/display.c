@@ -119,6 +119,20 @@ void build_font_index(void) {
 
 }
 
+void draw_text_rj(uint16_t x, uint16_t y, char* text, int size, uint16_t colour) {
+
+    uint16_t xlen = 0;
+    int len = strlen(text);
+
+    for (int i=0; i<len; i++) {
+        uint8_t c = text[i] - FONT_FIRST_CHAR;
+        xlen += (font_widths[c] + 1)*size;
+    }
+
+    draw_text(x-xlen, y, text, size, colour);
+
+}
+
 void draw_text(uint16_t x, uint16_t y, char* text, int size, uint16_t colour) {
 
     uint16_t xoffs = x;

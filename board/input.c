@@ -20,13 +20,13 @@ EncoderState encoders[NUM_ENCODERS];
 void input_init(void) {
 
     // buttons
-    button_ports[BUTTON_ENVELOPE] = GPIOA;
+    button_ports[BUTTON_ENVELOPE] = GPIOC;
     button_pins[BUTTON_ENVELOPE]  = LL_GPIO_PIN_0;
-    button_ports[BUTTON_FILTER] = GPIOB;
-    button_pins[BUTTON_FILTER]  = LL_GPIO_PIN_0;
+    button_ports[BUTTON_FILTER]   = GPIOC;
+    button_pins[BUTTON_FILTER]    = LL_GPIO_PIN_1;
 
     for (int i=0; i<NUM_BUTTONS; i++) {
-        pin_cfg_input(button_ports[i], button_pins[i], LL_GPIO_PULL_NO);
+        pin_cfg_input(button_ports[i], button_pins[i], LL_GPIO_PULL_DOWN);
     }
 
     // encoders

@@ -119,13 +119,10 @@ void build_font_index(void) {
 
 }
 
-void draw_text(uint16_t x, uint16_t y, char* text, uint16_t colour) {
-
-    build_font_index();
+void draw_text(uint16_t x, uint16_t y, char* text, int size, uint16_t colour) {
 
     uint16_t xoffs = x;
     int len = strlen(text);
-
 
     for (int i=0; i<len; i++) {
 
@@ -139,7 +136,15 @@ void draw_text(uint16_t x, uint16_t y, char* text, uint16_t colour) {
             for (int py=0; py<FONT_HEIGHT; py++) {
                 uint16_t col = data & (1<<py);
                 col = col ? colour : 0;
-                draw_pixel(xoffs+px, y+py, col);
+                if (size == 1) {
+                    draw_pixel(xoffs+px, y+py, col);
+                } else {
+                    for (int sx=0; sx<size; sx++) {
+                        for (int sy=0; sy<size; sy++) {
+                            draw_pixel(xoffs+px*size+sx, y+py*size+sy, col);
+                        }
+                    }
+                }
             }
 
             // bottom 4
@@ -147,16 +152,21 @@ void draw_text(uint16_t x, uint16_t y, char* text, uint16_t colour) {
             for (int py=0; py<4; py++) {
                 uint16_t col = data & (0x10<<py);
                 col = col ? colour : 0;
-                draw_pixel(xoffs+px, y+py+8, col);
+                if (size == 1) {
+                    draw_pixel(xoffs+px, y+py+8, col);
+                } else {
+                    for (int sx=0; sx<size; sx++) {
+                        for (int sy=0; sy<size; sy++) {
+                            draw_pixel(xoffs+px*size+sx, y+(py+8)*size+sy, col);
+                        }
+                    }
+                }
             }
-
         }
 
-        xoffs += char_width + 1; // 1px space between characters
+        xoffs += (char_width + 1)*size; // 1px space between characters
 
     }
-
-
 }
 
 

@@ -12,58 +12,56 @@
 
 void hardware_init(void);
 void SystemClock_Config(void);
-
 void draw_adsr(void);
+void draw_filter(void);
 
 ControllerConfig ctrlcfg = CTRL_ENVELOPE;
+bool redraw;
 
 typedef struct {
     int attack;
     int decay;
     int release;
     int sustain;
+    int cutoff;
+    int resonance;
+    int env_mod;
 } InputSettings;
 InputSettings input;
 
+#define COL_RED     0xF800
+#define COL_GREEN   0x07E0
+#define COL_BLUE    0x001F
+#define COL_WHITE   0xC618
+
 #define ADD_DELTA_CLAMPED(x, y) {(x) += (y); if ((x) > 127) (x) = 127; if ((x) < 0) (x) = 0;}
-
-
 
 /******************************************************************************/
 int main(void) { 
 
     HAL_Init();
     hardware_init();
-     
     printf("Running.\r\n");
+    build_font_index();
     gen_note_table();
-
-    //display_fillrect(0, 0, 128, 128, 0x0000);
-    //display_write(0, 0, 128, 128, (uint16_t*)oled_test);
-
-    // for (int i=0; i<8; i++) {
-    //     draw_text(0, i*16, "The quick brown fox ju", (3<<(i*2)));
-    //     //HAL_Delay(1000);
-    // }
-
     synth_start();
 
     cfgnew.freq = note[69];
     cfgnew.key = true;
     cfgnew.osc_wave = WAVE_SAW;
-    control_updated = true;
+    redraw = true;
 
     while (1) {
+
         bool evt = read_buttons();
         if (evt) {
             if (buttons[BUTTON_ENVELOPE] == BTN_PRESSED) {
-                printf("btn down\r\n");            
-            } else if (buttons[BUTTON_ENVELOPE] == BTN_RELEASED) {
-                printf("btn up\r\n");
+                ctrlcfg = CTRL_ENVELOPE;
+                redraw = true;
             }
-
             if (buttons[BUTTON_FILTER] == BTN_PRESSED) {
-                printf("filt\r\n");
+                ctrlcfg = CTRL_FILTER;
+                redraw = true;
             }
         }
 
@@ -76,7 +74,7 @@ int main(void) {
                 if (encoders[ENC_RED].delta) {
                     ADD_DELTA_CLAMPED(input.attack, encoders[ENC_RED].delta);
                     cfgnew.attack_time = (float)input.attack/127 + 0.001f;
-                    cfgnew.attack_rate = 1.0f/(cfg.attack_time * SAMPLE_RATE);                    
+                    cfgnew.attack_rate = 1.0f/(cfgnew.attack_time * SAMPLE_RATE);                    
                 }
                 // Decay
                 if (encoders[ENC_GREEN].delta) {
@@ -101,22 +99,42 @@ int main(void) {
                     cfgnew.release_rate = 1.0 - exp(cfgnew.env_curve / (cfgnew.release_time * SAMPLE_RATE));
                 }
 
-
-                control_updated = true;
+                redraw = true;
                 break;
+
+            case CTRL_FILTER:
+
+                // Cutoff
+                if (encoders[ENC_RED].delta) {
+                    ADD_DELTA_CLAMPED(input.cutoff, encoders[ENC_RED].delta);
+                    cfgnew.cutoff = 10000.0f * (float)input.cutoff/127;
+                }
+                // Resonance
+                if (encoders[ENC_GREEN].delta) {
+                    ADD_DELTA_CLAMPED(input.resonance, encoders[ENC_GREEN].delta);
+                    cfgnew.resonance = 3.99f * (float)input.resonance/127;
+                }
+                // Envelope modulation
+                if (encoders[ENC_BLUE].delta) {
+                    ADD_DELTA_CLAMPED(input.env_mod, encoders[ENC_BLUE].delta);
+                    cfgnew.env_mod = 5000.0f * (float)input.env_mod/127;
+                }
+
+                redraw = true;
+                break;         
             }
         }
 
-        if (ctrlcfg == CTRL_ENVELOPE && control_updated) {
-            control_updated = false;
-            draw_adsr();
+        // Redraw if required
+        if (redraw) {
+            redraw = false;
+            if (ctrlcfg == CTRL_ENVELOPE) {
+                draw_adsr();
+            } else if (ctrlcfg == CTRL_FILTER) {
+                draw_filter();
+            }
         }
 
-        //printf("%d\t%d\t%d\r\n", encoders[0].value, encoders[0].last_value, encoders[0].delta);
-
-        //         case '1': ctrlcfg = CTRL_MAIN; printf("MAIN\r\n"); break;
-        //         case '2': ctrlcfg = CTRL_ENVELOPE; printf("ENVELOPE\r\n"); break;
-        //         case '3': ctrlcfg = CTRL_FILTER; printf("FILTER\r\n"); break;
         //         // Legato
         //         case 'l': cfgnew.legato ^= 1; break;
         //         // arpeggio
@@ -145,34 +163,43 @@ int main(void) {
 void draw_adsr(void) {
 
     const uint8_t height = 64;
-    const uint16_t attack_col  = 0xF800;
-    const uint16_t decay_col   = 0x07E0;
-    const uint16_t release_col = 0xFFFF;
+    float sus = cfgnew.sustain_level;
+    char buf[32];
 
     draw_rect(0, 0, 128, 128, 0x0000);
 
-    char buf[32];
-    sprintf(buf, "Attack   %.3f", cfgnew.attack_time);
-    draw_text(0, 64, buf, attack_col);
-    sprintf(buf, "Decay    %.3f", cfgnew.decay_time);
-    draw_text(0, 80, buf, decay_col);
-    sprintf(buf, "Sustain  %.3f", cfgnew.sustain_level);
-    draw_text(0, 96, buf, 0x001F);
-    sprintf(buf, "Release  %.3f", cfgnew.release_time);
-    draw_text(0, 112, buf, release_col);
+    draw_text(0,  80,  "A", 1, COL_RED);
+    draw_text(64, 80,  "D", 1, COL_GREEN);
+    draw_text(0,  112, "S", 1, COL_BLUE);
+    draw_text(64, 112, "R", 1, COL_WHITE);
+
+    sprintf(buf, "%d", input.attack);
+    draw_text(0+12, 74, buf, 2, COL_RED);
+    
+    sprintf(buf, "%d", input.decay);
+    draw_text(64+12, 74, buf, 2, COL_GREEN);
+    
+    sprintf(buf, "%d", input.sustain);
+    //draw_text(0+12, 106, buf, 2, COL_BLUE);
+    draw_text(10, 106, buf, 2, COL_BLUE);
+    
+    sprintf(buf, "%d", input.release);
+    draw_text(64+12, 106, buf, 2, COL_WHITE);
 
 
     uint8_t y, yold = 0;
     
     uint8_t offs;
 
+    
+
     // Calculate the actual durations for decay and release.
     // (.decay_time and .release_time are 'nominal' values:
     // .decay_time assumes sustain=0, .release_time assumes sustain=1)
     float dr = cfgnew.env_curve / cfgnew.decay_time;
     float rr = cfgnew.env_curve / cfgnew.release_time;
-    float decay_time_actual   = (float)log(ENV_OVERSHOOT / (1.0f - (cfgnew.sustain_level - ENV_OVERSHOOT))) / dr;
-    float release_time_actual = (float)log(ENV_OVERSHOOT / (cfgnew.sustain_level + ENV_OVERSHOOT)) / rr;
+    float decay_time_actual   = (float)log(ENV_OVERSHOOT / (1.0f - (sus - ENV_OVERSHOOT))) / dr;
+    float release_time_actual = (float)log(ENV_OVERSHOOT / (sus + ENV_OVERSHOOT)) / rr;
 
     // Calculate time step per pixel, and divide the display into
     // attack/decay/release sections appropriately based on the total time
@@ -187,15 +214,15 @@ void draw_adsr(void) {
     }
 
     // Attack
-    draw_line(0, height, attack_px, 0, attack_col);
+    draw_line(0, height, attack_px, 0, COL_RED);
 
     // Decay
     offs = attack_px;
-    float b = cfgnew.sustain_level - ENV_OVERSHOOT;
+    float b = sus - ENV_OVERSHOOT;
     for (uint8_t x=0; x<decay_px; x++) {
         float v = b + (1.0f-b) * (float)exp(dr * x * time_step);
         y = height * (1.0f-v);
-        if (x>0) draw_line(offs + x-1, yold, offs + x, y, decay_col);
+        if (x>0) draw_line(offs + x-1, yold, offs + x, y, COL_GREEN);
         yold = y;
     }
     offs += decay_px;
@@ -203,11 +230,33 @@ void draw_adsr(void) {
     // Release
     b = -ENV_OVERSHOOT;
     for (uint8_t x=0; x<release_px; x++) {
-        float v = b + (cfg.sustain_level-b)* (float)exp(rr * x * time_step);
+        float v = b + (sus-b)* (float)exp(rr * x * time_step);
         y = height * (1.0f-v);
-        draw_line(offs + x-1, yold, offs + x, y, release_col);
+        draw_line(offs + x-1, yold, offs + x, y, COL_WHITE);
         yold = y;
     }
+
+    display_draw();
+
+}
+
+void draw_filter(void) {
+
+    draw_rect(0, 0, 128, 128, 0x0000);
+
+    char buf[32];
+    
+    draw_text(0, 0, "Cutoff", 1, COL_RED);
+    sprintf(buf, "%02d", input.cutoff);
+    draw_text(0, 16, buf, 3, COL_RED);
+    
+    draw_text(64, 0, "Resonance", 1, COL_GREEN);
+    sprintf(buf, "%02d", input.resonance);
+    draw_text(64, 16, buf, 3, COL_GREEN);
+
+    draw_text(0, 64, "Env. mod.", 1, COL_BLUE);
+    sprintf(buf, "%02d", input.env_mod);
+    draw_text(0, 80, buf, 3, COL_BLUE);
 
     display_draw();
 

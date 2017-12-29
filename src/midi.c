@@ -11,7 +11,6 @@
 void midi_process_command(void);
 
 uint8_t command[3];
-bool control_updated = false;
 
 // Called from the MIDI UART interrupt handler
 void midi_process_byte(uint8_t byte) {
@@ -102,7 +101,6 @@ void midi_process_command(void) {
 
         // Controller
         case 0xB0:
-            control_updated = true;
             value = (float)(command[2]) / 0x7F;
 
             switch (ctrlcfg) {
@@ -131,23 +129,7 @@ void midi_process_command(void) {
                     break;
 
                 case CTRL_FILTER:
-                    switch (command[1]) {
-                        // Cutoff
-                        case CONTROLLER_1:
-                            cfgnew.cutoff = 10000.0f * value;
-                            break;
-
-                        // Resonance
-                        case CONTROLLER_2:
-                            cfgnew.resonance = 3.99f * value;
-                            break;
-
-                        // Env mod
-                        case CONTROLLER_3:
-                            cfgnew.env_mod = 5000.0f * value;
-                            break;
-                    }
-                    break;                    
+                    break;
 
             }
             break;

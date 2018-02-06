@@ -11,9 +11,10 @@
 SynthConfig cfgnew;
 SynthConfig cfg;
 
-uint32_t nco1, nco2;
-float    env = 0.0;
-EnvState env_state;
+uint32_t nco[NUM_OSC];
+float    env[NUM_OSC] = {0.0f};
+EnvState env_state[NUM_OSC] = {ENV_RELEASE};
+
 float    z1, z2, z3, z4; // filter state
 uint32_t next_beat = 0;
 int      arp_note = 0;
@@ -55,15 +56,12 @@ void BSP_AUDIO_OUT_TransferComplete_CallBack(void) {
             BSP_AUDIO_OUT_SetVolume(cfgnew.volume);
         }
 
-        // 
-
-
         memcpy(&cfg, &cfgnew, sizeof(SynthConfig));
-        if (cfg.env_retrigger) {
-            cfgnew.env_retrigger = false;
-            cfg.env_retrigger = false;
-            env_state = ENV_RELEASE;
-        }
+        // if (cfg.env_retrigger) {
+        //     cfgnew.env_retrigger = false;
+        //     cfg.env_retrigger = false;
+        //     env_state = ENV_RELEASE;
+        // }
     }
 
     sequencer_update();
@@ -74,6 +72,7 @@ void BSP_AUDIO_OUT_TransferComplete_CallBack(void) {
 
 }
 
+// many things broken
 inline void sequencer_update(void) {
 
     if (start_time > next_beat) {
@@ -82,15 +81,15 @@ inline void sequencer_update(void) {
 
 
         if (cfg.arp) {
-            env_state = ENV_RELEASE;
+            //env_state = ENV_RELEASE;
             arp_note++;
             if ((arp_note == MAX_ARP) || (cfg.arp_freqs[arp_note] == 0)) arp_note = 0;           
         }
     }
 
     if (cfg.arp) {
-        cfg.key = true;
-        cfg.freq = cfg.arp_freqs[arp_note];
+        //cfg.key = true;
+        //cfg.freq = cfg.arp_freqs[arp_note];
     }
 
 
@@ -136,61 +135,68 @@ inline float polyblep(float t, uint32_t f) {
 
 inline float sample_synth(void) {
 
-    float s;
-    float phase;
-    float s1, s2;
+    float s = 0.0f;
+
+    // Oscillators / envelopes
+    for (int i=0; i<NUM_OSC; i++) {
+        nco[i] += cfg.osc_freq[i];
+        float phase = (float)nco[i] / UINT32_MAX;
+        float s1 = 2.0f * phase - 1.0f;
+        s1 -= polyblep(phase, cfg.osc_freq[i]);
+
+        if (cfg.key[i]) {
+            if (env_state[i] == ENV_RELEASE) {
+                env_state[i] = ENV_ATTACK;
+                env[i] = 0.0f;
+            }
+
+            if (env_state[i] == ENV_ATTACK) {
+                env[i] += cfg.attack_rate;
+                if (env[i] > 1.0f) {
+                    env[i] = 1.0f;
+                    env_state[i] = ENV_DECAY;
+                }
+            } else if (env_state[i] == ENV_DECAY) {
+                env[i] += cfg.decay_rate * (cfg.sustain_level - ENV_OVERSHOOT - env[i]);
+                if (env[i] < cfg.sustain_level) {
+                    env[i] = cfg.sustain_level;
+                    env_state[i] = ENV_SUSTAIN;
+                }
+            } else if (env_state[i] == ENV_SUSTAIN) {
+                env[i] = cfg.sustain_level;
+            }
+
+        } else {
+            env_state[i] = ENV_RELEASE;
+            env[i] += cfg.release_rate * (-ENV_OVERSHOOT - env[i]);
+            if (env[i] < 0.0f) env[i] = 0.0f;
+        }
+
+        s += s1 * env[i];
+
+    }
+    s /= (float)NUM_OSC;
 
     // Oscillator
-    uint32_t old_nco1 = nco1;
-    nco1 += cfg.freq;
-    if (cfg.sync && nco1 < old_nco1) nco2 = 0;
-    phase = (float)nco1 / UINT32_MAX;
-    s1 = 2.0f * phase - 1.0f;
-    s1 -= polyblep(phase, cfg.freq);
+    // uint32_t old_nco1 = nco1;
+    // nco1 += cfg.freq;
+    // if (cfg.sync && nco1 < old_nco1) nco2 = 0;
+    // phase = (float)nco1 / UINT32_MAX;
+    // s1 = 2.0f * phase - 1.0f;
+    // s1 -= polyblep(phase, cfg.freq);
 
-    uint32_t freq2 = (uint32_t)(cfg.detune * (float)(cfg.freq));
+    // uint32_t freq2 = (uint32_t)(cfg.detune * (float)(cfg.freq));
 
-    nco2 += freq2;
-    phase = (float)nco2 / UINT32_MAX;
-    s2 = 2.0f * phase - 1.0f;
-    s2 -= polyblep(phase, freq2);
+    // nco2 += freq2;
+    // phase = (float)nco2 / UINT32_MAX;
+    // s2 = 2.0f * phase - 1.0f;
+    // s2 -= polyblep(phase, freq2);
 
-    s = (s1 + s2) / 2.0f;
+    // s = (s1 + s2) / 2.0f;
 
-
-    // Envelope
-    if (cfg.key) {
-        if (env_state == ENV_RELEASE) {
-            env_state = ENV_ATTACK;
-            env = 0.0f;
-        }
-
-        if (env_state == ENV_ATTACK) {
-            env += cfg.attack_rate;
-            if (env > 1.0f) {
-                env = 1.0f;
-                env_state = ENV_DECAY;
-            }
-        } else if (env_state == ENV_DECAY) {
-            env += cfg.decay_rate * (cfg.sustain_level - ENV_OVERSHOOT - env);
-            if (env < cfg.sustain_level) {
-                env = cfg.sustain_level;
-                env_state = ENV_SUSTAIN;
-            }
-        } else if (env_state == ENV_SUSTAIN) {
-            env = cfg.sustain_level;
-        }
-
-    } else {
-        env_state = ENV_RELEASE;
-        env += cfg.release_rate * (-ENV_OVERSHOOT - env);
-        if (env < 0.0f) env = 0.0f;
-    }
-
-    s = s * env;
 
     // Filter
-    float fc = cfg.cutoff + cfg.env_mod * env;
+    float fc = cfg.cutoff;// + cfg.env_mod * env;
     float a = PI * fc/SAMPLE_RATE;
     float ria = 1.0f / (1.0f + a);
     float g = a * ria;
@@ -248,8 +254,7 @@ void synth_start(void) {
 
     // Initial config
     cfg.busy    = false;
-    cfg.volume  = 55;
-    cfg.osc_wave = WAVE_SINE;
+    cfg.volume  = 0;
     cfg.legato  = false;
     cfg.arp     = ARP_OFF;
     cfg.arp_freqs[0] = 0;
@@ -271,7 +276,6 @@ void synth_start(void) {
     cfg.resonance = 0.0;
     cfg.env_mod = 0.0;
     cfg.env_curve = -log((1 + ENV_OVERSHOOT) / ENV_OVERSHOOT);
-    env_state = ENV_RELEASE;
     memcpy(&cfgnew, &cfg, sizeof(SynthConfig));
 
     create_wave_tables();

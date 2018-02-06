@@ -24,6 +24,8 @@ void input_init(void) {
     button_pins[BUTTON_ENVELOPE]  = LL_GPIO_PIN_0;
     button_ports[BUTTON_FILTER]   = GPIOC;
     button_pins[BUTTON_FILTER]    = LL_GPIO_PIN_1;
+    button_ports[BUTTON_OSC]      = GPIOC;
+    button_pins[BUTTON_OSC]       = LL_GPIO_PIN_2;
 
     for (int i=0; i<NUM_BUTTONS; i++) {
         pin_cfg_input(button_ports[i], button_pins[i], LL_GPIO_PULL_DOWN);

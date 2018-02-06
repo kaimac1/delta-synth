@@ -24,7 +24,9 @@ typedef enum {
     ARP_UP_DOWN,
 } ArpMode;
 
+
 #define MAX_ARP 5
+#define NUM_OSC 4
 
 typedef struct {
     bool busy;          // config being updated, don't copy
@@ -38,13 +40,14 @@ typedef struct {
     int tempo;          // bpm
 
     // Oscillators
-    uint32_t freq;      // normalised (max=fs/2)
-    Wave osc_wave;      // waveform
+    uint32_t osc_freq[NUM_OSC];
+    Wave osc_wave[NUM_OSC];
+
     bool sync;          // osc2 sync to master?
     float detune;       // fraction of master freq.
 
     // ADSR 
-    bool key;           // key down?
+    bool key[NUM_OSC];           // key down?
     float attack_rate;
     float decay_rate;
     float sustain_level;

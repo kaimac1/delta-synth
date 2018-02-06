@@ -14,6 +14,7 @@ void hardware_init(void);
 void SystemClock_Config(void);
 void draw_adsr(void);
 void draw_filter(void);
+void draw_osc(void);
 
 ControllerConfig ctrlcfg = CTRL_ENVELOPE;
 bool redraw;
@@ -46,9 +47,7 @@ int main(void) {
     gen_note_table();
     synth_start();
 
-    cfgnew.freq = note[69];
-    cfgnew.key = true;
-    cfgnew.osc_wave = WAVE_SAW;
+    cfgnew.volume = 80;
     redraw = true;
 
     while (1) {
@@ -60,6 +59,10 @@ int main(void) {
             }
             if (buttons[BUTTON_FILTER] == BTN_PRESSED) {
                 ctrlcfg = CTRL_FILTER;
+                redraw = true;
+            }
+            if (buttons[BUTTON_OSC] == BTN_PRESSED) {
+                ctrlcfg = CTRL_OSC;
                 redraw = true;
             }
         }
@@ -120,7 +123,14 @@ int main(void) {
                 }
 
                 redraw = true;
-                break;         
+                break;
+
+            case CTRL_OSC:
+
+                // 
+
+                redraw = true;
+                break;
             }
         }
 
@@ -149,10 +159,8 @@ int main(void) {
         // for (int i=0; i<MAX_ARP; i++) {
         //     printf("arp[%d] = %lu\r\n", i, cfgnew.arp_freqs[i]);
         // }
-        //printf("%lu\t%lu\r\n", disp_time, loop_time);
+        printf("%lu\r\n", loop_time);
         //printf("%d\r\n", pin_read(GPIOA, 1));
-
-        HAL_Delay(2);
 
     }
   

@@ -32,6 +32,31 @@ void midi_process_byte(uint8_t byte) {
     
 }
 
+
+void poly_add(uint32_t freq) {
+    cfgnew.busy = true;
+    for (int i=0; i<NUM_OSC; i++) {
+        if (cfgnew.key[i] == false) {
+            cfgnew.osc_freq[i] = freq;
+            cfgnew.key[i] = true;
+            break;
+        }
+    }
+    cfgnew.busy = false;
+}
+
+void poly_del(uint32_t freq) {
+    cfgnew.busy = true;
+    for (int i=0; i<NUM_OSC; i++) {
+        if (cfgnew.osc_freq[i] == freq) {
+            cfgnew.key[i] = false;
+            break;
+        }
+    }
+    cfgnew.busy = false;
+}
+
+
 void arp_add(uint32_t freq) {
 
     cfgnew.busy = true;
@@ -70,69 +95,56 @@ void arp_del(uint32_t freq) {
 
 void midi_process_command(void) {
 
-    float value;
-
     switch(command[0]) {
 
         // Note on
         case 0x90:
-            if (cfgnew.arp != ARP_OFF) {
-                arp_add(note[command[1]]);
-                break;
-            }
+            poly_add(note[command[1]]);
+            // if (cfgnew.arp != ARP_OFF) {
+            //     arp_add(note[command[1]]);
+            //     break;
+            // }
             // Retrigger on new note in normal mode
-            if (!cfgnew.legato && (note[command[1]] != cfg.freq)) {
-                cfgnew.env_retrigger = true;
-            }
-            cfgnew.freq = note[command[1]];
-            cfgnew.key = true;
+            // if (!cfgnew.legato && (note[command[1]] != cfg.freq)) {
+            //     cfgnew.env_retrigger = true;
+            // }
+            // cfgnew.freq = note[command[1]];
             break;
 
         // Note off
         case 0x80:
-            if (cfgnew.arp != ARP_OFF) {
-                arp_del(note[command[1]]);
-                break;
-            }
-            if (note[command[1]] == cfgnew.freq) {
-                cfgnew.key = false;
-            }
+            poly_del(note[command[1]]);
+            // if (cfgnew.arp != ARP_OFF) {
+            //     arp_del(note[command[1]]);
+            //     break;
+            // }
+            // if (note[command[1]] == cfgnew.freq) {
+            //     cfgnew.key = false;
+            // }
             break;
 
-        // Controller
-        case 0xB0:
-            value = (float)(command[2]) / 0x7F;
+        // value = (float)(command[2]) / 0x7F;
+        // switch (ctrlcfg) {
+        //     case CTRL_MAIN:
+        //         switch (command[1]) {
+        //             // Master volume
+        //             case CONTROLLER_1:
+        //                 cfgnew.volume = 100 * value;
+        //                 printf("volume = %d\r\n", cfgnew.volume);
+        //                 break;
 
-            switch (ctrlcfg) {
-                case CTRL_MAIN:
-                    switch (command[1]) {
-                        // Master volume
-                        case CONTROLLER_1:
-                            cfgnew.volume = 100 * value;
-                            printf("volume = %d\r\n", cfgnew.volume);
-                            break;
+        //             case CONTROLLER_2:
+        //                 cfgnew.tempo = 160 * value;
+        //                 printf("tempo = %d\r\n", cfgnew.tempo);
+        //                 break;
 
-                        case CONTROLLER_2:
-                            cfgnew.tempo = 160 * value;
-                            printf("tempo = %d\r\n", cfgnew.tempo);
-                            break;
-
-                        case CONTROLLER_3:
-                            cfgnew.detune = 1.0f + 1.5f * value;
-                            //printf("detune = %f\r\n", cfgnew.detune);
-                            break;
-                    }
-                    break;
-
-
-                case CTRL_ENVELOPE:
-                    break;
-
-                case CTRL_FILTER:
-                    break;
-
-            }
-            break;
+        //             case CONTROLLER_3:
+        //                 cfgnew.detune = 1.0f + 1.5f * value;
+        //                 //printf("detune = %f\r\n", cfgnew.detune);
+        //                 break;
+        //         }
+        //         break;
+        // }
 
         default:
             printf("%02x %02x %02x\r\n", command[0], command[1], command[2]);

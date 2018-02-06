@@ -5,7 +5,7 @@
 #include <stdio.h>
 
 typedef enum {
-	CTRL_MAIN,
+	CTRL_OSC,
 	CTRL_ENVELOPE,
 	CTRL_FILTER
 } ControllerConfig;

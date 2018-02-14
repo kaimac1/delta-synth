@@ -1,7 +1,6 @@
 #include "synth.h"
 #include "board.h"
-#include "stm32f401_discovery.h"
-#include "stm32f401_discovery_audio.h"
+#include "audio.h"
 #include <math.h>
 #include <string.h>
 #include "stm32f4xx_ll_tim.h"
@@ -53,7 +52,7 @@ void BSP_AUDIO_OUT_TransferComplete_CallBack(void) {
 
         // Volume level changed
         if (cfgnew.volume != cfg.volume) {
-            BSP_AUDIO_OUT_SetVolume(cfgnew.volume);
+            //BSP_AUDIO_OUT_SetVolume(cfgnew.volume);
         }
 
         memcpy(&cfg, &cfgnew, sizeof(SynthConfig));
@@ -105,7 +104,7 @@ inline void fill_buffer(void) {
         //s = 0.0f;
         //s += sample_drums();
 
-        int16_t s16 = s * 10000;
+        int16_t s16 = s * 1000;
         out_buffer[i] = s16;   // left
         out_buffer[i+1] = s16; // right
     }
@@ -281,7 +280,7 @@ void synth_start(void) {
     create_wave_tables();
     fill_buffer();
 
-    if (BSP_AUDIO_OUT_Init(OUTPUT_DEVICE_AUTO, cfg.volume, SAMPLE_RATE) != 0) {
+    if (BSP_AUDIO_OUT_Init(SAMPLE_RATE) != 0) {
         printf("init failed\r\n");
         return;
     }

@@ -1,6 +1,6 @@
 #pragma once
 #include "main.h"
-#include "stm32f401_discovery.h"
+#include "stm32f4xx_hal.h"
 #include "stm32f4xx_ll_gpio.h"
 
 extern UART_HandleTypeDef h_uart_debug;
@@ -65,8 +65,3 @@ void build_font_index(void);
 // uart
 void uart_init(void);
 
-#define MIDI_PORT	GPIOA
-#define MIDI_TX_PIN	GPIO_PIN_9
-#define MIDI_RX_PIN GPIO_PIN_10
-#define MIDI_TX_AF	GPIO_AF7_USART1
-#define MIDI_RX_AF	GPIO_AF7_USART1

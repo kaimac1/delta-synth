@@ -11,25 +11,26 @@
 
 void display_reset(void);
 
-#define DISPLAY_SPI SPI1
-#define SPI_CLK_EN  __HAL_RCC_SPI1_CLK_ENABLE
+#define DISPLAY_SPI SPI2
+#define SPI_CLK_EN  __HAL_RCC_SPI2_CLK_ENABLE
 
-#define RESET_PORT  GPIOD
-#define RESET_PIN   LL_GPIO_PIN_0
-#define CS_PORT     GPIOD
-#define CS_PIN      LL_GPIO_PIN_1
-#define DC_PORT     GPIOD
-#define DC_PIN      LL_GPIO_PIN_2
+#define RESET_PORT  GPIOB
+#define RESET_PIN   LL_GPIO_PIN_10
+#define CS_PORT     GPIOB
+#define CS_PIN      LL_GPIO_PIN_12
+#define DC_PORT     GPIOB
+#define DC_PIN      LL_GPIO_PIN_14
 #define SCK_PORT    GPIOB
-#define SCK_PIN     LL_GPIO_PIN_3
+#define SCK_PIN     LL_GPIO_PIN_13
 #define MOSI_PORT   GPIOB
-#define MOSI_PIN    LL_GPIO_PIN_5
+#define MOSI_PIN    LL_GPIO_PIN_15
+
+#define NOPS 32 // was 16
 
 uint16_t dbuffer[128][128];
 
 void display_init(void) {
 
-    __HAL_RCC_GPIOD_CLK_ENABLE();
     __HAL_RCC_GPIOB_CLK_ENABLE();
     SPI_CLK_EN();
 
@@ -67,14 +68,14 @@ void display_init(void) {
 void writeCommand(uint8_t c) {
     LL_GPIO_ResetOutputPin(DC_PORT, DC_PIN);
     DISPLAY_SPI->DR = c;
-    for (int i=0; i<16; i++) asm("nop");
+    for (int i=0; i<NOPS; i++) asm("nop");
 
 }
 
 void writeData(uint8_t c) {
     LL_GPIO_SetOutputPin(DC_PORT, DC_PIN);
     DISPLAY_SPI->DR = c;
-    for (int i=0; i<16; i++) asm("nop");
+    for (int i=0; i<NOPS; i++) asm("nop");
 } 
 
 
@@ -257,9 +258,9 @@ void display_write(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t *buf
     for (uint16_t i=0; i < w*h; i++) {
         uint16_t col = buffer[i];
         DISPLAY_SPI->DR = col >> 8;
-        for (int i=0; i<16; i++) asm("nop");
+        for (int i=0; i<NOPS; i++) asm("nop");
         DISPLAY_SPI->DR = col & 0xFF;
-        for (int i=0; i<16; i++) asm("nop");
+        for (int i=0; i<NOPS; i++) asm("nop");
     }
 
 }

@@ -7,52 +7,40 @@
 UART_HandleTypeDef h_uart_debug;
 UART_HandleTypeDef h_uart_midi;
 
+#define DEBUG_PORT   GPIOA
+#define DEBUG_TX_PIN LL_GPIO_PIN_9
+#define DEBUG_RX_PIN LL_GPIO_PIN_10
+#define DEBUG_AF 7
+
+#define MIDI_PORT   GPIOC
+#define MIDI_TX_PIN LL_GPIO_PIN_6
+#define MIDI_RX_PIN LL_GPIO_PIN_7
+#define MIDI_AF 8
+
 void HAL_UART_MspInit(UART_HandleTypeDef *huart) {  
 
-    GPIO_InitTypeDef  GPIO_InitStruct;
-
     if (huart == &h_uart_debug) {
-        __HAL_RCC_USART2_CLK_ENABLE();
-
-        // TX
-        GPIO_InitStruct.Pin       = GPIO_PIN_2;
-        GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
-        GPIO_InitStruct.Pull      = GPIO_NOPULL;
-        GPIO_InitStruct.Speed     = GPIO_SPEED_FAST;
-        GPIO_InitStruct.Alternate = GPIO_AF7_USART2;
-        HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-        // RX
-        GPIO_InitStruct.Pin = GPIO_PIN_3;
-        GPIO_InitStruct.Alternate = GPIO_AF7_USART2;
-        HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-        HAL_NVIC_SetPriority(USART2_IRQn, 3, 0);
-        HAL_NVIC_EnableIRQ(USART2_IRQn);
-
-    } else if (huart == &h_uart_midi) {
         __HAL_RCC_USART1_CLK_ENABLE();
 
-        // TX
-        GPIO_InitStruct.Pin       = MIDI_TX_PIN;
-        GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
-        GPIO_InitStruct.Pull      = GPIO_NOPULL;
-        GPIO_InitStruct.Speed     = GPIO_SPEED_FAST;
-        GPIO_InitStruct.Alternate = MIDI_TX_AF;
-        HAL_GPIO_Init(MIDI_PORT, &GPIO_InitStruct);
-        // RX
-        GPIO_InitStruct.Pin = MIDI_RX_PIN;
-        GPIO_InitStruct.Alternate = MIDI_RX_AF;
-        HAL_GPIO_Init(MIDI_PORT, &GPIO_InitStruct);
+        pin_cfg_af(DEBUG_PORT, DEBUG_TX_PIN, DEBUG_AF);
+        pin_cfg_af(DEBUG_PORT, DEBUG_RX_PIN, DEBUG_AF);
+        HAL_NVIC_SetPriority(USART1_IRQn, 3, 0);
+        HAL_NVIC_EnableIRQ(USART1_IRQn);
 
-        HAL_NVIC_SetPriority(USART1_IRQn, 1, 0);
-        HAL_NVIC_EnableIRQ(USART1_IRQn);        
+    } else if (huart == &h_uart_midi) {
+        __HAL_RCC_USART6_CLK_ENABLE();
+
+        pin_cfg_af(MIDI_PORT, MIDI_TX_PIN, MIDI_AF);
+        pin_cfg_af(MIDI_PORT, MIDI_RX_PIN, MIDI_AF);        
+        HAL_NVIC_SetPriority(USART6_IRQn, 1, 0);
+        HAL_NVIC_EnableIRQ(USART6_IRQn);        
     }
 }
 
 void uart_init(void) {
 
     // debug
-    h_uart_debug.Instance          = USART2;
+    h_uart_debug.Instance          = USART1;
     h_uart_debug.Init.BaudRate     = 115200;
     h_uart_debug.Init.WordLength   = UART_WORDLENGTH_8B;
     h_uart_debug.Init.StopBits     = UART_STOPBITS_1;
@@ -65,7 +53,7 @@ void uart_init(void) {
     HAL_UART_Init(&h_uart_debug);
 
     // midi
-    h_uart_midi.Instance          = USART1;
+    h_uart_midi.Instance          = USART6;
     h_uart_midi.Init.BaudRate     = 31250;
     h_uart_midi.Init.WordLength   = UART_WORDLENGTH_8B;
     h_uart_midi.Init.StopBits     = UART_STOPBITS_1;
@@ -76,18 +64,18 @@ void uart_init(void) {
     
     HAL_UART_MspInit(&h_uart_midi);
     HAL_UART_Init(&h_uart_midi);
-    LL_USART_EnableIT_RXNE(USART1);
+    LL_USART_EnableIT_RXNE(USART6);
 
 }
 
-void USART2_IRQHandler(void) {
+void USART1_IRQHandler(void) {
     HAL_UART_IRQHandler(&h_uart_debug);
 }
 
 void uart_send(uint8_t *ptr, int len) {
     for (int i=0; i<len; i++) {
-        while (!LL_USART_IsActiveFlag_TXE(USART2));
-        LL_USART_TransmitData8(USART2, *ptr++);
+        while (!LL_USART_IsActiveFlag_TXE(USART1));
+        LL_USART_TransmitData8(USART1, *ptr++);
     }
 }
 
@@ -99,10 +87,10 @@ int _write(int file, char * ptr, int len) {
 
 
 // MIDI in
-void USART1_IRQHandler(void) {
-    if (LL_USART_IsActiveFlag_RXNE(USART1)) {
-        LL_USART_ClearFlag_RXNE(USART1);
-        uint8_t byte = LL_USART_ReceiveData8(USART1);
+void USART6_IRQHandler(void) {
+    if (LL_USART_IsActiveFlag_RXNE(USART6)) {
+        LL_USART_ClearFlag_RXNE(USART6);
+        uint8_t byte = LL_USART_ReceiveData8(USART6);
         midi_process_byte(byte);
     }
 }

@@ -9,10 +9,6 @@ BUILD_DIR = build
 ######################################
 C_SOURCES =  \
 src/main.c \
-src/synth.c \
-src/midi.c \
-src/notes.c \
-src/stm32f4xx_it.c \
 src/system_stm32f4xx.c \
 stm32/hal/Src/stm32f4xx_hal.c \
 stm32/hal/Src/stm32f4xx_hal_cortex.c \
@@ -33,13 +29,19 @@ stm32/hal/Src/stm32f4xx_ll_usart.c \
 stm32/hal/Src/stm32f4xx_ll_gpio.c \
 stm32/hal/Src/stm32f4xx_ll_exti.c \
 stm32/hal/Src/stm32f4xx_ll_spi.c \
-board/uart.c \
 board/gpio.c \
-board/input.c \
+board/uart.c \
+src/synth.c  \
+src/midi.c   \
+src/notes.c  \
+src/stm32f4xx_it.c  \
+board/audio.c \
 board/display.c \
-board/stm32f401_discovery.c \
-board/stm32f401_discovery_audio.c \
-board/cs43l22/cs43l22.c \
+
+#board/input.c \
+
+
+
 
 C_INCLUDES =  \
 -Isrc \
@@ -48,10 +50,10 @@ C_INCLUDES =  \
 -Istm32/cmsis \
 -Istm32/hal/Inc \
 -Iboard \
--Iboard/cs43l22 \
+
 
 # ASM sources
-ASM_SOURCES = stm32/startup_stm32f401xc.s
+ASM_SOURCES = stm32/startup_stm32f446xx.s
 
 
 #######################################
@@ -76,7 +78,7 @@ MCU = -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard
 C_DEFS =  \
 -DUSE_HAL_DRIVER \
 -DUSE_FULL_LL_DRIVER \
--DSTM32F401xC
+-DSTM32F446xx
 
 ASFLAGS = $(MCU) $(OPT) -Wall -fdata-sections -ffunction-sections
 CFLAGS = $(MCU) $(C_DEFS) $(C_INCLUDES) $(OPT) -Wall -fdata-sections -ffunction-sections -Wdouble-promotion
@@ -94,7 +96,7 @@ CFLAGS += -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)"
 # LDFLAGS
 #######################################
 # link script
-LDSCRIPT = STM32F401VCTx_FLASH.ld
+LDSCRIPT = STM32F446RETx_FLASH.ld
 
 # libraries
 LIBS = -lc -lm -lnosys

@@ -52,7 +52,7 @@ int main(void) {
     pin_set(GPIOA, 1<<5, 1);
 
     while (1) {
-    //     bool evt = read_buttons();
+        bool evt = read_buttons();
     //     if (evt) {
     //         if (buttons[BUTTON_ENVELOPE] == BTN_PRESSED) {
     //             ctrlcfg = CTRL_ENVELOPE;
@@ -68,72 +68,72 @@ int main(void) {
     //         }
     //     }
 
-    //     evt = read_encoders();
-    //     if (evt) {
-    //         switch (ctrlcfg) {
-    //         case CTRL_ENVELOPE:
+        evt = read_encoders();
+        if (evt) {
+            switch (ctrlcfg) {
+            case CTRL_ENVELOPE:
 
-    //             // Attack
-    //             if (encoders[ENC_RED].delta) {
-    //                 ADD_DELTA_CLAMPED(input.attack, encoders[ENC_RED].delta);
-    //                 cfgnew.attack_time = (float)input.attack/127 + 0.001f;
-    //                 cfgnew.attack_rate = 1.0f/(cfgnew.attack_time * SAMPLE_RATE);                    
-    //             }
-    //             // Decay
-    //             if (encoders[ENC_GREEN].delta) {
-    //                 ADD_DELTA_CLAMPED(input.decay, encoders[ENC_GREEN].delta);
-    //                 float value = (float)input.decay/127;
-    //                 value = value*value*value;
-    //                 cfgnew.decay_time = value * 5;
-    //                 cfgnew.decay_rate = 1.0 - exp(cfgnew.env_curve / (cfgnew.decay_time * SAMPLE_RATE));
-    //             }
-    //             // Sustain
-    //             if (encoders[ENC_BLUE].delta) {
-    //                 ADD_DELTA_CLAMPED(input.sustain, encoders[ENC_BLUE].delta);
-    //                 float value = (float)input.sustain/127;
-    //                 cfgnew.sustain_level = value;
-    //             }
-    //             // Release
-    //             if (encoders[ENC_WHITE].delta) {
-    //                 ADD_DELTA_CLAMPED(input.release, encoders[ENC_WHITE].delta);
-    //                 float value = (float)input.release/127;
-    //                 value = value*value*value;
-    //                 cfgnew.release_time = value * 5;
-    //                 cfgnew.release_rate = 1.0 - exp(cfgnew.env_curve / (cfgnew.release_time * SAMPLE_RATE));
-    //             }
+                // Attack
+                if (encoders[ENC_RED].delta) {
+                    ADD_DELTA_CLAMPED(input.attack, encoders[ENC_RED].delta);
+                    cfgnew.attack_time = (float)input.attack/127 + 0.001f;
+                    cfgnew.attack_rate = 1.0f/(cfgnew.attack_time * SAMPLE_RATE);                    
+                }
+                // Decay
+                if (encoders[ENC_GREEN].delta) {
+                    ADD_DELTA_CLAMPED(input.decay, encoders[ENC_GREEN].delta);
+                    float value = (float)input.decay/127;
+                    value = value*value*value;
+                    cfgnew.decay_time = value * 5;
+                    cfgnew.decay_rate = 1.0 - exp(cfgnew.env_curve / (cfgnew.decay_time * SAMPLE_RATE));
+                }
+                // Sustain
+                if (encoders[ENC_BLUE].delta) {
+                    ADD_DELTA_CLAMPED(input.sustain, encoders[ENC_BLUE].delta);
+                    float value = (float)input.sustain/127;
+                    cfgnew.sustain_level = value;
+                }
+                // Release
+                if (encoders[ENC_WHITE].delta) {
+                    ADD_DELTA_CLAMPED(input.release, encoders[ENC_WHITE].delta);
+                    float value = (float)input.release/127;
+                    value = value*value*value;
+                    cfgnew.release_time = value * 5;
+                    cfgnew.release_rate = 1.0 - exp(cfgnew.env_curve / (cfgnew.release_time * SAMPLE_RATE));
+                }
 
-    //             redraw = true;
-    //             break;
+                redraw = true;
+                break;
 
-    //         case CTRL_FILTER:
+            case CTRL_FILTER:
 
-    //             // Cutoff
-    //             if (encoders[ENC_RED].delta) {
-    //                 ADD_DELTA_CLAMPED(input.cutoff, encoders[ENC_RED].delta);
-    //                 cfgnew.cutoff = 10000.0f * (float)input.cutoff/127;
-    //             }
-    //             // Resonance
-    //             if (encoders[ENC_GREEN].delta) {
-    //                 ADD_DELTA_CLAMPED(input.resonance, encoders[ENC_GREEN].delta);
-    //                 cfgnew.resonance = 3.99f * (float)input.resonance/127;
-    //             }
-    //             // Envelope modulation
-    //             if (encoders[ENC_BLUE].delta) {
-    //                 ADD_DELTA_CLAMPED(input.env_mod, encoders[ENC_BLUE].delta);
-    //                 cfgnew.env_mod = 5000.0f * (float)input.env_mod/127;
-    //             }
+                // Cutoff
+                if (encoders[ENC_RED].delta) {
+                    ADD_DELTA_CLAMPED(input.cutoff, encoders[ENC_RED].delta);
+                    cfgnew.cutoff = 10000.0f * (float)input.cutoff/127;
+                }
+                // Resonance
+                if (encoders[ENC_GREEN].delta) {
+                    ADD_DELTA_CLAMPED(input.resonance, encoders[ENC_GREEN].delta);
+                    cfgnew.resonance = 3.99f * (float)input.resonance/127;
+                }
+                // Envelope modulation
+                if (encoders[ENC_BLUE].delta) {
+                    ADD_DELTA_CLAMPED(input.env_mod, encoders[ENC_BLUE].delta);
+                    cfgnew.env_mod = 5000.0f * (float)input.env_mod/127;
+                }
 
-    //             redraw = true;
-    //             break;
+                redraw = true;
+                break;
 
-    //         case CTRL_OSC:
+            case CTRL_OSC:
 
-    //             // 
+                // 
 
-    //             redraw = true;
-    //             break;
-    //         }
-    //     }
+                redraw = true;
+                break;
+            }
+        }
 
         // Redraw if required
         if (redraw) {
@@ -274,7 +274,7 @@ void hardware_init(void) {
     SystemClock_Config();
 
     uart_init();
-    //input_init();
+    input_init();
     display_init();
 
     // Microsecond timer

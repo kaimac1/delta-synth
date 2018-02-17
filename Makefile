@@ -10,6 +10,7 @@ BUILD_DIR = build
 C_SOURCES =  \
 src/main.c \
 src/system_stm32f4xx.c \
+stm32/stm32f4xx_it.c \
 stm32/hal/Src/stm32f4xx_hal.c \
 stm32/hal/Src/stm32f4xx_hal_cortex.c \
 stm32/hal/Src/stm32f4xx_hal_rcc_ex.c \
@@ -34,11 +35,9 @@ board/uart.c \
 src/synth.c  \
 src/midi.c   \
 src/notes.c  \
-src/stm32f4xx_it.c  \
 board/audio.c \
 board/display.c \
-
-#board/input.c \
+board/input.c \
 
 
 

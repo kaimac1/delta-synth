@@ -27,23 +27,23 @@ void input_init(void) {
     button_ports[BUTTON_OSC]      = GPIOC;
     button_pins[BUTTON_OSC]       = LL_GPIO_PIN_2;
 
-    for (int i=0; i<NUM_BUTTONS; i++) {
-        pin_cfg_input(button_ports[i], button_pins[i], LL_GPIO_PULL_DOWN);
-    }
+    // for (int i=0; i<NUM_BUTTONS; i++) {
+    //     pin_cfg_input(button_ports[i], button_pins[i], LL_GPIO_PULL_DOWN);
+    // }
 
     // encoders
-    encoder_ports[0] = GPIOE;
-    encoder_pin_a[0]  = LL_GPIO_PIN_7;
-    encoder_pin_b[0]  = LL_GPIO_PIN_8;
-    encoder_ports[1] = GPIOE;
-    encoder_pin_a[1]  = LL_GPIO_PIN_9;
-    encoder_pin_b[1]  = LL_GPIO_PIN_10;
-    encoder_ports[2] = GPIOE;
-    encoder_pin_a[2]  = LL_GPIO_PIN_11;
-    encoder_pin_b[2]  = LL_GPIO_PIN_12;
-    encoder_ports[3] = GPIOE;
-    encoder_pin_a[3]  = LL_GPIO_PIN_13;
-    encoder_pin_b[3]  = LL_GPIO_PIN_14;
+    encoder_ports[0] = GPIOA;
+    encoder_pin_a[0] = LL_GPIO_PIN_14;
+    encoder_pin_b[0] = LL_GPIO_PIN_15;
+    encoder_ports[1] = GPIOA;
+    encoder_pin_a[1] = LL_GPIO_PIN_11;
+    encoder_pin_b[1] = LL_GPIO_PIN_12;
+    encoder_ports[2] = GPIOB;
+    encoder_pin_a[2] = LL_GPIO_PIN_8;
+    encoder_pin_b[2] = LL_GPIO_PIN_9;
+    encoder_ports[3] = GPIOB;
+    encoder_pin_a[3] = LL_GPIO_PIN_6;
+    encoder_pin_b[3] = LL_GPIO_PIN_7;
 
     for (int i=0; i<NUM_ENCODERS; i++) {
         pin_cfg_exti(encoder_ports[i], encoder_pin_a[i],  LL_GPIO_PULL_UP, LL_EXTI_TRIGGER_RISING_FALLING);
@@ -51,17 +51,17 @@ void input_init(void) {
         enc_history[i] = (pin_read(encoder_ports[i], encoder_pin_b[i]) << 1) | pin_read(encoder_ports[i], encoder_pin_a[i]);
     }
 
-    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTE, LL_SYSCFG_EXTI_LINE7);
-    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTE, LL_SYSCFG_EXTI_LINE8);
-    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTE, LL_SYSCFG_EXTI_LINE9);
-    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTE, LL_SYSCFG_EXTI_LINE10);
-    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTE, LL_SYSCFG_EXTI_LINE11);
-    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTE, LL_SYSCFG_EXTI_LINE12);
-    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTE, LL_SYSCFG_EXTI_LINE13);
-    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTE, LL_SYSCFG_EXTI_LINE14);
+    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTA, LL_SYSCFG_EXTI_LINE14);
+    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTA, LL_SYSCFG_EXTI_LINE15);
+    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTA, LL_SYSCFG_EXTI_LINE11);
+    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTA, LL_SYSCFG_EXTI_LINE12);
+    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTB, LL_SYSCFG_EXTI_LINE8);
+    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTB, LL_SYSCFG_EXTI_LINE9);
+    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTB, LL_SYSCFG_EXTI_LINE6);
+    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTB, LL_SYSCFG_EXTI_LINE7);
     HAL_NVIC_SetPriority(EXTI9_5_IRQn, 5, 0);
-    HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
     HAL_NVIC_SetPriority(EXTI15_10_IRQn, 5, 0);
+    HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
     HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
 }

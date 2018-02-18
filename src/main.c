@@ -165,22 +165,37 @@ int main(void) {
   
 }
 
+void draw_arc(uint16_t x, uint16_t y, uint16_t radius, float start_angle, float end_angle, uint16_t colour) {
+
+    float step = 2.0f * 3.1415926f / 128;
+    float xold = -1;
+    float yold = -1;
+
+    for (float a=start_angle; a<end_angle; a+=step) {
+        float ynew = y + 0.5f + radius*cosf(a);
+        float xnew = x + 0.5f - radius*sinf(a);
+        if (xold != -1) draw_line(xold, yold, xnew, ynew, colour);
+        xold = xnew;
+        yold = ynew;
+    }
+
+}
+
 void draw_adsr(void) {
 
-    const uint8_t height = 64;
     char buf[32];
 
     draw_rect(0, 0, 128, 128, 0x0000);
-    draw_text(0,  80,  "A", 1, COL_RED);
-    draw_text(64, 80,  "D", 1, COL_GREEN);
-    draw_text(0,  112, "S", 1, COL_BLUE);
-    draw_text(64, 112, "R", 1, COL_WHITE);
+    draw_text(0,  0,  "Attack", 1, COL_RED);
+    // draw_text(64, 80,  "D", 1, COL_GREEN);
+    // draw_text(0,  112, "S", 1, COL_BLUE);
+    // draw_text(64, 112, "R", 1, COL_WHITE);
 
     sprintf(buf, "%d", input.attack);
     draw_text(0+12, 74, buf, 2, COL_RED);
     
-    sprintf(buf, "%d", input.decay);
-    draw_text(64+12, 74, buf, 2, COL_GREEN);
+    // sprintf(buf, "%d", input.decay);
+    // draw_text(64+12, 74, buf, 2, COL_GREEN);
     
     sprintf(buf, "%d", input.sustain);
     draw_text(0+12, 104, buf, 2, COL_BLUE);
@@ -188,51 +203,26 @@ void draw_adsr(void) {
     sprintf(buf, "%d", input.release);
     draw_text(64+12, 104, buf, 2, COL_WHITE);
 
-    uint8_t y, yold = 0;
-    uint8_t offs;
+    int cx = 32;
+    int cy = 32;
+    int cr = input.sustain;
 
-    // Calculate the actual durations for decay and release.
-    // (.decay_time and .release_time are 'nominal' values:
-    // .decay_time assumes sustain=0, .release_time assumes sustain=1)
-    float sus = cfgnew.sustain_level;
-    float dr = cfgnew.env_curve / cfgnew.decay_time;
-    float rr = cfgnew.env_curve / cfgnew.release_time;
-    float decay_time_actual   = (float)log(ENV_OVERSHOOT / (1.0f - (sus - ENV_OVERSHOOT))) / dr;
-    float release_time_actual = (float)log(ENV_OVERSHOOT / (sus + ENV_OVERSHOOT)) / rr;
+    float attack = input.attack / 127.0f;
+    float rad = attack * 3.1415926f * 2;
 
-    // Calculate time step per pixel, and divide the display into
-    // attack/decay/release sections appropriately based on the total time
-    float total = cfgnew.attack_time + decay_time_actual + release_time_actual;
-    float time_step = total / 127;
-    uint8_t attack_px = cfgnew.attack_time / time_step;
-    uint8_t decay_px  = decay_time_actual / time_step;
-    uint8_t release_px = release_time_actual / time_step;
+    int py = cy + cr*cosf(rad);
+    int px = cx - cr*sinf(rad);
 
-    if (decay_px == 0) {
-        decay_px++;
+    for (int r=0; r<input.release; r++) {
+        draw_arc(cx, cy, cr+r, 0.0f, 2*3.1415926f, 0x1111);
     }
 
-    // Attack
-    draw_line(0, height, attack_px, 0, COL_RED);
 
-    // Decay
-    offs = attack_px;
-    float b = sus - ENV_OVERSHOOT;
-    for (uint8_t x=0; x<decay_px; x++) {
-        float v = b + (1.0f-b) * (float)exp(dr * x * time_step);
-        y = height * (1.0f-v);
-        if (x>0) draw_line(offs + x-1, yold, offs + x, y, COL_GREEN);
-        yold = y;
-    }
-    offs += decay_px;
+    //draw_line(cx, cy+cr/2, cx, cy+cr, COL_RED);
+    draw_line((cx+px)/2, (cy+py)/2, px, py, COL_RED);
 
-    // Release
-    b = -ENV_OVERSHOOT;
-    for (uint8_t x=0; x<release_px; x++) {
-        float v = b + (sus-b)* (float)exp(rr * x * time_step);
-        y = height * (1.0f-v);
-        draw_line(offs + x-1, yold, offs + x, y, COL_WHITE);
-        yold = y;
+    for (int r=0; r<input.release; r++) {
+        draw_arc(cx, cy, cr+r, 0.0f, rad, COL_RED);
     }
 
     display_draw();

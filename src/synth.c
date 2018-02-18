@@ -244,7 +244,7 @@ void create_wave_tables(void) {
     // Sine
     for (int i=0; i<SINE_TABLE_SIZE; i++) {
         float arg = 2*PI*i / SINE_TABLE_SIZE;
-        sine_table[i] = (int16_t)(sin(arg) * 32768);
+        sine_table[i] = (int16_t)(sinf(arg) * 32768);
     }
 }
 

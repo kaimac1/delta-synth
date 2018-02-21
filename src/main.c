@@ -198,7 +198,7 @@ inline float fast_cos(float arg) {
 void draw_gauge(uint16_t x, uint16_t y, float amount, uint16_t colour) {
 
     int radius = 16;
-    int thickness = 7;
+    int thickness = 23-radius;
 
     float start = TWOPI * 0.1f;
     float end = TWOPI * 0.9f;
@@ -228,15 +228,27 @@ void draw_adsr(void) {
     uint32_t time = LL_TIM_GetCounter(TIM2);
 
     draw_rect(0, 0, 128, 128, 0x0000);
-    draw_text(0,  0,   "Attack",  1, COL_RED);
-    draw_text(64, 0,   "Decay",   1, COL_GREEN);
-    draw_text(0,  64, "Sustain", 1, COL_BLUE);
-    draw_text(64, 64, "Release", 1, COL_WHITE);
+    draw_text(0,  0,   "Top text blah blah blah",  1, COL_WHITE);
 
-    draw_gauge(32, 40, input.attack / 127.0f, COL_RED);
-    draw_gauge(96, 40, input.decay / 127.0f, COL_GREEN);
-    draw_gauge(32, 104, input.sustain / 127.0f, COL_BLUE);
-    draw_gauge(96, 104, input.release / 127.0f, COL_WHITE);
+    const int y1 = 16;
+    const int gy = 36;
+
+    #define CRED rgb(192,10,10)
+    #define CGRN rgb(10,192,10)
+    #define CBLU rgb(10,10,192)
+    #define CWHT rgb(192,192,192)
+
+    draw_text_cen(32,  y1,   "ATTACK",  1, CRED);
+    draw_gauge(32, y1+gy, input.attack / 127.0f, CRED);
+
+    draw_text_cen(96, y1,   "DECAY",   1, CGRN);
+    draw_gauge(96, y1+gy, input.decay / 127.0f, CGRN);
+    
+    draw_text_cen(32,   116, "SUSTAIN", 1, CBLU);
+    draw_gauge(32, 94, input.sustain / 127.0f, CBLU);
+    
+    draw_text_cen(96,  116, "RELEASE", 1, CWHT);
+    draw_gauge(96, 94, input.release / 127.0f, CWHT);
 
     time = LL_TIM_GetCounter(TIM2) - time;
 
@@ -248,6 +260,8 @@ void draw_adsr(void) {
     // draw_text(0,96, buf, 1, COL_WHITE);
     // sprintf(buf, "txfer %lu", transfer_time);
     // draw_text(0,112, buf, 1, COL_WHITE);    
+
+
 
     display_draw();
 

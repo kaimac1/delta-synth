@@ -67,8 +67,10 @@ void draw_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t fillcolo
 void draw_line(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t col);
 void draw_text(uint16_t x, uint16_t y, char* text, int size, uint16_t colour);
 void draw_text_rj(uint16_t x, uint16_t y, char* text, int size, uint16_t colour);
+void draw_text_cen(uint16_t x, uint16_t y, char* text, int size, uint16_t colour);
 void display_draw(void);
 void build_font_index(void);
+uint16_t rgb(uint8_t r, uint8_t g, uint8_t b);
 
 // uart
 void uart_init(void);

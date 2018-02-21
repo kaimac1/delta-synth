@@ -90,16 +90,16 @@ void set_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
 
 }
 
-// uint16_t Adafruit_SSD1351::Color565(uint8_t r, uint8_t g, uint8_t b) {
-//   uint16_t c;
-//   c = r >> 3;
-//   c <<= 6;
-//   c |= g >> 2;
-//   c <<= 5;
-//   c |= b >> 3;
+uint16_t rgb(uint8_t r, uint8_t g, uint8_t b) {
+  uint16_t c;
+  c = r >> 3;
+  c <<= 6;
+  c |= g >> 2;
+  c <<= 5;
+  c |= b >> 3;
 
-//   return c;
-// }
+  return c;
+}
 
 void draw_pixel(uint16_t x, uint16_t y, uint16_t col) {
     dbuffer[y][x] = col;
@@ -116,6 +116,21 @@ void build_font_index(void) {
         font_index[i] = idx;
         idx += font_widths[i]*2;
     }
+
+}
+
+void draw_text_cen(uint16_t x, uint16_t y, char* text, int size, uint16_t colour) {
+
+    uint16_t xlen = 0;
+    int len = strlen(text);
+
+    for (int i=0; i<len; i++) {
+        uint8_t c = text[i] - FONT_FIRST_CHAR;
+        xlen += (font_widths[c] + 1)*size;
+    }
+
+    draw_text(x-xlen/2, y, text, size, colour);
+
 
 }
 

@@ -38,6 +38,7 @@ src/notes.c  \
 board/audio.c \
 board/display.c \
 board/input.c \
+board/timer.c \
 
 
 

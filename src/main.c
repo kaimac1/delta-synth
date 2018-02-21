@@ -165,19 +165,59 @@ int main(void) {
   
 }
 
-void draw_arc(uint16_t x, uint16_t y, uint16_t radius, float start_angle, float end_angle, uint16_t colour) {
+#define TWOPI 6.2831853f
 
-    float step = 2.0f * 3.1415926f / 128;
-    float xold = -1;
-    float yold = -1;
+void draw_arc(uint16_t x, uint16_t y, uint16_t radius, uint16_t width, float start_angle, float end_angle, uint16_t colour) {
 
+    const int segments = 700;
+    float step = TWOPI / segments;
+    float xf = x + 0.5f;
+    float yf = y + 0.5f;
+    
     for (float a=start_angle; a<end_angle; a+=step) {
-        float ynew = y + 0.5f + radius*cosf(a);
-        float xnew = x + 0.5f - radius*sinf(a);
-        if (xold != -1) draw_line(xold, yold, xnew, ynew, colour);
-        xold = xnew;
-        yold = ynew;
+        float sina = -sinf(a);
+        float cosa = cosf(a);
+        float rad1 = radius;
+        float rad2 = radius + width;
+        draw_line(xf + rad1*sina, yf + rad1*cosa, xf + rad2*sina, yf + rad2*cosa, colour);
     }
+
+}
+
+inline float fast_sin(float arg) {
+    size_t idx = (size_t)(SINE_TABLE_SIZE * arg/TWOPI) + 1;
+    return sine_table[idx] / 32768.0f;
+}
+inline float fast_cos(float arg) {
+    size_t idx = (size_t)(SINE_TABLE_SIZE * arg/TWOPI) + 1;
+    idx += SINE_TABLE_SIZE >> 2;
+    idx %= SINE_TABLE_SIZE;
+    return sine_table[idx] / 32768.0f;
+}
+
+void draw_gauge(uint16_t x, uint16_t y, float amount, uint16_t colour) {
+
+    int radius = 16;
+    int thickness = 7;
+
+    float start = TWOPI * 0.1f;
+    float end = TWOPI * 0.9f;
+
+    float angle = start + (end-start) * amount;
+
+    int segments = 284; // Tune this so there are no gaps
+    float step = TWOPI / segments;
+    float xf = x + 0.5f;
+    float yf = y + 0.5f;
+    
+    for (float a=start; a<end; a+=step) {
+        float sina = -fast_sin(a);
+        float cosa = fast_cos(a);
+        float rad1 = radius;
+        float rad2 = radius + thickness;
+        uint16_t col = (a < angle) ? colour : 0x1082;
+        draw_line(xf + rad1*sina, yf + rad1*cosa, xf + rad2*sina, yf + rad2*cosa, col);
+    }    
 
 }
 
@@ -185,45 +225,29 @@ void draw_adsr(void) {
 
     char buf[32];
 
+    uint32_t time = LL_TIM_GetCounter(TIM2);
+
     draw_rect(0, 0, 128, 128, 0x0000);
-    draw_text(0,  0,  "Attack", 1, COL_RED);
-    // draw_text(64, 80,  "D", 1, COL_GREEN);
-    // draw_text(0,  112, "S", 1, COL_BLUE);
-    // draw_text(64, 112, "R", 1, COL_WHITE);
+    draw_text(0,  0,   "Attack",  1, COL_RED);
+    draw_text(64, 0,   "Decay",   1, COL_GREEN);
+    draw_text(0,  64, "Sustain", 1, COL_BLUE);
+    draw_text(64, 64, "Release", 1, COL_WHITE);
 
-    sprintf(buf, "%d", input.attack);
-    draw_text(0+12, 74, buf, 2, COL_RED);
-    
-    // sprintf(buf, "%d", input.decay);
-    // draw_text(64+12, 74, buf, 2, COL_GREEN);
-    
-    sprintf(buf, "%d", input.sustain);
-    draw_text(0+12, 104, buf, 2, COL_BLUE);
-    
-    sprintf(buf, "%d", input.release);
-    draw_text(64+12, 104, buf, 2, COL_WHITE);
+    draw_gauge(32, 40, input.attack / 127.0f, COL_RED);
+    draw_gauge(96, 40, input.decay / 127.0f, COL_GREEN);
+    draw_gauge(32, 104, input.sustain / 127.0f, COL_BLUE);
+    draw_gauge(96, 104, input.release / 127.0f, COL_WHITE);
 
-    int cx = 32;
-    int cy = 32;
-    int cr = input.sustain;
+    time = LL_TIM_GetCounter(TIM2) - time;
 
-    float attack = input.attack / 127.0f;
-    float rad = attack * 3.1415926f * 2;
-
-    int py = cy + cr*cosf(rad);
-    int px = cx - cr*sinf(rad);
-
-    for (int r=0; r<input.release; r++) {
-        draw_arc(cx, cy, cr+r, 0.0f, 2*3.1415926f, 0x1111);
-    }
-
-
-    //draw_line(cx, cy+cr/2, cx, cy+cr, COL_RED);
-    draw_line((cx+px)/2, (cy+py)/2, px, py, COL_RED);
-
-    for (int r=0; r<input.release; r++) {
-        draw_arc(cx, cy, cr+r, 0.0f, rad, COL_RED);
-    }
+    // sprintf(buf, "draw %lu", time);
+    // draw_text(0,64, buf, 1, COL_WHITE);   
+    // sprintf(buf, "disp %lu", display_write_time);
+    // draw_text(0,80, buf, 1, COL_WHITE);
+    // sprintf(buf, "loop %lu", loop_time);
+    // draw_text(0,96, buf, 1, COL_WHITE);
+    // sprintf(buf, "txfer %lu", transfer_time);
+    // draw_text(0,112, buf, 1, COL_WHITE);    
 
     display_draw();
 
@@ -253,6 +277,8 @@ void draw_filter(void) {
 
 void hardware_init(void) {
 
+    SystemClock_Config();
+
     // Enable all GPIO clocks
     __HAL_RCC_GPIOA_CLK_ENABLE();
     __HAL_RCC_GPIOB_CLK_ENABLE();
@@ -261,22 +287,12 @@ void hardware_init(void) {
     __HAL_RCC_GPIOE_CLK_ENABLE();
     __HAL_RCC_SYSCFG_CLK_ENABLE();
 
-    SystemClock_Config();
-
     uart_init();
     input_init();
+    timer_init();
     display_init();
+    
 
-    // Microsecond timer
-    __HAL_RCC_TIM2_CLK_ENABLE();
-    LL_TIM_InitTypeDef tim;
-    tim.Prescaler = (SystemCoreClock / 1000000) - 1;
-    tim.CounterMode = LL_TIM_COUNTERMODE_UP;
-    tim.Autoreload = UINT32_MAX;
-    tim.ClockDivision = 0;
-    tim.RepetitionCounter = 0;
-    LL_TIM_Init(TIM2, &tim);
-    LL_TIM_EnableCounter(TIM2);
 
 }
 
@@ -286,25 +302,28 @@ void SystemClock_Config(void) {
     RCC_ClkInitTypeDef RCC_ClkInitStruct;
     RCC_OscInitTypeDef RCC_OscInitStruct;
 
+    __HAL_PWR_OVERDRIVE_ENABLE();
     __HAL_RCC_PWR_CLK_ENABLE();
-    __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE2);
+    __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
 
-    // 84 MHz
+    // 180 MHz
     RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
     RCC_OscInitStruct.HSEState = RCC_HSE_ON;
     RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
     RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-    RCC_OscInitStruct.PLL.PLLM = 8;
-    RCC_OscInitStruct.PLL.PLLN = 336;
-    RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV4;
-    RCC_OscInitStruct.PLL.PLLQ = 7;
+    RCC_OscInitStruct.PLL.PLLM = 8;             // 1 MHz PLL input
+    RCC_OscInitStruct.PLL.PLLN = 360;           // 360 MHz fVCO
+    RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2; // 180 MHz PLL output
+    RCC_OscInitStruct.PLL.PLLQ = 7;             // USB clock - don't care
     HAL_RCC_OscConfig(&RCC_OscInitStruct);
 
     RCC_ClkInitStruct.ClockType = (RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2);
     RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-    RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-    RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;  
-    RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;  
-    HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2);
+    RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;          // CPU  = 180 MHz
+    RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;           // APB1 =  45 MHz
+    RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;           // APB2 =  90 MHz
+    HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5);        
+
+
 }
 

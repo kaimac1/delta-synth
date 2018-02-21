@@ -38,32 +38,18 @@
 #define AUDIO_ERROR                     1
 #define AUDIO_TIMEOUT                   2
 
-/* AudioFreq * DataSize (2 bytes) * NumChannels (Stereo: 2) */
-#define DEFAULT_AUDIO_IN_FREQ                 I2S_AUDIOFREQ_16K
-#define DEFAULT_AUDIO_IN_BIT_RESOLUTION       16
-#define DEFAULT_AUDIO_IN_CHANNEL_NBR          1 /* Mono = 1, Stereo = 2 */
-#define DEFAULT_AUDIO_IN_VOLUME               64
-
-/* PDM buffer input size */
-#define INTERNAL_BUFF_SIZE                    128*DEFAULT_AUDIO_IN_FREQ/16000*DEFAULT_AUDIO_IN_CHANNEL_NBR
-/* PCM buffer output size */
-#define PCM_OUT_SIZE                          DEFAULT_AUDIO_IN_FREQ/1000
-#define CHANNEL_DEMUX_MASK                    0x55
    
 #define DMA_MAX(_X_)                (((_X_) <= DMA_MAX_SZE)? (_X_):DMA_MAX_SZE)
 
 
-uint8_t BSP_AUDIO_OUT_Init(uint32_t AudioFreq);
 uint8_t BSP_AUDIO_OUT_Play(uint16_t* pBuffer, uint32_t Size);
-void    BSP_AUDIO_OUT_ChangeBuffer(uint16_t *pData, uint16_t Size);
 uint8_t BSP_AUDIO_OUT_Pause(void);
 uint8_t BSP_AUDIO_OUT_Resume(void);
 uint8_t BSP_AUDIO_OUT_Stop(uint32_t Option);
 void    BSP_AUDIO_OUT_SetFrequency(uint32_t AudioFreq);
 
-void    BSP_AUDIO_OUT_TransferComplete_CallBack(void);
-void    BSP_AUDIO_OUT_HalfTransfer_CallBack(void);
-void    BSP_AUDIO_OUT_Error_CallBack(void);
+void audio_init(uint32_t sample_rate);
+void audio_change_buffer(uint16_t *pData, uint16_t Size);
 
 void  BSP_AUDIO_OUT_ClockConfig(I2S_HandleTypeDef *hi2s, uint32_t AudioFreq, void *Params);
 void  BSP_AUDIO_OUT_MspInit(I2S_HandleTypeDef *hi2s, void *Params);

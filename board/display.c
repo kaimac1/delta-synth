@@ -2,6 +2,7 @@
 #include "display.h"
 #include "stm32f4xx_ll_gpio.h"
 #include "stm32f4xx_ll_spi.h"
+#include "stm32f4xx_ll_tim.h"
 
 #include "font.h"
 #include <string.h>
@@ -19,15 +20,14 @@ void display_reset(void);
 #define CS_PORT     GPIOB
 #define CS_PIN      LL_GPIO_PIN_12
 #define DC_PORT     GPIOB
-#define DC_PIN      LL_GPIO_PIN_14
+#define DC_PIN      LL_GPIO_PIN_4
 #define SCK_PORT    GPIOB
 #define SCK_PIN     LL_GPIO_PIN_13
 #define MOSI_PORT   GPIOB
 #define MOSI_PIN    LL_GPIO_PIN_15
 
-#define NOPS 32 // was 16
-
 uint16_t dbuffer[128][128];
+uint32_t display_write_time;
 
 void display_init(void) {
 
@@ -53,7 +53,7 @@ void display_init(void) {
     spi.ClockPolarity   = LL_SPI_POLARITY_LOW;
     spi.ClockPhase      = LL_SPI_PHASE_1EDGE;
     spi.NSS             = LL_SPI_NSS_SOFT;
-    spi.BaudRate        = LL_SPI_BAUDRATEPRESCALER_DIV8;
+    spi.BaudRate        = LL_SPI_BAUDRATEPRESCALER_DIV4;
     spi.BitOrder        = LL_SPI_MSB_FIRST; 
     spi.CRCCalculation  = LL_SPI_CRCCALCULATION_DISABLE;
     spi.CRCPoly         = 0;
@@ -68,14 +68,13 @@ void display_init(void) {
 void writeCommand(uint8_t c) {
     LL_GPIO_ResetOutputPin(DC_PORT, DC_PIN);
     DISPLAY_SPI->DR = c;
-    for (int i=0; i<NOPS; i++) asm("nop");
-
+    delay_us(5);
 }
 
 void writeData(uint8_t c) {
     LL_GPIO_SetOutputPin(DC_PORT, DC_PIN);
     DISPLAY_SPI->DR = c;
-    for (int i=0; i<NOPS; i++) asm("nop");
+    delay_us(5);
 } 
 
 
@@ -246,7 +245,9 @@ void draw_line(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t col)
 
 
 void display_draw(void) {
+    uint32_t start = NOW_US();
     display_write(0, 0, 128, 128, (uint16_t*)dbuffer);
+    display_write_time = NOW_US() - start;
 }
 
 
@@ -258,9 +259,9 @@ void display_write(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t *buf
     for (uint16_t i=0; i < w*h; i++) {
         uint16_t col = buffer[i];
         DISPLAY_SPI->DR = col >> 8;
-        for (int i=0; i<NOPS; i++) asm("nop");
+        while (!(DISPLAY_SPI->SR & LL_SPI_SR_TXE));
         DISPLAY_SPI->DR = col & 0xFF;
-        for (int i=0; i<NOPS; i++) asm("nop");
+        while (!(DISPLAY_SPI->SR & LL_SPI_SR_TXE));
     }
 
 }

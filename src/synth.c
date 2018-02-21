@@ -19,6 +19,7 @@ uint32_t next_beat = 0;
 int      arp_note = 0;
 uint32_t start_time;
 uint32_t loop_time;
+uint32_t transfer_time;
 
 // Output buffer
 #define OUT_BUFFER_SAMPLES 512
@@ -27,8 +28,6 @@ uint16_t out_buffer_2[OUT_BUFFER_SAMPLES];
 uint16_t *out_buffer = out_buffer_1;
 
 // Sine table
-#define SINE_TABLE_WIDTH 11 // bits
-#define SINE_TABLE_SIZE (1<<SINE_TABLE_WIDTH)
 int16_t sine_table[SINE_TABLE_SIZE];
 
 inline void sequencer_update(void);
@@ -40,21 +39,20 @@ inline float sample_drums(void);
 // This ISR is called when the DMA transfer of one buffer (A) completes.
 // We need to immediately swap the DMA over to the other buffer (B), and start
 // refilling the buffer that was just sent (A).
-void BSP_AUDIO_OUT_TransferComplete_CallBack(void) {
- 
-    BSP_AUDIO_OUT_ChangeBuffer(out_buffer, OUT_BUFFER_SAMPLES);
-    out_buffer = (out_buffer == out_buffer_1) ? out_buffer_2 : out_buffer_1;
+void HAL_I2S_TxCpltCallback(I2S_HandleTypeDef *hi2s) {
 
-    start_time = LL_TIM_GetCounter(TIM2);
+    static uint32_t txtime = 0;
+    static uint32_t ltime = 0;
+
+    uint32_t now = NOW_US();
+    txtime = now - start_time;
+    start_time = now;
+
+    audio_change_buffer(out_buffer, OUT_BUFFER_SAMPLES);
+    out_buffer = (out_buffer == out_buffer_1) ? out_buffer_2 : out_buffer_1;
 
     // Copy new settings: cfgnew -> cfg
     if (!cfgnew.busy) {
-
-        // Volume level changed
-        if (cfgnew.volume != cfg.volume) {
-            //BSP_AUDIO_OUT_SetVolume(cfgnew.volume);
-        }
-
         memcpy(&cfg, &cfgnew, sizeof(SynthConfig));
         // if (cfg.env_retrigger) {
         //     cfgnew.env_retrigger = false;
@@ -65,9 +63,10 @@ void BSP_AUDIO_OUT_TransferComplete_CallBack(void) {
 
     sequencer_update();
     fill_buffer();
-    loop_time = LL_TIM_GetCounter(TIM2) - start_time;
 
-    //BSP_LED_Off(LED3);
+    ltime = NOW_US() - start_time;
+    loop_time = ltime;
+    transfer_time = txtime;
 
 }
 
@@ -244,7 +243,7 @@ void create_wave_tables(void) {
     // Sine
     for (int i=0; i<SINE_TABLE_SIZE; i++) {
         float arg = 2*PI*i / SINE_TABLE_SIZE;
-        sine_table[i] = (int16_t)(sinf(arg) * 32768);
+        sine_table[i] = (int16_t)(sinf(arg) * 32767);
     }
 }
 
@@ -280,12 +279,9 @@ void synth_start(void) {
     create_wave_tables();
     fill_buffer();
 
-    if (BSP_AUDIO_OUT_Init(SAMPLE_RATE) != 0) {
-        printf("init failed\r\n");
-        return;
-    }
-
+    audio_init(SAMPLE_RATE);
     BSP_AUDIO_OUT_Play(out_buffer, OUT_BUFFER_SAMPLES * 2);
+
 }
 
 

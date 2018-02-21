@@ -4,6 +4,11 @@
 #define SAMPLE_RATE 44100
 #define ENV_OVERSHOOT 0.05f
 
+#define SINE_TABLE_WIDTH 11 // bits
+#define SINE_TABLE_SIZE (1<<SINE_TABLE_WIDTH)
+extern int16_t sine_table[SINE_TABLE_SIZE];
+
+
 typedef enum {
     ENV_ATTACK,
     ENV_DECAY,
@@ -70,6 +75,7 @@ extern SynthConfig cfg;
 extern SynthConfig cfgnew;
 
 extern uint32_t loop_time;
+extern uint32_t transfer_time;
 
 void synth_start(void);
 

@@ -32,9 +32,9 @@ void input_init(void) {
     // }
 
     // encoders
-    encoder_ports[0] = GPIOA;
-    encoder_pin_a[0] = LL_GPIO_PIN_14;
-    encoder_pin_b[0] = LL_GPIO_PIN_15;
+    encoder_ports[0] = GPIOB;
+    encoder_pin_a[0] = LL_GPIO_PIN_5;
+    encoder_pin_b[0] = LL_GPIO_PIN_14;
     encoder_ports[1] = GPIOA;
     encoder_pin_a[1] = LL_GPIO_PIN_11;
     encoder_pin_b[1] = LL_GPIO_PIN_12;
@@ -51,8 +51,8 @@ void input_init(void) {
         enc_history[i] = (pin_read(encoder_ports[i], encoder_pin_b[i]) << 1) | pin_read(encoder_ports[i], encoder_pin_a[i]);
     }
 
-    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTA, LL_SYSCFG_EXTI_LINE14);
-    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTA, LL_SYSCFG_EXTI_LINE15);
+    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTB, LL_SYSCFG_EXTI_LINE5);
+    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTB, LL_SYSCFG_EXTI_LINE14);
     LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTA, LL_SYSCFG_EXTI_LINE11);
     LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTA, LL_SYSCFG_EXTI_LINE12);
     LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTB, LL_SYSCFG_EXTI_LINE8);

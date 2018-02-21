@@ -2,9 +2,15 @@
 #include "main.h"
 #include "stm32f4xx_hal.h"
 #include "stm32f4xx_ll_gpio.h"
+#include "stm32f4xx_ll_tim.h"
 
 extern UART_HandleTypeDef h_uart_debug;
 extern UART_HandleTypeDef h_uart_midi;
+
+// timer
+#define NOW_US() LL_TIM_GetCounter(TIM2)
+void timer_init();
+void delay_us(uint32_t microseconds);
 
 // gpio
 void pin_cfg_output(GPIO_TypeDef *port, uint32_t pin);
@@ -13,6 +19,8 @@ void pin_cfg_exti(GPIO_TypeDef *port, uint32_t pin, uint32_t pull, uint32_t edge
 void pin_cfg_af(GPIO_TypeDef *port, uint32_t pin, uint32_t af);
 void pin_set(GPIO_TypeDef *port, uint32_t pin, bool state);
 bool pin_read(GPIO_TypeDef *port, uint32_t pin);
+
+extern uint32_t display_write_time;
 
 
 // input

@@ -35,6 +35,7 @@ board/uart.c \
 src/synth.c  \
 src/midi.c   \
 src/notes.c  \
+src/ui.c \
 board/audio.c \
 board/display.c \
 board/input.c \

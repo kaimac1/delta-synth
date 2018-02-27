@@ -27,9 +27,9 @@ void input_init(void) {
     button_ports[BUTTON_OSC]      = GPIOC;
     button_pins[BUTTON_OSC]       = LL_GPIO_PIN_2;
 
-    // for (int i=0; i<NUM_BUTTONS; i++) {
-    //     pin_cfg_input(button_ports[i], button_pins[i], LL_GPIO_PULL_DOWN);
-    // }
+    for (int i=0; i<NUM_BUTTONS; i++) {
+        pin_cfg_input(button_ports[i], button_pins[i], LL_GPIO_PULL_DOWN);
+    }
 
     // encoders
     encoder_ports[0] = GPIOB;
@@ -59,8 +59,8 @@ void input_init(void) {
     LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTB, LL_SYSCFG_EXTI_LINE9);
     LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTB, LL_SYSCFG_EXTI_LINE6);
     LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTB, LL_SYSCFG_EXTI_LINE7);
-    HAL_NVIC_SetPriority(EXTI9_5_IRQn, 5, 0);
-    HAL_NVIC_SetPriority(EXTI15_10_IRQn, 5, 0);
+    HAL_NVIC_SetPriority(EXTI9_5_IRQn, 3, 0);
+    HAL_NVIC_SetPriority(EXTI15_10_IRQn, 3, 0);
     HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
     HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
@@ -123,16 +123,20 @@ bool read_encoders(void) {
 
 void encoder_irq(void) {
 
+    uint32_t port;
+
     for (int i=0; i<NUM_ENCODERS; i++) {
 
-        int inca = pin_read(encoder_ports[i], encoder_pin_a[i]);
-        int incb = pin_read(encoder_ports[i], encoder_pin_b[i]);
+        port = encoder_ports[i]->IDR;
+        int inca = !!(port & encoder_pin_a[i]);
+        int incb = !!(port & encoder_pin_b[i]);
 
         enc_history[i] <<= 2;
         enc_history[i] |= ((incb << 1) | inca);
         encoders[i].value += enc_states[enc_history[i] & 0x0F];
 
     }
+
 }
 
 void EXTI9_5_IRQHandler(void) {

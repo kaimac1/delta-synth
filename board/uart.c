@@ -32,7 +32,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef *huart) {
 
         pin_cfg_af(MIDI_PORT, MIDI_TX_PIN, MIDI_AF);
         pin_cfg_af(MIDI_PORT, MIDI_RX_PIN, MIDI_AF);        
-        HAL_NVIC_SetPriority(USART6_IRQn, 1, 0);
+        HAL_NVIC_SetPriority(USART6_IRQn, 0, 0);
         HAL_NVIC_EnableIRQ(USART6_IRQn);        
     }
 }
@@ -41,7 +41,7 @@ void uart_init(void) {
 
     // debug
     h_uart_debug.Instance          = USART1;
-    h_uart_debug.Init.BaudRate     = 115200;
+    h_uart_debug.Init.BaudRate     = 1000000;
     h_uart_debug.Init.WordLength   = UART_WORDLENGTH_8B;
     h_uart_debug.Init.StopBits     = UART_STOPBITS_1;
     h_uart_debug.Init.Parity       = UART_PARITY_NONE;

@@ -1,6 +1,7 @@
 #include "main.h"
 #include "notes.h"
 #include "synth.h"
+#include "board.h"
 #include <math.h>
 
 #define CONTROLLER_1    0x0E
@@ -11,6 +12,7 @@
 void midi_process_command(void);
 
 uint8_t command[3];
+bool midi_event;
 
 // Called from the MIDI UART interrupt handler
 void midi_process_byte(uint8_t byte) {
@@ -34,13 +36,19 @@ void midi_process_byte(uint8_t byte) {
 
 
 void poly_add(uint32_t freq) {
+    int idx = -1;
     cfgnew.busy = true;
     for (int i=0; i<NUM_OSC; i++) {
-        if (cfgnew.key[i] == false) {
-            cfgnew.osc_freq[i] = freq;
-            cfgnew.key[i] = true;
+        if (cfgnew.key[i] == false) idx = i;
+        if (cfgnew.key[i] && cfgnew.osc_freq[i] == freq) {
+            // Note already on
+            idx = i;
             break;
         }
+    }
+    if (idx >= 0) {
+        cfgnew.osc_freq[idx] = freq;
+        cfgnew.key[idx] = true;
     }
     cfgnew.busy = false;
 }
@@ -50,7 +58,6 @@ void poly_del(uint32_t freq) {
     for (int i=0; i<NUM_OSC; i++) {
         if (cfgnew.osc_freq[i] == freq) {
             cfgnew.key[i] = false;
-            break;
         }
     }
     cfgnew.busy = false;
@@ -99,6 +106,7 @@ void midi_process_command(void) {
 
         // Note on
         case 0x90:
+            //printf("ON     %d\r\n", command[1]);
             poly_add(note[command[1]]);
             // if (cfgnew.arp != ARP_OFF) {
             //     arp_add(note[command[1]]);
@@ -113,6 +121,7 @@ void midi_process_command(void) {
 
         // Note off
         case 0x80:
+            //printf("   OFF %d\r\n", command[1]);
             poly_del(note[command[1]]);
             // if (cfgnew.arp != ARP_OFF) {
             //     arp_del(note[command[1]]);
@@ -149,5 +158,7 @@ void midi_process_command(void) {
         default:
             printf("%02x %02x %02x\r\n", command[0], command[1], command[2]);
     }
+
+    midi_event = true;
 
 }

@@ -77,6 +77,7 @@ extern SynthConfig cfgnew;
 extern uint32_t loop_time;
 extern uint32_t transfer_time;
 
+void create_wave_tables(void);
 void synth_start(void);
 
 

@@ -43,6 +43,7 @@ void HAL_I2S_TxCpltCallback(I2S_HandleTypeDef *hi2s) {
 
     static uint32_t txtime = 0;
     static uint32_t ltime = 0;
+    static int i = 0;
 
     uint32_t now = NOW_US();
     txtime = now - start_time;
@@ -64,9 +65,12 @@ void HAL_I2S_TxCpltCallback(I2S_HandleTypeDef *hi2s) {
     sequencer_update();
     fill_buffer();
 
-    ltime = NOW_US() - start_time;
-    loop_time = ltime;
-    transfer_time = txtime;
+    if (i++ > 100) {
+        ltime = NOW_US() - start_time;
+        loop_time = ltime;
+        transfer_time = txtime;
+        i = 0;
+    }
 
 }
 
@@ -276,7 +280,7 @@ void synth_start(void) {
     cfg.env_curve = -log((1 + ENV_OVERSHOOT) / ENV_OVERSHOOT);
     memcpy(&cfgnew, &cfg, sizeof(SynthConfig));
 
-    create_wave_tables();
+    
     fill_buffer();
 
     audio_init(SAMPLE_RATE);

@@ -4,36 +4,11 @@
 #include "audio.h"
 #include "board.h"
 #include "synth.h"
+#include "ui.h"
 #include "stm32f4xx_ll_tim.h"
-
-#include <math.h>
 
 void hardware_init(void);
 void SystemClock_Config(void);
-void draw_adsr(void);
-void draw_filter(void);
-void draw_osc(void);
-
-ControllerConfig ctrlcfg = CTRL_ENVELOPE;
-bool redraw;
-
-typedef struct {
-    int attack;
-    int decay;
-    int release;
-    int sustain;
-    int cutoff;
-    int resonance;
-    int env_mod;
-} InputSettings;
-InputSettings input;
-
-#define COL_RED     0xF800
-#define COL_GREEN   0x07E0
-#define COL_BLUE    0x001F
-#define COL_WHITE   0xC618
-
-#define ADD_DELTA_CLAMPED(x, y) {(x) += (y); if ((x) > 127) (x) = 127; if ((x) < 0) (x) = 0;}
 
 /******************************************************************************/
 int main(void) { 
@@ -43,107 +18,17 @@ int main(void) {
     printf("Running.\r\n");
     build_font_index();
     gen_note_table();
+    create_wave_tables();
     synth_start();
 
     cfgnew.volume = 60;
-    redraw = true;
 
-    pin_cfg_output(GPIOA, 1<<5);
+    pin_cfg_output(GPIOA, 1<<5);    // Nucleo LED
     pin_set(GPIOA, 1<<5, 1);
 
     while (1) {
-        bool evt = read_buttons();
-    //     if (evt) {
-    //         if (buttons[BUTTON_ENVELOPE] == BTN_PRESSED) {
-    //             ctrlcfg = CTRL_ENVELOPE;
-    //             redraw = true;
-    //         }
-    //         if (buttons[BUTTON_FILTER] == BTN_PRESSED) {
-    //             ctrlcfg = CTRL_FILTER;
-    //             redraw = true;
-    //         }
-    //         if (buttons[BUTTON_OSC] == BTN_PRESSED) {
-    //             ctrlcfg = CTRL_OSC;
-    //             redraw = true;
-    //         }
-    //     }
-
-        evt = read_encoders();
-        if (evt) {
-            switch (ctrlcfg) {
-            case CTRL_ENVELOPE:
-
-                // Attack
-                if (encoders[ENC_RED].delta) {
-                    ADD_DELTA_CLAMPED(input.attack, encoders[ENC_RED].delta);
-                    cfgnew.attack_time = (float)input.attack/127 + 0.001f;
-                    cfgnew.attack_rate = 1.0f/(cfgnew.attack_time * SAMPLE_RATE);                    
-                }
-                // Decay
-                if (encoders[ENC_GREEN].delta) {
-                    ADD_DELTA_CLAMPED(input.decay, encoders[ENC_GREEN].delta);
-                    float value = (float)input.decay/127;
-                    value = value*value*value;
-                    cfgnew.decay_time = value * 5;
-                    cfgnew.decay_rate = 1.0 - exp(cfgnew.env_curve / (cfgnew.decay_time * SAMPLE_RATE));
-                }
-                // Sustain
-                if (encoders[ENC_BLUE].delta) {
-                    ADD_DELTA_CLAMPED(input.sustain, encoders[ENC_BLUE].delta);
-                    float value = (float)input.sustain/127;
-                    cfgnew.sustain_level = value;
-                }
-                // Release
-                if (encoders[ENC_WHITE].delta) {
-                    ADD_DELTA_CLAMPED(input.release, encoders[ENC_WHITE].delta);
-                    float value = (float)input.release/127;
-                    value = value*value*value;
-                    cfgnew.release_time = value * 5;
-                    cfgnew.release_rate = 1.0 - exp(cfgnew.env_curve / (cfgnew.release_time * SAMPLE_RATE));
-                }
-
-                redraw = true;
-                break;
-
-            case CTRL_FILTER:
-
-                // Cutoff
-                if (encoders[ENC_RED].delta) {
-                    ADD_DELTA_CLAMPED(input.cutoff, encoders[ENC_RED].delta);
-                    cfgnew.cutoff = 10000.0f * (float)input.cutoff/127;
-                }
-                // Resonance
-                if (encoders[ENC_GREEN].delta) {
-                    ADD_DELTA_CLAMPED(input.resonance, encoders[ENC_GREEN].delta);
-                    cfgnew.resonance = 3.99f * (float)input.resonance/127;
-                }
-                // Envelope modulation
-                if (encoders[ENC_BLUE].delta) {
-                    ADD_DELTA_CLAMPED(input.env_mod, encoders[ENC_BLUE].delta);
-                    cfgnew.env_mod = 5000.0f * (float)input.env_mod/127;
-                }
-
-                redraw = true;
-                break;
-
-            case CTRL_OSC:
-
-                // 
-
-                redraw = true;
-                break;
-            }
-        }
-
-        // Redraw if required
-        if (redraw) {
-            redraw = false;
-            if (ctrlcfg == CTRL_ENVELOPE) {
-                draw_adsr();
-            } else if (ctrlcfg == CTRL_FILTER) {
-                draw_filter();
-            }
-        }
+        ui_update();
+    }
 
         //         // Legato
         //         case 'l': cfgnew.legato ^= 1; break;
@@ -160,134 +45,9 @@ int main(void) {
         // for (int i=0; i<MAX_ARP; i++) {
         //     printf("arp[%d] = %lu\r\n", i, cfgnew.arp_freqs[i]);
         // }
-        //printf("%lu\r\n", loop_time);
-    }
   
 }
 
-#define TWOPI 6.2831853f
-
-void draw_arc(uint16_t x, uint16_t y, uint16_t radius, uint16_t width, float start_angle, float end_angle, uint16_t colour) {
-
-    const int segments = 700;
-    float step = TWOPI / segments;
-    float xf = x + 0.5f;
-    float yf = y + 0.5f;
-    
-    for (float a=start_angle; a<end_angle; a+=step) {
-        float sina = -sinf(a);
-        float cosa = cosf(a);
-        float rad1 = radius;
-        float rad2 = radius + width;
-        draw_line(xf + rad1*sina, yf + rad1*cosa, xf + rad2*sina, yf + rad2*cosa, colour);
-    }
-
-}
-
-inline float fast_sin(float arg) {
-    size_t idx = (size_t)(SINE_TABLE_SIZE * arg/TWOPI) + 1;
-    return sine_table[idx] / 32768.0f;
-}
-inline float fast_cos(float arg) {
-    size_t idx = (size_t)(SINE_TABLE_SIZE * arg/TWOPI) + 1;
-    idx += SINE_TABLE_SIZE >> 2;
-    idx %= SINE_TABLE_SIZE;
-    return sine_table[idx] / 32768.0f;
-}
-
-void draw_gauge(uint16_t x, uint16_t y, float amount, uint16_t colour) {
-
-    int radius = 16;
-    int thickness = 23-radius;
-
-    float start = TWOPI * 0.1f;
-    float end = TWOPI * 0.9f;
-
-    float angle = start + (end-start) * amount;
-
-    int segments = 284; // Tune this so there are no gaps
-    float step = TWOPI / segments;
-    float xf = x + 0.5f;
-    float yf = y + 0.5f;
-    
-    for (float a=start; a<end; a+=step) {
-        float sina = -fast_sin(a);
-        float cosa = fast_cos(a);
-        float rad1 = radius;
-        float rad2 = radius + thickness;
-        uint16_t col = (a < angle) ? colour : 0x1082;
-        draw_line(xf + rad1*sina, yf + rad1*cosa, xf + rad2*sina, yf + rad2*cosa, col);
-    }    
-
-}
-
-void draw_adsr(void) {
-
-    char buf[32];
-
-    uint32_t time = LL_TIM_GetCounter(TIM2);
-
-    draw_rect(0, 0, 128, 128, 0x0000);
-    draw_text(0,  0,   "Top text blah blah blah",  1, COL_WHITE);
-
-    const int y1 = 16;
-    const int gy = 36;
-
-    #define CRED rgb(192,10,10)
-    #define CGRN rgb(10,192,10)
-    #define CBLU rgb(10,10,192)
-    #define CWHT rgb(192,192,192)
-
-    draw_text_cen(32,  y1,   "ATTACK",  1, CRED);
-    draw_gauge(32, y1+gy, input.attack / 127.0f, CRED);
-
-    draw_text_cen(96, y1,   "DECAY",   1, CGRN);
-    draw_gauge(96, y1+gy, input.decay / 127.0f, CGRN);
-    
-    draw_text_cen(32,   116, "SUSTAIN", 1, CBLU);
-    draw_gauge(32, 94, input.sustain / 127.0f, CBLU);
-    
-    draw_text_cen(96,  116, "RELEASE", 1, CWHT);
-    draw_gauge(96, 94, input.release / 127.0f, CWHT);
-
-    time = LL_TIM_GetCounter(TIM2) - time;
-
-    // sprintf(buf, "draw %lu", time);
-    // draw_text(0,64, buf, 1, COL_WHITE);   
-    // sprintf(buf, "disp %lu", display_write_time);
-    // draw_text(0,80, buf, 1, COL_WHITE);
-    // sprintf(buf, "loop %lu", loop_time);
-    // draw_text(0,96, buf, 1, COL_WHITE);
-    // sprintf(buf, "txfer %lu", transfer_time);
-    // draw_text(0,112, buf, 1, COL_WHITE);    
-
-
-
-    display_draw();
-
-}
-
-void draw_filter(void) {
-
-    draw_rect(0, 0, 128, 128, 0x0000);
-
-    char buf[32];
-    
-    draw_text(0, 0, "Cutoff", 1, COL_RED);
-    sprintf(buf, "%d", input.cutoff);
-    draw_text(0, 16, buf, 3, COL_RED);
-    
-    draw_text(64, 0, "Resonance", 1, COL_GREEN);
-    sprintf(buf, "%d", input.resonance);
-    draw_text_rj(128, 16, buf, 3, COL_GREEN);
-
-    draw_text(0, 64, "Env. mod.", 1, COL_BLUE);
-    sprintf(buf, "%d", input.env_mod);
-    draw_text(0, 80, buf, 3, COL_BLUE);
-
-    display_draw();
-
-}
 
 void hardware_init(void) {
 
@@ -305,8 +65,6 @@ void hardware_init(void) {
     input_init();
     timer_init();
     display_init();
-    
-
 
 }
 

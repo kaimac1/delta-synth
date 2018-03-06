@@ -21,9 +21,10 @@
 #define ADD_DELTA_CLAMPED(x, y) {(x) += (y); if ((x) > 127) (x) = 127; if ((x) < 0) (x) = 0;}
 
 typedef enum {
-    PAGE_OSC,
+    PAGE_OSC1,
     PAGE_ENV,
-    PAGE_FILTER
+    PAGE_FILTER,
+    NUM_PAGES
 } UIPage;
 UIPage page = PAGE_ENV;
 
@@ -32,13 +33,22 @@ typedef struct {
     int decay;
     int release;
     int sustain;
+
     int cutoff;
     int resonance;
     int env_mod;
+
+    int osc0_wave;
+    int osc0_folding;
+    int osc0_duty;
+    int osc0_gain;
+    int osc0_detune;
 } InputSettings;
 InputSettings input;
 
+
 bool redraw = true;
+void draw_screen(void);
 
 
 void ui_update(void) {
@@ -46,17 +56,18 @@ void ui_update(void) {
     bool evt = read_buttons();
     if (evt) {
         if (buttons[BUTTON_ENVELOPE] == BTN_PRESSED) {
-            page = PAGE_ENV;
+            page++;
+            page %= NUM_PAGES;
             redraw = true;
         }
-        if (buttons[BUTTON_FILTER] == BTN_PRESSED) {
-            page = PAGE_FILTER;
-            redraw = true;
-        }
-        if (buttons[BUTTON_OSC] == BTN_PRESSED) {
-            page = PAGE_OSC;
-            redraw = true;
-        }
+        // if (buttons[BUTTON_FILTER] == BTN_PRESSED) {
+        //     page = PAGE_FILTER;
+        //     redraw = true;
+        // }
+        // if (buttons[BUTTON_OSC] == BTN_PRESSED) {
+        //     page = PAGE_OSC;
+        //     redraw = true;
+        // }
     }
 
     evt = read_encoders();
@@ -117,11 +128,34 @@ void ui_update(void) {
             redraw = true;
             break;
 
-        case PAGE_OSC:
+        case PAGE_OSC1:
+            // Waveform selector
+            if (encoders[ENC_RED].delta) {
+                ADD_DELTA_CLAMPED(input.osc0_wave, encoders[ENC_RED].delta);
+                cfgnew.osc[0].waveform = input.osc0_wave > 42 ? (input.osc0_wave > 85 ? WAVE_TRI : WAVE_SQUARE) : WAVE_SAW;
+            }
 
-            // 
+            if (encoders[ENC_GREEN].delta) {
+                ADD_DELTA_CLAMPED(input.osc0_folding, encoders[ENC_GREEN].delta);
+                cfgnew.osc[0].folding = 2.0f * (float)input.osc0_folding/127;
+            }
+            // Detune
+            if (encoders[ENC_BLUE].delta) {
+                ADD_DELTA_CLAMPED(input.osc0_detune, encoders[ENC_BLUE].delta);
+                cfgnew.osc[0].detune = 1.0f + 0.1f * (float)input.osc0_detune/127;
+            }
+            // Gain
+            if (encoders[ENC_WHITE].delta) {
+                ADD_DELTA_CLAMPED(input.osc0_gain, encoders[ENC_WHITE].delta);
+                cfgnew.osc[0].gain = (float)input.osc0_gain/127;
+            }
+
+
 
             redraw = true;
+            break;
+
+        default:
             break;
         }
     }
@@ -134,11 +168,7 @@ void ui_update(void) {
     // Redraw if required
     if (redraw) {
         redraw = false;
-        if (page == PAGE_ENV) {
-            draw_adsr();
-        } else if (page == PAGE_FILTER) {
-            draw_filter();
-        }
+        draw_screen();
     }
 
 }
@@ -180,62 +210,95 @@ void draw_gauge(uint16_t x, uint16_t y, float amount, uint16_t colour) {
 
 }
 
-void draw_adsr(void) {
+void draw_screen(void) {
 
     char buf[32];
-
-    uint32_t time = LL_TIM_GetCounter(TIM2);
-
-    draw_rect(0, 0, 128, 128, 0x0000);
-    draw_text(0,  0,   "Envelope",  1, COL_WHITE);
-
-    draw_text_cen(32,  16,   "ATTACK",  1, CRED);
-    draw_gauge(32, 52, input.attack / 127.0f, CRED);
-
-    draw_text_cen(96, 16,   "DECAY",   1, CGRN);
-    draw_gauge(96, 52, input.decay / 127.0f, CGRN);
-    
-    draw_text_cen(32,   116, "SUSTAIN", 1, CBLU);
-    draw_gauge(32, 94, input.sustain / 127.0f, CBLU);
-    
-    draw_text_cen(96,  116, "RELEASE", 1, CWHT);
-    draw_gauge(96, 94, input.release / 127.0f, CWHT);
-
-    time = LL_TIM_GetCounter(TIM2) - time;
-
-    int fps = 1000000 / display_write_time;
-    float load = 100 * ((float)loop_time / transfer_time);
-    sprintf(buf, "%d/%.1f", fps, load);
-    draw_text(64,0, buf, 1, COL_WHITE);
-
-    display_draw();
-
-}
-
-void draw_filter(void) {
+    uint32_t time;
+    char *wave;
 
     draw_rect(0, 0, 128, 128, 0x0000);
-    draw_text(0,  0,   "Filter",  1, COL_WHITE);
 
-    draw_text_cen(32,  16,   "CUTOFF",  1, CRED);
-    draw_gauge(32, 52, input.cutoff / 127.0f, CRED);
+    switch (page) {
+        case PAGE_ENV:
+            time = LL_TIM_GetCounter(TIM2);
+            draw_text(0,  0,   "Envelope",  1, COL_WHITE);
 
-    draw_text_cen(96, 16,   "RESONANCE",   1, CGRN);
-    draw_gauge(96, 52, input.resonance / 127.0f, CGRN);
+            draw_text_cen(32,  16,   "ATTACK",  1, CRED);
+            draw_gauge(32, 52, input.attack / 127.0f, CRED);
 
-    draw_text_cen(32,   116, "ENV MOD", 1, CBLU);
-    draw_gauge(32, 94, input.env_mod / 127.0f, CBLU);
+            draw_text_cen(96, 16,   "DECAY",   1, CGRN);
+            draw_gauge(96, 52, input.decay / 127.0f, CGRN);
+            
+            draw_text_cen(32,   116, "SUSTAIN", 1, CBLU);
+            draw_gauge(32, 94, input.sustain / 127.0f, CBLU);
+            
+            draw_text_cen(96,  116, "RELEASE", 1, CWHT);
+            draw_gauge(96, 94, input.release / 127.0f, CWHT);
 
-    char buf[32];
-    for (int i=0; i<NUM_OSC; i++) {
-        if (cfg.key[i]) {
-            sprintf(buf, "%d: %lu", i, cfg.osc_freq[i] / 1000);
-        } else {
-            sprintf(buf, "%d: --", i);
-        }
-        draw_text(64, 64+12*i, buf, 1, 0xFFFF);
+            time = LL_TIM_GetCounter(TIM2) - time;
+
+            int fps = 1000000 / display_write_time;
+            float load = 100 * ((float)loop_time / transfer_time);
+            sprintf(buf, "%d/%.1f", fps, load);
+            draw_text(64,0, buf, 1, COL_WHITE);
+            break;
+
+
+        case PAGE_FILTER:
+            draw_text(0,  0,   "Filter",  1, COL_WHITE);
+
+            draw_text_cen(32,  16,   "CUTOFF",  1, CRED);
+            draw_gauge(32, 52, input.cutoff / 127.0f, CRED);
+
+            draw_text_cen(96, 16,   "RESONANCE",   1, CGRN);
+            draw_gauge(96, 52, input.resonance / 127.0f, CGRN);
+
+            draw_text_cen(32,   116, "ENV MOD", 1, CBLU);
+            draw_gauge(32, 94, input.env_mod / 127.0f, CBLU);
+
+            char buf[32];
+            for (int i=0; i<NUM_VOICE; i++) {
+                if (cfg.key[i]) {
+                    //sprintf(buf, "%d: %lu", i, cfg.freq[i] / 1000);
+                } else {
+                    //sprintf(buf, "%d: --", i);
+                }
+                //draw_text(64, 64+12*i, buf, 1, 0xFFFF);
+            }
+            break;
+
+
+        case PAGE_OSC1:
+            draw_text(0,  0,   "Osc 1",  1, COL_WHITE);
+
+            draw_text_cen(32,  16,   "WAVEFORM",  1, CRED);
+            if (cfg.osc[0].waveform == WAVE_SAW) {
+                wave = "Saw";
+            } else if (cfg.osc[0].waveform == WAVE_SQUARE) {
+                wave = "Square";
+                draw_text_cen(96, 16, "SYMMETRY", 1, CGRN);
+                draw_gauge(96, 52, input.osc0_duty / 127.0f, CGRN);
+            } else {
+                wave = "Tri";
+                draw_text_cen(96, 16, "FOLDING", 1, CGRN);
+                draw_gauge(96, 52, input.osc0_folding / 127.0f, CGRN);                
+            }
+            draw_text_cen(32,  40, wave,  1, CRED);
+
+            draw_text_cen(32,   116, "DETUNE", 1, CBLU);
+            draw_gauge(32, 94, input.osc0_detune / 127.0f, CBLU);
+            
+            draw_text_cen(96,  116, "GAIN", 1, CWHT);
+            draw_gauge(96, 94, input.osc0_gain / 127.0f, CWHT);
+
+
+            break;
+
+
+        default:
+            break;
     }
-    
-    display_draw();
 
+    display_draw();
 }
+

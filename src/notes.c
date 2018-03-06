@@ -1,7 +1,7 @@
 #include "main.h"
 #include "synth.h"
 
-uint32_t note[128];
+float note[128];
 
 void gen_note_table(void) {
 
@@ -137,7 +137,7 @@ void gen_note_table(void) {
     };
 
     for (int i=0; i<128; i++) {
-        note[i] = freq[i] / SAMPLE_RATE * UINT32_MAX;
+        note[i] = freq[i] / SAMPLE_RATE;
     }
 
 }

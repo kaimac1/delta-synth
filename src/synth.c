@@ -10,9 +10,9 @@
 SynthConfig cfgnew;
 SynthConfig cfg;
 
-uint32_t nco[NUM_OSC];
-float    env[NUM_OSC] = {0.0f};
-EnvState env_state[NUM_OSC] = {ENV_RELEASE};
+float nco[NUM_VOICE][NUM_OSCILLATOR];
+float    env[NUM_VOICE] = {0.0f};
+EnvState env_state[NUM_VOICE] = {ENV_RELEASE};
 
 float    z1, z2, z3, z4; // filter state
 uint32_t next_beat = 0;
@@ -104,7 +104,6 @@ inline void fill_buffer(void) {
     for (int i=0; i<OUT_BUFFER_SAMPLES; i += 2) {
         
         s = sample_synth();
-        //s = 0.0f;
         //s += sample_drums();
 
         int16_t s16 = s * 1000;
@@ -118,10 +117,8 @@ inline void fill_buffer(void) {
 /******************************************************************************/
 // PolyBLEP (polynomial band-limited step)
 // t: phase, [0,1]
-// f: frequency, normalised
-inline float polyblep(float t, uint32_t f) {
-
-    float dt = (float)f / UINT32_MAX; // 0-1
+// dt: frequency, normalised [0,1]
+inline float polyblep(float t, float dt) {
 
     if (t < dt) {
         t /= dt;
@@ -134,18 +131,46 @@ inline float polyblep(float t, uint32_t f) {
     }
 }
 
-
 inline float sample_synth(void) {
 
     float s = 0.0f;
 
-    // Oscillators / envelopes
-    for (int i=0; i<NUM_OSC; i++) {
-        nco[i] += cfg.osc_freq[i];
-        float phase = (float)nco[i] / UINT32_MAX;
-        float s1 = 2.0f * phase - 1.0f;
-        s1 -= polyblep(phase, cfg.osc_freq[i]);
+    for (int i=0; i<NUM_VOICE; i++) {
+        float osc_mix = 0.0f;
 
+        // Oscillators
+        for (int osc=0; osc<NUM_OSCILLATOR; osc++) {
+
+            // Advance oscillator phase according to (detuned) frequency
+            float freq = cfg.osc[osc].detune * cfg.freq[i];
+            nco[i][osc] += freq;
+            if (nco[i][osc] > 1.0f) nco[i][osc] -= 1.0f;
+            float phase = nco[i][osc];
+            float s1 = 0.0f;
+
+            // Generate waveform from phase
+            if (cfg.osc[osc].waveform == WAVE_SAW) {
+                s1 = 2.0f * phase - 1.0f;
+                s1 -= polyblep(phase, freq);
+
+            } else if (cfg.osc[osc].waveform == WAVE_SQUARE) {
+                s1 = (phase < 0.5f) ? -1.0f : 1.0f;
+                s1 -= polyblep(phase, freq);
+                float phase2 = (phase > 0.5f) ? phase-0.5f : phase+0.5f;
+                s1 += polyblep(phase2, freq);
+
+            } else if (cfg.osc[osc].waveform == WAVE_TRI) {
+                s1 = (phase < 0.5f) ? phase : 1.0f - phase;
+                s1 = 8.0f * s1 - 2.0f;
+                if (s1 > cfg.osc[osc].folding) s1 = cfg.osc[osc].folding - (s1-cfg.osc[osc].folding);
+                if (s1 < -cfg.osc[osc].folding) s1 = -cfg.osc[osc].folding - (s1-cfg.osc[osc].folding);
+            }
+
+            s1 *= cfg.osc[osc].gain;
+            osc_mix += s1;
+        }
+
+        // Envelope
         if (cfg.key[i]) {
             if (env_state[i] == ENV_RELEASE) {
                 env_state[i] = ENV_ATTACK;
@@ -174,27 +199,10 @@ inline float sample_synth(void) {
             if (env[i] < 0.0f) env[i] = 0.0f;
         }
 
-        s += s1 * env[i];
+        s += osc_mix * env[i];
 
     }
-    s /= (float)NUM_OSC;
-
-    // Oscillator
-    // uint32_t old_nco1 = nco1;
-    // nco1 += cfg.freq;
-    // if (cfg.sync && nco1 < old_nco1) nco2 = 0;
-    // phase = (float)nco1 / UINT32_MAX;
-    // s1 = 2.0f * phase - 1.0f;
-    // s1 -= polyblep(phase, cfg.freq);
-
-    // uint32_t freq2 = (uint32_t)(cfg.detune * (float)(cfg.freq));
-
-    // nco2 += freq2;
-    // phase = (float)nco2 / UINT32_MAX;
-    // s2 = 2.0f * phase - 1.0f;
-    // s2 -= polyblep(phase, freq2);
-
-    // s = (s1 + s2) / 2.0f;
+    s /= (float)NUM_VOICE;
 
 
     // Filter
@@ -266,8 +274,21 @@ void synth_start(void) {
     cfg.arp_freqs[4] = 0;
 
     cfg.tempo = 120;
-    cfg.detune = 1.0f;
-    cfg.sync = false;
+
+    cfg.osc[0].waveform = WAVE_SQUARE;
+    cfg.osc[0].folding = 2.0f;
+    cfg.osc[0].gain = 1.0f;
+    cfg.osc[0].detune = 1.0f;
+
+    cfg.osc[1].waveform = WAVE_SQUARE;
+    cfg.osc[1].folding = 2.0f;
+    cfg.osc[1].gain = 0.5f;
+    cfg.osc[1].detune = 1.0f;    
+
+    cfg.osc[2].waveform = WAVE_SQUARE;
+    cfg.osc[2].folding = 2.0f;
+    cfg.osc[2].gain = 0.5f;
+    cfg.osc[2].detune = 1.0f;        
 
     cfg.attack_rate  = 0.0005;
     cfg.decay_rate   = 0.005;

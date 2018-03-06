@@ -35,28 +35,28 @@ void midi_process_byte(uint8_t byte) {
 }
 
 
-void poly_add(uint32_t freq) {
+void poly_add(float freq) {
     int idx = -1;
     cfgnew.busy = true;
-    for (int i=0; i<NUM_OSC; i++) {
+    for (int i=0; i<NUM_VOICE; i++) {
         if (cfgnew.key[i] == false) idx = i;
-        if (cfgnew.key[i] && cfgnew.osc_freq[i] == freq) {
+        if (cfgnew.key[i] && cfgnew.freq[i] == freq) {
             // Note already on
             idx = i;
             break;
         }
     }
     if (idx >= 0) {
-        cfgnew.osc_freq[idx] = freq;
+        cfgnew.freq[idx] = freq;
         cfgnew.key[idx] = true;
     }
     cfgnew.busy = false;
 }
 
-void poly_del(uint32_t freq) {
+void poly_del(float freq) {
     cfgnew.busy = true;
-    for (int i=0; i<NUM_OSC; i++) {
-        if (cfgnew.osc_freq[i] == freq) {
+    for (int i=0; i<NUM_VOICE; i++) {
+        if (cfgnew.freq[i] == freq) {
             cfgnew.key[i] = false;
         }
     }

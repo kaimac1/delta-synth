@@ -1,6 +1,6 @@
 TARGET = synth
 DEBUG = 1
-OPT = -O2
+OPT = -O3
 
 BUILD_DIR = build
 

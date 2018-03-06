@@ -17,7 +17,7 @@ typedef enum {
 } EnvState;
 
 typedef enum {
-    WAVE_SINE,
+    WAVE_TRI,
     WAVE_SQUARE,
     WAVE_SAW
 } Wave;
@@ -31,7 +31,16 @@ typedef enum {
 
 
 #define MAX_ARP 5
-#define NUM_OSC 4
+#define NUM_VOICE 4
+#define NUM_OSCILLATOR 3
+
+typedef struct {
+    Wave waveform;
+    float folding;
+    float duty;
+    float detune;
+    float gain;
+} Oscillator;
 
 typedef struct {
     bool busy;          // config being updated, don't copy
@@ -45,14 +54,11 @@ typedef struct {
     int tempo;          // bpm
 
     // Oscillators
-    uint32_t osc_freq[NUM_OSC];
-    Wave osc_wave[NUM_OSC];
-
-    bool sync;          // osc2 sync to master?
-    float detune;       // fraction of master freq.
+    float freq[NUM_VOICE];
+    Oscillator osc[NUM_OSCILLATOR];
 
     // ADSR 
-    bool key[NUM_OSC];           // key down?
+    bool key[NUM_VOICE];           // key down?
     float attack_rate;
     float decay_rate;
     float sustain_level;

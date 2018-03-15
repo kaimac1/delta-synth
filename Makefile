@@ -33,6 +33,7 @@ stm32/hal/Src/stm32f4xx_ll_spi.c \
 board/gpio.c \
 board/uart.c \
 src/synth.c  \
+src/synth_fx.c \
 src/midi.c   \
 src/notes.c  \
 src/ui.c \

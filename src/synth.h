@@ -75,6 +75,10 @@ typedef struct {
     float resonance;    // 0-4
     float env_mod;      // Hz at max env
 
+    int ncombs;
+    float fx_damping;
+    float fx_combg;
+
 } SynthConfig;
 
 extern SynthConfig cfg;

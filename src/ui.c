@@ -24,9 +24,10 @@ typedef enum {
     PAGE_OSC1,
     PAGE_ENV,
     PAGE_FILTER,
+    PAGE_FX,
     NUM_PAGES
 } UIPage;
-UIPage page = PAGE_ENV;
+UIPage page = PAGE_FX;
 
 typedef struct {
     int attack;
@@ -43,6 +44,10 @@ typedef struct {
     int osc0_duty;
     int osc0_gain;
     int osc0_detune;
+
+    int fx_ncombs;
+    int fx_damping;
+    int fx_amount;
 } InputSettings;
 InputSettings input;
 
@@ -152,6 +157,28 @@ void ui_update(void) {
 
 
 
+            redraw = true;
+            break;
+
+        case PAGE_FX:
+            if (encoders[ENC_RED].delta) {
+                ADD_DELTA_CLAMPED(input.fx_ncombs, encoders[ENC_RED].delta);
+                if (input.fx_ncombs > 8) input.fx_ncombs = 8;
+                cfgnew.ncombs = input.fx_ncombs;
+            }
+
+            if (encoders[ENC_GREEN].delta) {
+                ADD_DELTA_CLAMPED(input.fx_damping, encoders[ENC_GREEN].delta);
+                cfgnew.fx_damping = (float)input.fx_damping/127;
+            }
+
+            if (encoders[ENC_BLUE].delta) {
+                ADD_DELTA_CLAMPED(input.fx_amount, encoders[ENC_BLUE].delta);
+                float a = -1.0f / logf(1.0f - 0.3f);
+                float b = 127.0f / (logf(1.0f - 0.98f) * a + 1.0f);
+                float fb = 1.0f - expf(((float)input.fx_amount - b) / (a*b));
+                cfgnew.fx_combg = fb;
+            }            
             redraw = true;
             break;
 
@@ -291,6 +318,19 @@ void draw_screen(void) {
             draw_text_cen(96,  116, "GAIN", 1, CWHT);
             draw_gauge(96, 94, input.osc0_gain / 127.0f, CWHT);
 
+
+            break;
+
+        case PAGE_FX:
+            draw_text_cen(32,  16,   "COMBS",  1, CRED);
+            sprintf(buf, "%d", input.fx_ncombs);
+            draw_text_cen(32,  40, buf,  1, CRED);
+
+            draw_text_cen(96, 16, "DAMPING", 1, CGRN);
+            draw_gauge(96, 52, input.fx_damping / 127.0f, CGRN);
+
+            draw_text_cen(32,   116, "AMOUNT", 1, CBLU);
+            draw_gauge(32, 94, input.fx_amount / 127.0f, CBLU);
 
             break;
 

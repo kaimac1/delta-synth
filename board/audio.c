@@ -1,4 +1,5 @@
 #include "audio.h"
+#include "board.h"
 
 /* These PLL parameters are valid when the f(VCO clock) = 1Mhz */
 const uint32_t I2SFreq[8] = {8000, 11025, 16000, 22050, 32000, 44100, 48000, 96000};
@@ -175,7 +176,7 @@ __weak void BSP_AUDIO_OUT_MspInit(I2S_HandleTypeDef *hi2s, void *Params)
   }
   
   /* I2S DMA IRQ Channel configuration */
-  HAL_NVIC_SetPriority(I2S3_DMAx_IRQ, AUDIO_OUT_IRQ_PREPRIO, 0);
+  HAL_NVIC_SetPriority(I2S3_DMAx_IRQ, PRIORITY_AUDIO, 0);
   HAL_NVIC_EnableIRQ(I2S3_DMAx_IRQ); 
 }
 

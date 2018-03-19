@@ -59,8 +59,8 @@ void input_init(void) {
     LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTB, LL_SYSCFG_EXTI_LINE9);
     LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTB, LL_SYSCFG_EXTI_LINE6);
     LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTB, LL_SYSCFG_EXTI_LINE7);
-    HAL_NVIC_SetPriority(EXTI9_5_IRQn, 3, 0);
-    HAL_NVIC_SetPriority(EXTI15_10_IRQn, 3, 0);
+    HAL_NVIC_SetPriority(EXTI9_5_IRQn,   PRIORITY_ENCODER, 0);
+    HAL_NVIC_SetPriority(EXTI15_10_IRQn, PRIORITY_ENCODER, 0);
     HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
     HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
@@ -126,7 +126,6 @@ void encoder_irq(void) {
     uint32_t port;
 
     for (int i=0; i<NUM_ENCODERS; i++) {
-
         port = encoder_ports[i]->IDR;
         int inca = !!(port & encoder_pin_a[i]);
         int incb = !!(port & encoder_pin_b[i]);
@@ -134,7 +133,6 @@ void encoder_irq(void) {
         enc_history[i] <<= 2;
         enc_history[i] |= ((incb << 1) | inca);
         encoders[i].value += enc_states[enc_history[i] & 0x0F];
-
     }
 
 }

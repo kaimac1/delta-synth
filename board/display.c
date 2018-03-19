@@ -3,6 +3,7 @@
 #include "stm32f4xx_ll_gpio.h"
 #include "stm32f4xx_ll_spi.h"
 #include "stm32f4xx_ll_tim.h"
+#include "stm32f4xx_ll_dma.h"
 
 #include "font.h"
 #include <string.h>
@@ -10,6 +11,7 @@
 #define _swap_int16_t(a, b) { int16_t t = a; a = b; b = t; }
 #define abs(x) (((x) > 0) ? (x) : (-(x)))
 
+void set_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h);
 void display_reset(void);
 
 #define DISPLAY_SPI SPI2
@@ -26,27 +28,29 @@ void display_reset(void);
 #define MOSI_PORT   GPIOB
 #define MOSI_PIN    LL_GPIO_PIN_15
 
+volatile bool display_busy;
 uint16_t dbuffer[128][128];
-uint32_t display_write_time;
+uint16_t font_index[FONT_CHARS];
+
 
 void display_init(void) {
 
     __HAL_RCC_GPIOB_CLK_ENABLE();
     SPI_CLK_EN();
+    __HAL_RCC_DMA1_CLK_ENABLE();
 
+    // Pin init
     pin_cfg_output(RESET_PORT, RESET_PIN);
     pin_cfg_output(CS_PORT, CS_PIN);
     pin_cfg_output(DC_PORT, DC_PIN);
     pin_cfg_af(SCK_PORT, SCK_PIN, 5);
     pin_cfg_af(MOSI_PORT, MOSI_PIN, 5);
-
     pin_set(RESET_PORT, RESET_PIN, 1);
     pin_set(CS_PORT, CS_PIN, 1);
     pin_set(DC_PORT, DC_PIN, 1);
 
-
+    // SPI init
     LL_SPI_InitTypeDef spi;
-
     spi.TransferDirection = LL_SPI_FULL_DUPLEX;
     spi.Mode            = LL_SPI_MODE_MASTER;
     spi.DataWidth       = LL_SPI_DATAWIDTH_8BIT;
@@ -57,11 +61,58 @@ void display_init(void) {
     spi.BitOrder        = LL_SPI_MSB_FIRST; 
     spi.CRCCalculation  = LL_SPI_CRCCALCULATION_DISABLE;
     spi.CRCPoly         = 0;
-
     LL_SPI_Init(DISPLAY_SPI, &spi);
     LL_SPI_Enable(DISPLAY_SPI);
 
+    // DMA init
+    HAL_NVIC_SetPriority(DMA1_Stream4_IRQn, PRIORITY_DISPLAY, 0);
+    HAL_NVIC_EnableIRQ(DMA1_Stream4_IRQn);
+    LL_DMA_InitTypeDef ddma;
+    ddma.PeriphOrM2MSrcAddress  = (uint32_t)&(DISPLAY_SPI->DR);
+    ddma.MemoryOrM2MDstAddress  = (uint32_t)&dbuffer;
+    ddma.Direction              = LL_DMA_DIRECTION_MEMORY_TO_PERIPH;
+    ddma.Mode                   = LL_DMA_MODE_NORMAL;
+    ddma.PeriphOrM2MSrcIncMode  = LL_DMA_PERIPH_NOINCREMENT;
+    ddma.MemoryOrM2MDstIncMode  = LL_DMA_MEMORY_INCREMENT;
+    ddma.PeriphOrM2MSrcDataSize = LL_DMA_PDATAALIGN_BYTE;
+    ddma.MemoryOrM2MDstDataSize = LL_DMA_MDATAALIGN_BYTE;
+    ddma.NbData                 = 2*128*128;
+    ddma.Channel                = LL_DMA_CHANNEL_0;
+    ddma.Priority               = LL_DMA_PRIORITY_LOW;
+    ddma.FIFOMode               = LL_DMA_FIFOMODE_DISABLE;
+    ddma.FIFOThreshold          = LL_DMA_FIFOTHRESHOLD_1_4;
+    ddma.MemBurst               = LL_DMA_MBURST_SINGLE;
+    ddma.PeriphBurst            = LL_DMA_PBURST_SINGLE;
+    LL_DMA_Init(DMA1, LL_DMA_STREAM_4, &ddma);
+    LL_DMA_EnableIT_TC(DMA1, LL_DMA_STREAM_4);
+    LL_SPI_EnableDMAReq_TX(DISPLAY_SPI);
+
     display_reset();
+
+}
+
+// Start a DMA transfer of the buffer to the display.
+// Returns false if a transfer is already in progress
+bool display_draw(void) {
+
+    if (display_busy) return false;
+    display_busy = true;
+
+    set_rect(0, 0, 128, 128);
+    LL_GPIO_SetOutputPin(DC_PORT, DC_PIN);
+    LL_DMA_EnableStream(DMA1, LL_DMA_STREAM_4);
+
+    return true;
+}
+
+// IRQ on transfer completion
+void DMA1_Stream4_IRQHandler(void) {
+
+    LL_DMA_DisableStream(DMA1, LL_DMA_STREAM_4);
+    LL_DMA_ClearFlag_HT4(DMA1);
+    LL_DMA_ClearFlag_TC4(DMA1);
+    LL_DMA_ClearFlag_TE4(DMA1);
+    display_busy = false;
 
 }
 
@@ -98,15 +149,13 @@ uint16_t rgb(uint8_t r, uint8_t g, uint8_t b) {
   c <<= 5;
   c |= b >> 3;
 
-  return c;
+  return (c >> 8) | ((c & 0xFF) << 8);
 }
 
 void draw_pixel(uint16_t x, uint16_t y, uint16_t col) {
     dbuffer[y][x] = col;
 }
 
-
-uint16_t font_index[FONT_CHARS];
 
 void build_font_index(void) {
 
@@ -256,29 +305,6 @@ void draw_line(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t col)
             err += dx;
         }
     }
-}
-
-
-void display_draw(void) {
-    uint32_t start = NOW_US();
-    display_write(0, 0, 128, 128, (uint16_t*)dbuffer);
-    display_write_time = NOW_US() - start;
-}
-
-
-void display_write(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t *buffer) {
-
-    set_rect(x, y, w, h);
-    LL_GPIO_SetOutputPin(DC_PORT, DC_PIN);
-
-    for (uint16_t i=0; i < w*h; i++) {
-        uint16_t col = buffer[i];
-        DISPLAY_SPI->DR = col >> 8;
-        while (!(DISPLAY_SPI->SR & LL_SPI_SR_TXE));
-        DISPLAY_SPI->DR = col & 0xFF;
-        while (!(DISPLAY_SPI->SR & LL_SPI_SR_TXE));
-    }
-
 }
 
 

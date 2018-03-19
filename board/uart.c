@@ -24,7 +24,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef *huart) {
 
         pin_cfg_af(DEBUG_PORT, DEBUG_TX_PIN, DEBUG_AF);
         pin_cfg_af(DEBUG_PORT, DEBUG_RX_PIN, DEBUG_AF);
-        HAL_NVIC_SetPriority(USART1_IRQn, 3, 0);
+        HAL_NVIC_SetPriority(USART1_IRQn, PRIORITY_DEBUG, 0);
         HAL_NVIC_EnableIRQ(USART1_IRQn);
 
     } else if (huart == &h_uart_midi) {
@@ -32,7 +32,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef *huart) {
 
         pin_cfg_af(MIDI_PORT, MIDI_TX_PIN, MIDI_AF);
         pin_cfg_af(MIDI_PORT, MIDI_RX_PIN, MIDI_AF);        
-        HAL_NVIC_SetPriority(USART6_IRQn, 0, 0);
+        HAL_NVIC_SetPriority(USART6_IRQn, PRIORITY_MIDI, 0);
         HAL_NVIC_EnableIRQ(USART6_IRQn);        
     }
 }

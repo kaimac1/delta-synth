@@ -25,6 +25,7 @@ stm32/hal/Src/stm32f4xx_hal_rcc.c \
 stm32/hal/Src/stm32f4xx_hal_uart.c \
 stm32/hal/Src/stm32f4xx_hal_usart.c \
 stm32/hal/Src/stm32f4xx_hal_spi.c \
+stm32/hal/Src/stm32f4xx_ll_dma.c \
 stm32/hal/Src/stm32f4xx_ll_tim.c \
 stm32/hal/Src/stm32f4xx_ll_usart.c \
 stm32/hal/Src/stm32f4xx_ll_gpio.c \
@@ -145,6 +146,6 @@ clean:
 
 -include $(shell mkdir .dep 2>/dev/null) $(wildcard .dep/*)
 
-upload: $(BUILD_DIR)/$(TARGET).hex
+program: $(BUILD_DIR)/$(TARGET).hex
 	st-flash --format ihex write $(BUILD_DIR)/$(TARGET).hex
 

@@ -8,14 +8,15 @@
 #include "stm32f4xx_ll_tim.h"
 #include <math.h>
 
-#define COL_RED     0xF800
-#define COL_GREEN   0x07E0
-#define COL_BLUE    0x001F
-#define COL_WHITE   0xC618
+#define COL_RED     0x00F8
+#define COL_GREEN   0xE007
+#define COL_BLUE    0x1F00
+#define COL_WHITE   0x18C6
 #define CRED rgb(192,10,10)
 #define CGRN rgb(10,192,10)
 #define CBLU rgb(10,10,192)
 #define CWHT rgb(192,192,192)
+#define CGREY 0x8210
 
 #define TWOPI 6.2831853f
 #define ADD_DELTA_CLAMPED(x, y) {(x) += (y); if ((x) > 127) (x) = 127; if ((x) < 0) (x) = 0;}
@@ -188,15 +189,17 @@ void ui_update(void) {
     }
 
     //if (midi_event) {
-        redraw = true;
-//        midi_event = false;
+        //redraw = true;
+        //midi_event = false;
     //}
 
     // Redraw if required
     if (redraw) {
-        redraw = false;
         draw_screen();
+        if (display_draw()) redraw = false;
     }
+
+    HAL_Delay(10);
 
 }
 
@@ -231,7 +234,7 @@ void draw_gauge(uint16_t x, uint16_t y, float amount, uint16_t colour) {
         float cosa = fast_cos(a);
         float rad1 = radius;
         float rad2 = radius + thickness;
-        uint16_t col = (a < angle) ? colour : 0x1082;
+        uint16_t col = (a < angle) ? colour : CGREY;
         draw_line(xf + rad1*sina, yf + rad1*cosa, xf + rad2*sina, yf + rad2*cosa, col);
     }    
 
@@ -242,6 +245,8 @@ void draw_screen(void) {
     char buf[32];
     uint32_t time;
     char *wave;
+
+    if (display_busy) return;
 
     draw_rect(0, 0, 128, 128, 0x0000);
 
@@ -264,9 +269,8 @@ void draw_screen(void) {
 
             time = LL_TIM_GetCounter(TIM2) - time;
 
-            int fps = 1000000 / display_write_time;
             float load = 100 * ((float)loop_time / transfer_time);
-            sprintf(buf, "%d/%.1f", fps, load);
+            sprintf(buf, "%.1f", load);
             draw_text(64,0, buf, 1, COL_WHITE);
             break;
 
@@ -339,6 +343,5 @@ void draw_screen(void) {
             break;
     }
 
-    display_draw();
 }
 

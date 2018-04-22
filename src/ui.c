@@ -21,7 +21,7 @@
 #define TWOPI 6.2831853f
 
 typedef enum {
-    PAGE_OSC1,
+    PAGE_OSC,
     PAGE_ENV,
     PAGE_FILTER,
     PAGE_FX,
@@ -29,27 +29,32 @@ typedef enum {
     PAGE_SEQ,
     NUM_PAGES
 } UIPage;
-UIPage page = PAGE_LFO;
+
+typedef struct {
+    UIPage page;
+    int selected_osc;
+} UIState;
+UIState ui;
+
+typedef struct {
+    int wave;
+    int folding;
+    int duty;
+    int gain;
+    int detune;
+} OscSettings;
 
 typedef struct {
     int attack;
     int decay;
     int release;
     int sustain;
-
     int cutoff;
     int resonance;
     int env_mod;
-
-    int osc0_wave;
-    int osc0_folding;
-    int osc0_duty;
-    int osc0_gain;
-    int osc0_detune;
-
+    OscSettings osc[NUM_OSCILLATOR];
     int lfo_rate;
     int lfo_amount;
-
     int fx_damping;
     int fx_amount;
 } InputSettings;
@@ -75,24 +80,30 @@ void ui_update(void) {
     bool evt = read_buttons();
     if (evt) {
         if (buttons[BUTTON_ENVELOPE] == BTN_PRESSED) {
-            page++;
-            page %= NUM_PAGES;
+            ui.page++;
+            ui.page %= NUM_PAGES;
             redraw = true;
         }
         if (buttons[BUTTON_FILTER] == BTN_PRESSED) {
-            page = PAGE_SEQ;
+            ui.page = PAGE_SEQ;
             redraw = true;
         }
         if (buttons[BUTTON_OSC] == BTN_PRESSED) {
-            cfgnew.seq_play = !cfgnew.seq_play;
-            //page = PAGE_OSC;
-            //redraw = true;
+            //cfgnew.seq_play = !cfgnew.seq_play;
+            if (ui.page != PAGE_OSC) {
+                ui.page = PAGE_OSC;
+                ui.selected_osc = 0;
+            } else {
+                ui.selected_osc++;
+                ui.selected_osc %= NUM_OSCILLATOR;
+            }
+            redraw = true;
         }
     }
 
     evt = read_encoders();
     if (evt) {
-        switch (page) {
+        switch (ui.page) {
         case PAGE_ENV:
 
             // Attack
@@ -144,28 +155,28 @@ void ui_update(void) {
             redraw = true;
             break;
 
-        case PAGE_OSC1:
+        case PAGE_OSC:
             // Waveform selector
             if (encoders[ENC_RED].delta) {
-                ADD_DELTA_WRAPPED(input.osc0_wave, encoders[ENC_RED].delta);
-                Wave w = input.osc0_wave / 16;
+                ADD_DELTA_WRAPPED(input.osc[ui.selected_osc].wave, encoders[ENC_RED].delta);
+                Wave w = input.osc[ui.selected_osc].wave / 16;
                 w %= NUM_WAVE;
-                cfgnew.osc[0].waveform = w;
+                cfgnew.osc[ui.selected_osc].waveform = w;
             }
 
             if (encoders[ENC_GREEN].delta) {
-                ADD_DELTA_CLAMPED(input.osc0_folding, encoders[ENC_GREEN].delta);
-                cfgnew.osc[0].folding = 2.0f * (float)input.osc0_folding/127;
+                ADD_DELTA_CLAMPED(input.osc[ui.selected_osc].folding, encoders[ENC_GREEN].delta);
+                cfgnew.osc[ui.selected_osc].folding = 2.0f * (float)input.osc[ui.selected_osc].folding/127;
             }
             // Detune
             if (encoders[ENC_BLUE].delta) {
-                ADD_DELTA_CLAMPED(input.osc0_detune, encoders[ENC_BLUE].delta);
-                cfgnew.osc[0].detune = 1.0f + 0.1f * (float)input.osc0_detune/127;
+                ADD_DELTA_CLAMPED(input.osc[ui.selected_osc].detune, encoders[ENC_BLUE].delta);
+                cfgnew.osc[ui.selected_osc].detune = 1.0f + 0.1f * (float)input.osc[ui.selected_osc].detune/127;
             }
             // Gain
             if (encoders[ENC_WHITE].delta) {
-                ADD_DELTA_CLAMPED(input.osc0_gain, encoders[ENC_WHITE].delta);
-                cfgnew.osc[0].gain = (float)input.osc0_gain/127;
+                ADD_DELTA_CLAMPED(input.osc[ui.selected_osc].gain, encoders[ENC_WHITE].delta);
+                cfgnew.osc[ui.selected_osc].gain = (float)input.osc[ui.selected_osc].gain/127;
             }
 
 
@@ -174,12 +185,6 @@ void ui_update(void) {
             break;
 
         case PAGE_FX:
-            if (encoders[ENC_RED].delta) {
-                //ADD_DELTA_CLAMPED(input.fx_ncombs, encoders[ENC_RED].delta);
-                //if (input.fx_ncombs > 8) input.fx_ncombs = 8;
-                //cfgnew.ncombs = input.fx_ncombs;
-            }
-
             if (encoders[ENC_GREEN].delta) {
                 ADD_DELTA_CLAMPED(input.fx_damping, encoders[ENC_GREEN].delta);
                 cfgnew.fx_damping = (float)input.fx_damping/127;
@@ -220,11 +225,6 @@ void ui_update(void) {
         }
     }
 
-    //if (midi_event) {
-        //redraw = true;
-        //midi_event = false;
-    //}
-
     if (cfgnew.seq_play && seq_note_input != 0.0f) {
         seq.note[seq_idx] = seq_note_input;
     }
@@ -232,7 +232,6 @@ void ui_update(void) {
     // Redraw if required
     if (redraw) {
         draw_screen();
-        //if (display_draw()) redraw = false;
         display_draw();
     }
 
@@ -291,7 +290,7 @@ void draw_screen(void) {
     draw_text(64,0, buf, 1, COL_WHITE);
    
 
-    switch (page) {
+    switch (ui.page) {
         case PAGE_ENV:
             draw_text(0,  0,   "Envelope",  1, COL_WHITE);
 
@@ -323,33 +322,34 @@ void draw_screen(void) {
             break;
 
 
-        case PAGE_OSC1:
-            draw_text(0,  0,   "Osc 1",  1, COL_WHITE);
+        case PAGE_OSC:
+            sprintf(buf, "Osc %d", ui.selected_osc);
+            draw_text(0,  0,   buf,  1, COL_WHITE);
 
             draw_text_cen(32,  16,   "WAVEFORM",  1, CRED);
-            if (cfg.osc[0].waveform == WAVE_SAW) {
+            if (cfg.osc[ui.selected_osc].waveform == WAVE_SAW) {
                 wave = "Saw";
-            } else if (cfg.osc[0].waveform == WAVE_SQUARE) {
+            } else if (cfg.osc[ui.selected_osc].waveform == WAVE_SQUARE) {
                 wave = "Square";
                 draw_text_cen(96, 16, "SYMMETRY", 1, CGRN);
-                draw_gauge(96, 52, input.osc0_duty / 127.0f, CGRN);
+                draw_gauge(96, 52, input.osc[ui.selected_osc].duty / 127.0f, CGRN);
             } else {
                 wave = "Tri";
                 draw_text_cen(96, 16, "FOLDING", 1, CGRN);
-                draw_gauge(96, 52, input.osc0_folding / 127.0f, CGRN);                
+                draw_gauge(96, 52, input.osc[ui.selected_osc].folding / 127.0f, CGRN);                
             }
             draw_text_cen(32,  40, wave,  1, CRED);
 
             draw_text_cen(32,   116, "DETUNE", 1, CBLU);
-            draw_gauge(32, 94, input.osc0_detune / 127.0f, CBLU);
+            draw_gauge(32, 94, input.osc[ui.selected_osc].detune / 127.0f, CBLU);
             
             draw_text_cen(96,  116, "GAIN", 1, CWHT);
-            draw_gauge(96, 94, input.osc0_gain / 127.0f, CWHT);
+            draw_gauge(96, 94, input.osc[ui.selected_osc].gain / 127.0f, CWHT);
             break;
 
 
         case PAGE_FX:
-            draw_text_cen(32,  16,   "COMBS",  1, CRED);
+            //draw_text_cen(32,  16,   "COMBS",  1, CRED);
             //sprintf(buf, "%d", input.fx_ncombs);
             //draw_text_cen(32,  40, buf,  1, CRED);
 

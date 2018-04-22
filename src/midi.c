@@ -2,6 +2,7 @@
 #include "notes.h"
 #include "synth.h"
 #include "board.h"
+#include "ui.h"
 #include <math.h>
 
 #define CONTROLLER_1    0x0E
@@ -107,7 +108,11 @@ void midi_process_command(void) {
         // Note on
         case 0x90:
             //printf("ON     %d\r\n", command[1]);
-            poly_add(note[command[1]]);
+            if (cfgnew.seq_play) {
+                seq_note_input = note[command[1]];
+            } else {
+                poly_add(note[command[1]]);
+            }
             // if (cfgnew.arp != ARP_OFF) {
             //     arp_add(note[command[1]]);
             //     break;
@@ -122,7 +127,11 @@ void midi_process_command(void) {
         // Note off
         case 0x80:
             //printf("   OFF %d\r\n", command[1]);
-            poly_del(note[command[1]]);
+            if (cfgnew.seq_play) {
+                seq_note_input = 0.0f;
+            } else {
+                poly_del(note[command[1]]);
+            }
             // if (cfgnew.arp != ARP_OFF) {
             //     arp_del(note[command[1]]);
             //     break;

@@ -19,7 +19,8 @@ typedef enum {
 typedef enum {
     WAVE_TRI,
     WAVE_SQUARE,
-    WAVE_SAW
+    WAVE_SAW,
+    NUM_WAVE
 } Wave;
 
 typedef enum {
@@ -52,6 +53,7 @@ typedef struct {
     ArpMode arp;        // arpeggio mode
     uint32_t arp_freqs[MAX_ARP]; // arp notes, normalised
     int tempo;          // bpm
+    bool seq_play;
 
     // Oscillators
     float freq[NUM_VOICE];
@@ -71,18 +73,29 @@ typedef struct {
     float release_time;
 
     // Filter
-    float cutoff;       // Hz
+    float cutoff;       // fs
     float resonance;    // 0-4
     float env_mod;      // Hz at max env
 
-    int ncombs;
+    // LFO
+    float lfo_rate;
+    float lfo_amount;
+
+    // FX
     float fx_damping;
     float fx_combg;
 
 } SynthConfig;
 
+#define NUM_SEQ_NOTES 8
+typedef struct {
+    float note[NUM_SEQ_NOTES];
+
+} SeqConfig;
+
 extern SynthConfig cfg;
 extern SynthConfig cfgnew;
+extern SeqConfig seq;
 
 extern uint32_t loop_time;
 extern uint32_t transfer_time;

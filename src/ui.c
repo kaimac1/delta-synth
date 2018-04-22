@@ -19,16 +19,17 @@
 #define CGREY 0x8210
 
 #define TWOPI 6.2831853f
-#define ADD_DELTA_CLAMPED(x, y) {(x) += (y); if ((x) > 127) (x) = 127; if ((x) < 0) (x) = 0;}
 
 typedef enum {
     PAGE_OSC1,
     PAGE_ENV,
     PAGE_FILTER,
     PAGE_FX,
+    PAGE_LFO,
+    PAGE_SEQ,
     NUM_PAGES
 } UIPage;
-UIPage page = PAGE_FX;
+UIPage page = PAGE_LFO;
 
 typedef struct {
     int attack;
@@ -46,15 +47,27 @@ typedef struct {
     int osc0_gain;
     int osc0_detune;
 
-    int fx_ncombs;
+    int lfo_rate;
+    int lfo_amount;
+
     int fx_damping;
     int fx_amount;
 } InputSettings;
 InputSettings input;
 
+unsigned int seq_idx;
+float seq_note_input;
+
+
+
 
 bool redraw = true;
 void draw_screen(void);
+
+
+#define ADD_DELTA_CLAMPED(x, y) {(x) += (y); if ((x) > 127) (x) = 127; if ((x) < 0) (x) = 0;}
+#define ADD_DELTA_WRAPPED(x, y) {(x) += (y); if ((x) > 127) (x) -= 127; if ((x) < 0) (x) += 127;}
+#define MAP_ENCODER(enc, var, block) if(encoders[enc].delta) { ADD_DELTA_CLAMPED(var, encoders[enc].delta); block; };
 
 
 void ui_update(void) {
@@ -66,14 +79,15 @@ void ui_update(void) {
             page %= NUM_PAGES;
             redraw = true;
         }
-        // if (buttons[BUTTON_FILTER] == BTN_PRESSED) {
-        //     page = PAGE_FILTER;
-        //     redraw = true;
-        // }
-        // if (buttons[BUTTON_OSC] == BTN_PRESSED) {
-        //     page = PAGE_OSC;
-        //     redraw = true;
-        // }
+        if (buttons[BUTTON_FILTER] == BTN_PRESSED) {
+            page = PAGE_SEQ;
+            redraw = true;
+        }
+        if (buttons[BUTTON_OSC] == BTN_PRESSED) {
+            cfgnew.seq_play = !cfgnew.seq_play;
+            //page = PAGE_OSC;
+            //redraw = true;
+        }
     }
 
     evt = read_encoders();
@@ -82,33 +96,29 @@ void ui_update(void) {
         case PAGE_ENV:
 
             // Attack
-            if (encoders[ENC_RED].delta) {
-                ADD_DELTA_CLAMPED(input.attack, encoders[ENC_RED].delta);
+            MAP_ENCODER(ENC_RED, input.attack, {
                 cfgnew.attack_time = (float)input.attack/127 + 0.001f;
-                cfgnew.attack_rate = 1.0f/(cfgnew.attack_time * SAMPLE_RATE);                    
-            }
+                cfgnew.attack_rate = 1.0f/(cfgnew.attack_time * SAMPLE_RATE);
+            });
             // Decay
-            if (encoders[ENC_GREEN].delta) {
-                ADD_DELTA_CLAMPED(input.decay, encoders[ENC_GREEN].delta);
+            MAP_ENCODER(ENC_GREEN, input.decay, {
                 float value = (float)input.decay/127;
                 value = value*value*value;
                 cfgnew.decay_time = value * 5;
                 cfgnew.decay_rate = 1.0 - exp(cfgnew.env_curve / (cfgnew.decay_time * SAMPLE_RATE));
-            }
+            });
             // Sustain
-            if (encoders[ENC_BLUE].delta) {
-                ADD_DELTA_CLAMPED(input.sustain, encoders[ENC_BLUE].delta);
+            MAP_ENCODER(ENC_BLUE, input.sustain, {
                 float value = (float)input.sustain/127;
                 cfgnew.sustain_level = value;
-            }
+            });
             // Release
-            if (encoders[ENC_WHITE].delta) {
-                ADD_DELTA_CLAMPED(input.release, encoders[ENC_WHITE].delta);
+            MAP_ENCODER(ENC_WHITE, input.release, {
                 float value = (float)input.release/127;
                 value = value*value*value;
                 cfgnew.release_time = value * 5;
                 cfgnew.release_rate = 1.0 - exp(cfgnew.env_curve / (cfgnew.release_time * SAMPLE_RATE));
-            }
+            });
 
             redraw = true;
             break;
@@ -137,8 +147,10 @@ void ui_update(void) {
         case PAGE_OSC1:
             // Waveform selector
             if (encoders[ENC_RED].delta) {
-                ADD_DELTA_CLAMPED(input.osc0_wave, encoders[ENC_RED].delta);
-                cfgnew.osc[0].waveform = input.osc0_wave > 42 ? (input.osc0_wave > 85 ? WAVE_TRI : WAVE_SQUARE) : WAVE_SAW;
+                ADD_DELTA_WRAPPED(input.osc0_wave, encoders[ENC_RED].delta);
+                Wave w = input.osc0_wave / 16;
+                w %= NUM_WAVE;
+                cfgnew.osc[0].waveform = w;
             }
 
             if (encoders[ENC_GREEN].delta) {
@@ -163,9 +175,9 @@ void ui_update(void) {
 
         case PAGE_FX:
             if (encoders[ENC_RED].delta) {
-                ADD_DELTA_CLAMPED(input.fx_ncombs, encoders[ENC_RED].delta);
-                if (input.fx_ncombs > 8) input.fx_ncombs = 8;
-                cfgnew.ncombs = input.fx_ncombs;
+                //ADD_DELTA_CLAMPED(input.fx_ncombs, encoders[ENC_RED].delta);
+                //if (input.fx_ncombs > 8) input.fx_ncombs = 8;
+                //cfgnew.ncombs = input.fx_ncombs;
             }
 
             if (encoders[ENC_GREEN].delta) {
@@ -183,6 +195,26 @@ void ui_update(void) {
             redraw = true;
             break;
 
+        case PAGE_LFO:
+            if (encoders[ENC_RED].delta) {
+                ADD_DELTA_CLAMPED(input.lfo_rate, encoders[ENC_RED].delta);
+                cfgnew.lfo_rate = (float)(input.lfo_rate+1) / (6 * SAMPLE_RATE);
+            }
+            if (encoders[ENC_GREEN].delta) {
+                ADD_DELTA_CLAMPED(input.lfo_amount, encoders[ENC_GREEN].delta);
+                cfgnew.lfo_amount = (float)input.lfo_amount/127;
+            }            
+            redraw = true;
+            break;
+
+        case PAGE_SEQ:
+            if (encoders[ENC_RED].delta) {
+                seq_idx += encoders[ENC_RED].delta;
+                seq_idx %= NUM_SEQ_NOTES;
+            }
+            redraw = true;
+            break;
+
         default:
             break;
         }
@@ -193,10 +225,15 @@ void ui_update(void) {
         //midi_event = false;
     //}
 
+    if (cfgnew.seq_play && seq_note_input != 0.0f) {
+        seq.note[seq_idx] = seq_note_input;
+    }
+
     // Redraw if required
     if (redraw) {
         draw_screen();
-        if (display_draw()) redraw = false;
+        //if (display_draw()) redraw = false;
+        display_draw();
     }
 
     HAL_Delay(10);
@@ -243,16 +280,19 @@ void draw_gauge(uint16_t x, uint16_t y, float amount, uint16_t colour) {
 void draw_screen(void) {
 
     char buf[32];
-    uint32_t time;
     char *wave;
 
     if (display_busy) return;
 
     draw_rect(0, 0, 128, 128, 0x0000);
 
+    float load = 100 * ((float)loop_time / transfer_time);
+    sprintf(buf, "%.1f", (double)load);
+    draw_text(64,0, buf, 1, COL_WHITE);
+   
+
     switch (page) {
         case PAGE_ENV:
-            time = LL_TIM_GetCounter(TIM2);
             draw_text(0,  0,   "Envelope",  1, COL_WHITE);
 
             draw_text_cen(32,  16,   "ATTACK",  1, CRED);
@@ -266,12 +306,6 @@ void draw_screen(void) {
             
             draw_text_cen(96,  116, "RELEASE", 1, CWHT);
             draw_gauge(96, 94, input.release / 127.0f, CWHT);
-
-            time = LL_TIM_GetCounter(TIM2) - time;
-
-            float load = 100 * ((float)loop_time / transfer_time);
-            sprintf(buf, "%.1f", load);
-            draw_text(64,0, buf, 1, COL_WHITE);
             break;
 
 
@@ -286,16 +320,6 @@ void draw_screen(void) {
 
             draw_text_cen(32,   116, "ENV MOD", 1, CBLU);
             draw_gauge(32, 94, input.env_mod / 127.0f, CBLU);
-
-            char buf[32];
-            for (int i=0; i<NUM_VOICE; i++) {
-                if (cfg.key[i]) {
-                    //sprintf(buf, "%d: %lu", i, cfg.freq[i] / 1000);
-                } else {
-                    //sprintf(buf, "%d: --", i);
-                }
-                //draw_text(64, 64+12*i, buf, 1, 0xFFFF);
-            }
             break;
 
 
@@ -321,21 +345,37 @@ void draw_screen(void) {
             
             draw_text_cen(96,  116, "GAIN", 1, CWHT);
             draw_gauge(96, 94, input.osc0_gain / 127.0f, CWHT);
-
-
             break;
+
 
         case PAGE_FX:
             draw_text_cen(32,  16,   "COMBS",  1, CRED);
-            sprintf(buf, "%d", input.fx_ncombs);
-            draw_text_cen(32,  40, buf,  1, CRED);
+            //sprintf(buf, "%d", input.fx_ncombs);
+            //draw_text_cen(32,  40, buf,  1, CRED);
 
             draw_text_cen(96, 16, "DAMPING", 1, CGRN);
             draw_gauge(96, 52, input.fx_damping / 127.0f, CGRN);
 
             draw_text_cen(32,   116, "AMOUNT", 1, CBLU);
             draw_gauge(32, 94, input.fx_amount / 127.0f, CBLU);
+            break;
 
+
+        case PAGE_LFO:
+            draw_text(0, 0, "LFO", 1, COL_WHITE);
+
+            draw_text_cen(32,  16,   "RATE",  1, CRED);
+            draw_gauge(32, 52, input.lfo_rate / 127.0f, CRED);
+
+            draw_text_cen(96, 16, "AMOUNT", 1, CGRN);
+            draw_gauge(96, 52, input.lfo_amount / 127.0f, CGRN);
+            break;
+
+
+        case PAGE_SEQ:
+            draw_text(0, 0, "Seq", 1, COL_WHITE);
+            sprintf(buf, "idx=%d", seq_idx);
+            draw_text(0, 32, buf, 1, COL_RED);
             break;
 
 

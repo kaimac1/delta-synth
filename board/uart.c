@@ -9,7 +9,6 @@ UART_HandleTypeDef h_uart_midi;
 
 #define DEBUG_PORT   GPIOA
 #define DEBUG_TX_PIN LL_GPIO_PIN_9
-#define DEBUG_RX_PIN LL_GPIO_PIN_10
 #define DEBUG_AF 7
 
 #define MIDI_PORT   GPIOC
@@ -23,9 +22,6 @@ void HAL_UART_MspInit(UART_HandleTypeDef *huart) {
         __HAL_RCC_USART1_CLK_ENABLE();
 
         pin_cfg_af(DEBUG_PORT, DEBUG_TX_PIN, DEBUG_AF);
-        pin_cfg_af(DEBUG_PORT, DEBUG_RX_PIN, DEBUG_AF);
-        HAL_NVIC_SetPriority(USART1_IRQn, PRIORITY_DEBUG, 0);
-        HAL_NVIC_EnableIRQ(USART1_IRQn);
 
     } else if (huart == &h_uart_midi) {
         __HAL_RCC_USART6_CLK_ENABLE();

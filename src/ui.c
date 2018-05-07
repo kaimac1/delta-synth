@@ -24,6 +24,7 @@ typedef enum {
     PAGE_OSC,
     PAGE_ENV,
     PAGE_FILTER,
+    PAGE_FILTER_ENV,
     PAGE_FX,
     PAGE_LFO,
     PAGE_SEQ,
@@ -85,11 +86,15 @@ void ui_update(void) {
             redraw = true;
         }
         if (buttons[BUTTON_FILTER] == BTN_PRESSED) {
-            ui.page = PAGE_SEQ;
+            cfgnew.seq_play = !cfgnew.seq_play;
+            if (ui.page != PAGE_FILTER) {
+                ui.page = PAGE_FILTER;
+            } else {
+                ui.page = PAGE_FILTER_ENV;
+            }
             redraw = true;
         }
         if (buttons[BUTTON_OSC] == BTN_PRESSED) {
-            //cfgnew.seq_play = !cfgnew.seq_play;
             if (ui.page != PAGE_OSC) {
                 ui.page = PAGE_OSC;
                 ui.selected_osc = 0;
@@ -321,9 +326,13 @@ void draw_screen(void) {
             draw_gauge(32, 94, input.env_mod / 127.0f, CBLU);
             break;
 
+        case PAGE_FILTER_ENV:
+            draw_text(0,  0,   "Filter Env",  1, COL_WHITE);
+            break;
+
 
         case PAGE_OSC:
-            sprintf(buf, "Osc %d", ui.selected_osc);
+            sprintf(buf, "Osc %d", ui.selected_osc+1);
             draw_text(0,  0,   buf,  1, COL_WHITE);
 
             draw_text_cen(32,  16,   "WAVEFORM",  1, CRED);
@@ -349,10 +358,6 @@ void draw_screen(void) {
 
 
         case PAGE_FX:
-            //draw_text_cen(32,  16,   "COMBS",  1, CRED);
-            //sprintf(buf, "%d", input.fx_ncombs);
-            //draw_text_cen(32,  40, buf,  1, CRED);
-
             draw_text_cen(96, 16, "DAMPING", 1, CGRN);
             draw_gauge(96, 52, input.fx_damping / 127.0f, CGRN);
 

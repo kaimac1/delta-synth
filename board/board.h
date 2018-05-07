@@ -30,9 +30,9 @@ bool pin_read(GPIO_TypeDef *port, uint32_t pin);
 
 // input
 typedef enum {
-    BUTTON_ENVELOPE,
-    BUTTON_FILTER,
     BUTTON_OSC,
+    BUTTON_FILTER,
+    BUTTON_ENVELOPE,
     NUM_BUTTONS
 } ButtonName;
 

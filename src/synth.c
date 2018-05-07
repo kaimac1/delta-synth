@@ -241,7 +241,9 @@ inline void fill_buffer(void) {
 
 
         // Filter
-        float fc = cfg.cutoff;// + cfg.env_mod * env;
+        int ei = 0;
+        for (int i=0; i<NUM_VOICE; i++) if (cfg.key[i]) ei = i;
+        float fc = cfg.cutoff + cfg.env_mod * env[ei];
         float a = PI * fc/SAMPLE_RATE;
         float ria = 1.0f / (1.0f + a);
         float g = a * ria;

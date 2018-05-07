@@ -20,7 +20,7 @@ void display_reset(void);
 #define RESET_PORT  GPIOB
 #define RESET_PIN   LL_GPIO_PIN_10
 #define CS_PORT     GPIOB
-#define CS_PIN      LL_GPIO_PIN_12
+#define CS_PIN      LL_GPIO_PIN_1
 #define DC_PORT     GPIOB
 #define DC_PIN      LL_GPIO_PIN_4
 #define SCK_PORT    GPIOB

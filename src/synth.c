@@ -298,7 +298,7 @@ inline void fill_buffer(void) {
         fx *= 0.1f;
         s = fx + s;
 
-        int16_t s16 = s * 500;
+        int16_t s16 = s * 700;
         out_buffer[i] = s16;   // left
         out_buffer[i+1] = s16; // right        
 

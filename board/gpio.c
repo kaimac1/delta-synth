@@ -57,6 +57,19 @@ void pin_cfg_af(GPIO_TypeDef *port, uint32_t pin, uint32_t af) {
 
 }
 
+void pin_cfg_an(GPIO_TypeDef *port, uint32_t pin) {
+
+    LL_GPIO_InitTypeDef gpio;
+    gpio.Mode       = LL_GPIO_MODE_ANALOG;
+    gpio.Speed      = LL_GPIO_SPEED_FREQ_VERY_HIGH;
+    gpio.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
+    gpio.Alternate  = 0;
+    gpio.Pull       = 0;
+    gpio.Pin        = pin;
+    LL_GPIO_Init(port, &gpio);    
+    
+}
+
 // Set state of output pin
 void pin_set(GPIO_TypeDef *port, uint32_t pin, bool state) {
 

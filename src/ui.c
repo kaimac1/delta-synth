@@ -6,6 +6,7 @@
 #include "board.h"
 #include "synth.h"
 #include "stm32f4xx_ll_tim.h"
+#include "stm32f4xx_ll_adc.h"
 #include <math.h>
 
 #define COL_RED     0x00F8
@@ -230,6 +231,8 @@ void ui_update(void) {
         }
     }
 
+    cfgnew.cutoff = 10000.0f * LL_ADC_REG_ReadConversionData12(ADC1) / 4095.0f;
+
     if (cfgnew.seq_play && seq_note_input != 0.0f) {
         seq.note[seq_idx] = seq_note_input;
     }
@@ -238,8 +241,10 @@ void ui_update(void) {
     if (redraw) {
         draw_screen();
         display_draw();
+        redraw = false;
     }
 
+    LL_ADC_REG_StartConversionSWStart(ADC1);
     HAL_Delay(10);
 
 }
@@ -290,9 +295,11 @@ void draw_screen(void) {
 
     draw_rect(0, 0, 128, 128, 0x0000);
 
-    float load = 100 * ((float)loop_time / transfer_time);
-    sprintf(buf, "%.1f", (double)load);
-    draw_text(64,0, buf, 1, COL_WHITE);
+    //float load = LL_ADC_REG_ReadConversionData12(ADC1) / 4095.0;
+
+    //float load = 100 * ((float)loop_time / transfer_time);
+    //sprintf(buf, "%.3f", (double)load);
+    //draw_text(64,0, buf, 1, COL_WHITE);
    
 
     switch (ui.page) {

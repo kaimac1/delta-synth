@@ -25,6 +25,7 @@ void pin_cfg_output(GPIO_TypeDef *port, uint32_t pin);
 void pin_cfg_input(GPIO_TypeDef *port, uint32_t pin, uint32_t pull);
 void pin_cfg_exti(GPIO_TypeDef *port, uint32_t pin, uint32_t pull, uint32_t edge);
 void pin_cfg_af(GPIO_TypeDef *port, uint32_t pin, uint32_t af);
+void pin_cfg_an(GPIO_TypeDef *port, uint32_t pin);
 void pin_set(GPIO_TypeDef *port, uint32_t pin, bool state);
 bool pin_read(GPIO_TypeDef *port, uint32_t pin);
 

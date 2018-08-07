@@ -59,7 +59,7 @@ typedef struct {
 extern EncoderState encoders[NUM_ENCODERS];
 
 void input_init(void);
-bool read_buttons(void);
+uint8_t read_buttons(void);
 bool read_encoders(void);
 
 

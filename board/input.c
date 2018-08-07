@@ -3,6 +3,7 @@
 #include "stm32f4xx_ll_system.h"
 #include "stm32f4xx_ll_exti.h"
 #include "stm32f4xx_ll_adc.h"
+#include "stm32f4xx_ll_spi.h"
 
 int enc_states[16] = {0, -1, 1, 0, 1, 0, 0, -1, -1, 0, 0, 1, 0, 1, -1, 0};
 uint8_t enc_history[NUM_ENCODERS];
@@ -16,55 +17,101 @@ uint32_t      encoder_pin_b[NUM_ENCODERS];
 ButtonState buttons[NUM_BUTTONS];
 EncoderState encoders[NUM_ENCODERS];
 
+#define SWITCH_SPI SPI2
+#define SPI_CLK_EN  __HAL_RCC_SPI2_CLK_ENABLE
+
+#define CS_PORT     GPIOB
+#define CS_PIN      LL_GPIO_PIN_12
+#define SCK_PORT    GPIOB
+#define SCK_PIN     LL_GPIO_PIN_13
+#define MISO_PORT   GPIOB
+#define MISO_PIN    LL_GPIO_PIN_14
+#define MOSI_PORT   GPIOB
+#define MOSI_PIN    LL_GPIO_PIN_15
+
+uint8_t read_reg(uint8_t reg) {
+
+    uint8_t value;
+
+    pin_set(CS_PORT, CS_PIN, 0);
+    SWITCH_SPI->DR = 0x41; // READ
+    while (!LL_SPI_IsActiveFlag_TXE(SWITCH_SPI));
+    SWITCH_SPI->DR = reg;
+    while (!LL_SPI_IsActiveFlag_TXE(SWITCH_SPI));
+    SWITCH_SPI->DR = 0x00;
+    while (!LL_SPI_IsActiveFlag_TXE(SWITCH_SPI));
+    while (!LL_I2S_IsActiveFlag_RXNE(SWITCH_SPI));
+    value = SWITCH_SPI->DR;
+    delay_us(500);
+    pin_set(CS_PORT, CS_PIN, 1);
+
+    return value;
+
+}
+
+void write_reg(uint8_t reg, uint8_t value) {
+
+    pin_set(CS_PORT, CS_PIN, 0);
+    SWITCH_SPI->DR = 0x40; // WRITE
+    while (!LL_SPI_IsActiveFlag_TXE(SWITCH_SPI));
+    SWITCH_SPI->DR = reg;
+    while (!LL_SPI_IsActiveFlag_TXE(SWITCH_SPI));
+    SWITCH_SPI->DR = value;
+    while (!LL_SPI_IsActiveFlag_TXE(SWITCH_SPI));
+    delay_us(500);
+    pin_set(CS_PORT, CS_PIN, 1);    
+
+}
 
 // Initialise input hardware.
 void input_init(void) {
 
-    // buttons
-    button_ports[BUTTON_OSC]      = GPIOA;
-    button_pins[BUTTON_OSC]       = LL_GPIO_PIN_2;
-    button_ports[BUTTON_FILTER]   = GPIOA;
-    button_pins[BUTTON_FILTER]    = LL_GPIO_PIN_10;
-    button_ports[BUTTON_ENVELOPE] = GPIOB;
-    button_pins[BUTTON_ENVELOPE]  = LL_GPIO_PIN_3;
+    __HAL_RCC_GPIOB_CLK_ENABLE();
+    SPI_CLK_EN();
+
+    // Pin init
+    pin_cfg_output(CS_PORT, CS_PIN);
+    pin_cfg_af(SCK_PORT, SCK_PIN, 5);
+    pin_cfg_af(MOSI_PORT, MOSI_PIN, 5);
+    pin_cfg_af(MISO_PORT, MISO_PIN, 5);
+
+    // SPI init
+    LL_SPI_InitTypeDef spi;
+    spi.TransferDirection = LL_SPI_FULL_DUPLEX;
+    spi.Mode            = LL_SPI_MODE_MASTER;
+    spi.DataWidth       = LL_SPI_DATAWIDTH_8BIT;
+    spi.ClockPolarity   = LL_SPI_POLARITY_LOW;
+    spi.ClockPhase      = LL_SPI_PHASE_1EDGE;
+    spi.NSS             = LL_SPI_NSS_SOFT;
+    spi.BaudRate        = LL_SPI_BAUDRATEPRESCALER_DIV32;
+    spi.BitOrder        = LL_SPI_MSB_FIRST; 
+    spi.CRCCalculation  = LL_SPI_CRCCALCULATION_DISABLE;
+    spi.CRCPoly         = 0;
+    LL_SPI_Init(SWITCH_SPI, &spi);
+    LL_SPI_Enable(SWITCH_SPI);    
+
+    // Set pull-ups
+    write_reg(0x0C, 0xFF);
 
 
-    for (int i=0; i<NUM_BUTTONS; i++) {
-        pin_cfg_input(button_ports[i], button_pins[i], LL_GPIO_PULL_DOWN);
-    }
 
     // encoders
-    encoder_ports[0] = GPIOB;   // Green
-    encoder_pin_a[0] = LL_GPIO_PIN_5;
-    encoder_pin_b[0] = LL_GPIO_PIN_14;
-    // encoder_ports[1] = GPIOA;   // Red
-    // encoder_pin_a[1] = LL_GPIO_PIN_6;
-    // encoder_pin_b[1] = LL_GPIO_PIN_7;
-    // encoder_ports[2] = GPIOB;   // Blue
-    // encoder_pin_a[2] = LL_GPIO_PIN_9;
-    // encoder_pin_b[2] = LL_GPIO_PIN_8;
-    // encoder_ports[3] = GPIOA;   // White
-    // encoder_pin_a[3] = LL_GPIO_PIN_12;
-    // encoder_pin_b[3] = LL_GPIO_PIN_11;
+    // encoder_ports[0] = GPIOB;   // Green
+    // encoder_pin_a[0] = LL_GPIO_PIN_5;
+    // encoder_pin_b[0] = LL_GPIO_PIN_14;
 
-    for (int i=0; i<NUM_ENCODERS; i++) {
-        pin_cfg_exti(encoder_ports[i], encoder_pin_a[i],  LL_GPIO_PULL_UP, LL_EXTI_TRIGGER_RISING_FALLING);
-        pin_cfg_exti(encoder_ports[i], encoder_pin_b[i],  LL_GPIO_PULL_UP, LL_EXTI_TRIGGER_RISING_FALLING);
-        enc_history[i] = (pin_read(encoder_ports[i], encoder_pin_b[i]) << 1) | pin_read(encoder_ports[i], encoder_pin_a[i]);
-    }
+    // for (int i=0; i<NUM_ENCODERS; i++) {
+    //     pin_cfg_exti(encoder_ports[i], encoder_pin_a[i],  LL_GPIO_PULL_UP, LL_EXTI_TRIGGER_RISING_FALLING);
+    //     pin_cfg_exti(encoder_ports[i], encoder_pin_b[i],  LL_GPIO_PULL_UP, LL_EXTI_TRIGGER_RISING_FALLING);
+    //     enc_history[i] = (pin_read(encoder_ports[i], encoder_pin_b[i]) << 1) | pin_read(encoder_ports[i], encoder_pin_a[i]);
+    // }
 
-    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTB, LL_SYSCFG_EXTI_LINE5);
-    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTB, LL_SYSCFG_EXTI_LINE14);
-    // LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTA, LL_SYSCFG_EXTI_LINE11);
-    // LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTA, LL_SYSCFG_EXTI_LINE12);
-    // LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTB, LL_SYSCFG_EXTI_LINE8);
-    // LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTB, LL_SYSCFG_EXTI_LINE9);
-    // LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTA, LL_SYSCFG_EXTI_LINE6);
-    // LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTA, LL_SYSCFG_EXTI_LINE7);
-    HAL_NVIC_SetPriority(EXTI9_5_IRQn,   PRIORITY_ENCODER, 0);
-    HAL_NVIC_SetPriority(EXTI15_10_IRQn, PRIORITY_ENCODER, 0);
-    HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
-    HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+    // LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTB, LL_SYSCFG_EXTI_LINE5);
+    // LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTB, LL_SYSCFG_EXTI_LINE14);
+    // HAL_NVIC_SetPriority(EXTI9_5_IRQn,   PRIORITY_ENCODER, 0);
+    // HAL_NVIC_SetPriority(EXTI15_10_IRQn, PRIORITY_ENCODER, 0);
+    // HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+    // HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
 
     // adc
@@ -105,38 +152,42 @@ void input_init(void) {
 
 // Read each button and update its state.
 // Returns true if any buttons have changed state.
-bool read_buttons(void) {
+uint8_t read_buttons(void) {
 
-    bool changed = false;
+    return read_reg(0x12);
 
-    for (int i=0; i<NUM_BUTTONS; i++) {
-        bool pressed = pin_read(button_ports[i], button_pins[i]);
 
-        switch (buttons[i]) {
-            case BTN_OFF:
-                if (pressed) {
-                    buttons[i] = BTN_PRESSED;
-                    changed = true;
-                }
-                break;
-            case BTN_PRESSED:
-                buttons[i] = pressed ? BTN_HELD : BTN_RELEASED;
-                changed = true;
-                break;
-            case BTN_HELD:
-                if (!pressed) {
-                    buttons[i] = BTN_RELEASED;
-                    changed = true;
-                }
-                break;
-            case BTN_RELEASED:
-                buttons[i] = BTN_OFF;
-                changed = true;
-                break;
-        }
-    }
 
-    return changed;
+    // bool changed = false;
+
+    // for (int i=0; i<NUM_BUTTONS; i++) {
+    //     bool pressed = pin_read(button_ports[i], button_pins[i]);
+
+    //     switch (buttons[i]) {
+    //         case BTN_OFF:
+    //             if (pressed) {
+    //                 buttons[i] = BTN_PRESSED;
+    //                 changed = true;
+    //             }
+    //             break;
+    //         case BTN_PRESSED:
+    //             buttons[i] = pressed ? BTN_HELD : BTN_RELEASED;
+    //             changed = true;
+    //             break;
+    //         case BTN_HELD:
+    //             if (!pressed) {
+    //                 buttons[i] = BTN_RELEASED;
+    //                 changed = true;
+    //             }
+    //             break;
+    //         case BTN_RELEASED:
+    //             buttons[i] = BTN_OFF;
+    //             changed = true;
+    //             break;
+    //     }
+    // }
+
+    // return changed;
 
 }
 

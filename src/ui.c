@@ -302,98 +302,98 @@ void draw_screen(void) {
     //draw_text(64,0, buf, 1, COL_WHITE);
    
 
-    switch (ui.page) {
-        case PAGE_ENV:
-            draw_text(0,  0,   "Envelope",  1, COL_WHITE);
+    // switch (ui.page) {
+    //     case PAGE_ENV:
+    //         draw_text(0,  0,   "Envelope",  1, COL_WHITE);
 
-            draw_text_cen(32,  16,   "ATTACK",  1, CRED);
-            draw_gauge(32, 52, input.attack / 127.0f, CRED);
+    //         draw_text_cen(32,  16,   "ATTACK",  1, CRED);
+    //         draw_gauge(32, 52, input.attack / 127.0f, CRED);
 
-            draw_text_cen(96, 16,   "DECAY",   1, CGRN);
-            draw_gauge(96, 52, input.decay / 127.0f, CGRN);
+    //         draw_text_cen(96, 16,   "DECAY",   1, CGRN);
+    //         draw_gauge(96, 52, input.decay / 127.0f, CGRN);
             
-            draw_text_cen(32,   116, "SUSTAIN", 1, CBLU);
-            draw_gauge(32, 94, input.sustain / 127.0f, CBLU);
+    //         draw_text_cen(32,   116, "SUSTAIN", 1, CBLU);
+    //         draw_gauge(32, 94, input.sustain / 127.0f, CBLU);
             
-            draw_text_cen(96,  116, "RELEASE", 1, CWHT);
-            draw_gauge(96, 94, input.release / 127.0f, CWHT);
-            break;
+    //         draw_text_cen(96,  116, "RELEASE", 1, CWHT);
+    //         draw_gauge(96, 94, input.release / 127.0f, CWHT);
+    //         break;
 
 
-        case PAGE_FILTER:
-            draw_text(0,  0,   "Filter",  1, COL_WHITE);
+    //     case PAGE_FILTER:
+    //         draw_text(0,  0,   "Filter",  1, COL_WHITE);
 
-            draw_text_cen(32,  16,   "CUTOFF",  1, CRED);
-            draw_gauge(32, 52, input.cutoff / 127.0f, CRED);
+    //         draw_text_cen(32,  16,   "CUTOFF",  1, CRED);
+    //         draw_gauge(32, 52, input.cutoff / 127.0f, CRED);
 
-            draw_text_cen(96, 16,   "RESONANCE",   1, CGRN);
-            draw_gauge(96, 52, input.resonance / 127.0f, CGRN);
+    //         draw_text_cen(96, 16,   "RESONANCE",   1, CGRN);
+    //         draw_gauge(96, 52, input.resonance / 127.0f, CGRN);
 
-            draw_text_cen(32,   116, "ENV MOD", 1, CBLU);
-            draw_gauge(32, 94, input.env_mod / 127.0f, CBLU);
-            break;
+    //         draw_text_cen(32,   116, "ENV MOD", 1, CBLU);
+    //         draw_gauge(32, 94, input.env_mod / 127.0f, CBLU);
+    //         break;
 
-        case PAGE_FILTER_ENV:
-            draw_text(0,  0,   "Filter Env",  1, COL_WHITE);
-            break;
+    //     case PAGE_FILTER_ENV:
+    //         draw_text(0,  0,   "Filter Env",  1, COL_WHITE);
+    //         break;
 
 
-        case PAGE_OSC:
-            sprintf(buf, "Osc %d", ui.selected_osc+1);
-            draw_text(0,  0,   buf,  1, COL_WHITE);
+    //     case PAGE_OSC:
+    //         sprintf(buf, "Osc %d", ui.selected_osc+1);
+    //         draw_text(0,  0,   buf,  1, COL_WHITE);
 
-            draw_text_cen(32,  16,   "WAVEFORM",  1, CRED);
-            if (cfg.osc[ui.selected_osc].waveform == WAVE_SAW) {
-                wave = "Saw";
-            } else if (cfg.osc[ui.selected_osc].waveform == WAVE_SQUARE) {
-                wave = "Square";
-                draw_text_cen(96, 16, "SYMMETRY", 1, CGRN);
-                draw_gauge(96, 52, input.osc[ui.selected_osc].duty / 127.0f, CGRN);
-            } else {
-                wave = "Tri";
-                draw_text_cen(96, 16, "FOLDING", 1, CGRN);
-                draw_gauge(96, 52, input.osc[ui.selected_osc].folding / 127.0f, CGRN);                
-            }
-            draw_text_cen(32,  40, wave,  1, CRED);
+    //         draw_text_cen(32,  16,   "WAVEFORM",  1, CRED);
+    //         if (cfg.osc[ui.selected_osc].waveform == WAVE_SAW) {
+    //             wave = "Saw";
+    //         } else if (cfg.osc[ui.selected_osc].waveform == WAVE_SQUARE) {
+    //             wave = "Square";
+    //             draw_text_cen(96, 16, "SYMMETRY", 1, CGRN);
+    //             draw_gauge(96, 52, input.osc[ui.selected_osc].duty / 127.0f, CGRN);
+    //         } else {
+    //             wave = "Tri";
+    //             draw_text_cen(96, 16, "FOLDING", 1, CGRN);
+    //             draw_gauge(96, 52, input.osc[ui.selected_osc].folding / 127.0f, CGRN);                
+    //         }
+    //         draw_text_cen(32,  40, wave,  1, CRED);
 
-            draw_text_cen(32,   116, "DETUNE", 1, CBLU);
-            draw_gauge(32, 94, input.osc[ui.selected_osc].detune / 127.0f, CBLU);
+    //         draw_text_cen(32,   116, "DETUNE", 1, CBLU);
+    //         draw_gauge(32, 94, input.osc[ui.selected_osc].detune / 127.0f, CBLU);
             
-            draw_text_cen(96,  116, "GAIN", 1, CWHT);
-            draw_gauge(96, 94, input.osc[ui.selected_osc].gain / 127.0f, CWHT);
-            break;
+    //         draw_text_cen(96,  116, "GAIN", 1, CWHT);
+    //         draw_gauge(96, 94, input.osc[ui.selected_osc].gain / 127.0f, CWHT);
+    //         break;
 
 
-        case PAGE_FX:
-            draw_text_cen(96, 16, "DAMPING", 1, CGRN);
-            draw_gauge(96, 52, input.fx_damping / 127.0f, CGRN);
+    //     case PAGE_FX:
+    //         draw_text_cen(96, 16, "DAMPING", 1, CGRN);
+    //         draw_gauge(96, 52, input.fx_damping / 127.0f, CGRN);
 
-            draw_text_cen(32,   116, "AMOUNT", 1, CBLU);
-            draw_gauge(32, 94, input.fx_amount / 127.0f, CBLU);
-            break;
-
-
-        case PAGE_LFO:
-            draw_text(0, 0, "LFO", 1, COL_WHITE);
-
-            draw_text_cen(32,  16,   "RATE",  1, CRED);
-            draw_gauge(32, 52, input.lfo_rate / 127.0f, CRED);
-
-            draw_text_cen(96, 16, "AMOUNT", 1, CGRN);
-            draw_gauge(96, 52, input.lfo_amount / 127.0f, CGRN);
-            break;
+    //         draw_text_cen(32,   116, "AMOUNT", 1, CBLU);
+    //         draw_gauge(32, 94, input.fx_amount / 127.0f, CBLU);
+    //         break;
 
 
-        case PAGE_SEQ:
-            draw_text(0, 0, "Seq", 1, COL_WHITE);
-            sprintf(buf, "idx=%d", seq_idx);
-            draw_text(0, 32, buf, 1, COL_RED);
-            break;
+    //     case PAGE_LFO:
+    //         draw_text(0, 0, "LFO", 1, COL_WHITE);
+
+    //         draw_text_cen(32,  16,   "RATE",  1, CRED);
+    //         draw_gauge(32, 52, input.lfo_rate / 127.0f, CRED);
+
+    //         draw_text_cen(96, 16, "AMOUNT", 1, CGRN);
+    //         draw_gauge(96, 52, input.lfo_amount / 127.0f, CGRN);
+    //         break;
 
 
-        default:
-            break;
-    }
+    //     case PAGE_SEQ:
+    //         draw_text(0, 0, "Seq", 1, COL_WHITE);
+    //         sprintf(buf, "idx=%d", seq_idx);
+    //         draw_text(0, 32, buf, 1, COL_RED);
+    //         break;
+
+
+    //     default:
+    //         break;
+    // }
 
 }
 

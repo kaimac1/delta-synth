@@ -37,15 +37,15 @@ void input_init(void) {
     encoder_ports[0] = GPIOB;   // Green
     encoder_pin_a[0] = LL_GPIO_PIN_5;
     encoder_pin_b[0] = LL_GPIO_PIN_14;
-    encoder_ports[1] = GPIOA;   // Red
-    encoder_pin_a[1] = LL_GPIO_PIN_6;
-    encoder_pin_b[1] = LL_GPIO_PIN_7;
-    encoder_ports[2] = GPIOB;   // Blue
-    encoder_pin_a[2] = LL_GPIO_PIN_9;
-    encoder_pin_b[2] = LL_GPIO_PIN_8;
-    encoder_ports[3] = GPIOA;   // White
-    encoder_pin_a[3] = LL_GPIO_PIN_12;
-    encoder_pin_b[3] = LL_GPIO_PIN_11;
+    // encoder_ports[1] = GPIOA;   // Red
+    // encoder_pin_a[1] = LL_GPIO_PIN_6;
+    // encoder_pin_b[1] = LL_GPIO_PIN_7;
+    // encoder_ports[2] = GPIOB;   // Blue
+    // encoder_pin_a[2] = LL_GPIO_PIN_9;
+    // encoder_pin_b[2] = LL_GPIO_PIN_8;
+    // encoder_ports[3] = GPIOA;   // White
+    // encoder_pin_a[3] = LL_GPIO_PIN_12;
+    // encoder_pin_b[3] = LL_GPIO_PIN_11;
 
     for (int i=0; i<NUM_ENCODERS; i++) {
         pin_cfg_exti(encoder_ports[i], encoder_pin_a[i],  LL_GPIO_PULL_UP, LL_EXTI_TRIGGER_RISING_FALLING);
@@ -55,12 +55,12 @@ void input_init(void) {
 
     LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTB, LL_SYSCFG_EXTI_LINE5);
     LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTB, LL_SYSCFG_EXTI_LINE14);
-    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTA, LL_SYSCFG_EXTI_LINE11);
-    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTA, LL_SYSCFG_EXTI_LINE12);
-    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTB, LL_SYSCFG_EXTI_LINE8);
-    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTB, LL_SYSCFG_EXTI_LINE9);
-    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTA, LL_SYSCFG_EXTI_LINE6);
-    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTA, LL_SYSCFG_EXTI_LINE7);
+    // LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTA, LL_SYSCFG_EXTI_LINE11);
+    // LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTA, LL_SYSCFG_EXTI_LINE12);
+    // LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTB, LL_SYSCFG_EXTI_LINE8);
+    // LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTB, LL_SYSCFG_EXTI_LINE9);
+    // LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTA, LL_SYSCFG_EXTI_LINE6);
+    // LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTA, LL_SYSCFG_EXTI_LINE7);
     HAL_NVIC_SetPriority(EXTI9_5_IRQn,   PRIORITY_ENCODER, 0);
     HAL_NVIC_SetPriority(EXTI15_10_IRQn, PRIORITY_ENCODER, 0);
     HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);

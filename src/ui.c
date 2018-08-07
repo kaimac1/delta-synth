@@ -112,11 +112,11 @@ void ui_update(void) {
         switch (ui.page) {
         case PAGE_ENV:
 
-            // Attack
-            MAP_ENCODER(ENC_RED, input.attack, {
-                cfgnew.attack_time = (float)input.attack/127 + 0.001f;
-                cfgnew.attack_rate = 1.0f/(cfgnew.attack_time * SAMPLE_RATE);
-            });
+            // // Attack
+            // MAP_ENCODER(ENC_RED, input.attack, {
+            //     cfgnew.attack_time = (float)input.attack/127 + 0.001f;
+            //     cfgnew.attack_rate = 1.0f/(cfgnew.attack_time * SAMPLE_RATE);
+            // });
             // Decay
             MAP_ENCODER(ENC_GREEN, input.decay, {
                 float value = (float)input.decay/127;
@@ -124,66 +124,66 @@ void ui_update(void) {
                 cfgnew.decay_time = value * 5;
                 cfgnew.decay_rate = 1.0 - exp(cfgnew.env_curve / (cfgnew.decay_time * SAMPLE_RATE));
             });
-            // Sustain
-            MAP_ENCODER(ENC_BLUE, input.sustain, {
-                float value = (float)input.sustain/127;
-                cfgnew.sustain_level = value;
-            });
-            // Release
-            MAP_ENCODER(ENC_WHITE, input.release, {
-                float value = (float)input.release/127;
-                value = value*value*value;
-                cfgnew.release_time = value * 5;
-                cfgnew.release_rate = 1.0 - exp(cfgnew.env_curve / (cfgnew.release_time * SAMPLE_RATE));
-            });
+            // // Sustain
+            // MAP_ENCODER(ENC_BLUE, input.sustain, {
+            //     float value = (float)input.sustain/127;
+            //     cfgnew.sustain_level = value;
+            // });
+            // // Release
+            // MAP_ENCODER(ENC_WHITE, input.release, {
+            //     float value = (float)input.release/127;
+            //     value = value*value*value;
+            //     cfgnew.release_time = value * 5;
+            //     cfgnew.release_rate = 1.0 - exp(cfgnew.env_curve / (cfgnew.release_time * SAMPLE_RATE));
+            // });
 
             redraw = true;
             break;
 
         case PAGE_FILTER:
 
-            // Cutoff
-            if (encoders[ENC_RED].delta) {
-                ADD_DELTA_CLAMPED(input.cutoff, encoders[ENC_RED].delta);
-                cfgnew.cutoff = 10000.0f * (float)input.cutoff/127;
-            }
+            // // Cutoff
+            // if (encoders[ENC_RED].delta) {
+            //     ADD_DELTA_CLAMPED(input.cutoff, encoders[ENC_RED].delta);
+            //     cfgnew.cutoff = 10000.0f * (float)input.cutoff/127;
+            // }
             // Resonance
             if (encoders[ENC_GREEN].delta) {
                 ADD_DELTA_CLAMPED(input.resonance, encoders[ENC_GREEN].delta);
                 cfgnew.resonance = 3.99f * (float)input.resonance/127;
             }
-            // Envelope modulation
-            if (encoders[ENC_BLUE].delta) {
-                ADD_DELTA_CLAMPED(input.env_mod, encoders[ENC_BLUE].delta);
-                cfgnew.env_mod = 5000.0f * (float)input.env_mod/127;
-            }
+            // // Envelope modulation
+            // if (encoders[ENC_BLUE].delta) {
+            //     ADD_DELTA_CLAMPED(input.env_mod, encoders[ENC_BLUE].delta);
+            //     cfgnew.env_mod = 5000.0f * (float)input.env_mod/127;
+            // }
 
             redraw = true;
             break;
 
         case PAGE_OSC:
-            // Waveform selector
-            if (encoders[ENC_RED].delta) {
-                ADD_DELTA_WRAPPED(input.osc[ui.selected_osc].wave, encoders[ENC_RED].delta);
-                Wave w = input.osc[ui.selected_osc].wave / 16;
-                w %= NUM_WAVE;
-                cfgnew.osc[ui.selected_osc].waveform = w;
-            }
+            // // Waveform selector
+            // if (encoders[ENC_RED].delta) {
+            //     ADD_DELTA_WRAPPED(input.osc[ui.selected_osc].wave, encoders[ENC_RED].delta);
+            //     Wave w = input.osc[ui.selected_osc].wave / 16;
+            //     w %= NUM_WAVE;
+            //     cfgnew.osc[ui.selected_osc].waveform = w;
+            // }
 
             if (encoders[ENC_GREEN].delta) {
                 ADD_DELTA_CLAMPED(input.osc[ui.selected_osc].folding, encoders[ENC_GREEN].delta);
                 cfgnew.osc[ui.selected_osc].folding = 2.0f * (float)input.osc[ui.selected_osc].folding/127;
             }
-            // Detune
-            if (encoders[ENC_BLUE].delta) {
-                ADD_DELTA_CLAMPED(input.osc[ui.selected_osc].detune, encoders[ENC_BLUE].delta);
-                cfgnew.osc[ui.selected_osc].detune = 1.0f + 0.1f * (float)input.osc[ui.selected_osc].detune/127;
-            }
-            // Gain
-            if (encoders[ENC_WHITE].delta) {
-                ADD_DELTA_CLAMPED(input.osc[ui.selected_osc].gain, encoders[ENC_WHITE].delta);
-                cfgnew.osc[ui.selected_osc].gain = (float)input.osc[ui.selected_osc].gain/127;
-            }
+            // // Detune
+            // if (encoders[ENC_BLUE].delta) {
+            //     ADD_DELTA_CLAMPED(input.osc[ui.selected_osc].detune, encoders[ENC_BLUE].delta);
+            //     cfgnew.osc[ui.selected_osc].detune = 1.0f + 0.1f * (float)input.osc[ui.selected_osc].detune/127;
+            // }
+            // // Gain
+            // if (encoders[ENC_WHITE].delta) {
+            //     ADD_DELTA_CLAMPED(input.osc[ui.selected_osc].gain, encoders[ENC_WHITE].delta);
+            //     cfgnew.osc[ui.selected_osc].gain = (float)input.osc[ui.selected_osc].gain/127;
+            // }
 
 
 
@@ -196,21 +196,21 @@ void ui_update(void) {
                 cfgnew.fx_damping = (float)input.fx_damping/127;
             }
 
-            if (encoders[ENC_BLUE].delta) {
-                ADD_DELTA_CLAMPED(input.fx_amount, encoders[ENC_BLUE].delta);
-                float a = -1.0f / logf(1.0f - 0.3f);
-                float b = 127.0f / (logf(1.0f - 0.98f) * a + 1.0f);
-                float fb = 1.0f - expf(((float)input.fx_amount - b) / (a*b));
-                cfgnew.fx_combg = fb;
-            }            
+            // if (encoders[ENC_BLUE].delta) {
+            //     ADD_DELTA_CLAMPED(input.fx_amount, encoders[ENC_BLUE].delta);
+            //     float a = -1.0f / logf(1.0f - 0.3f);
+            //     float b = 127.0f / (logf(1.0f - 0.98f) * a + 1.0f);
+            //     float fb = 1.0f - expf(((float)input.fx_amount - b) / (a*b));
+            //     cfgnew.fx_combg = fb;
+            // }            
             redraw = true;
             break;
 
         case PAGE_LFO:
-            if (encoders[ENC_RED].delta) {
-                ADD_DELTA_CLAMPED(input.lfo_rate, encoders[ENC_RED].delta);
-                cfgnew.lfo_rate = (float)(input.lfo_rate+1) / (6 * SAMPLE_RATE);
-            }
+            // if (encoders[ENC_RED].delta) {
+            //     ADD_DELTA_CLAMPED(input.lfo_rate, encoders[ENC_RED].delta);
+            //     cfgnew.lfo_rate = (float)(input.lfo_rate+1) / (6 * SAMPLE_RATE);
+            // }
             if (encoders[ENC_GREEN].delta) {
                 ADD_DELTA_CLAMPED(input.lfo_amount, encoders[ENC_GREEN].delta);
                 cfgnew.lfo_amount = (float)input.lfo_amount/127;
@@ -219,10 +219,10 @@ void ui_update(void) {
             break;
 
         case PAGE_SEQ:
-            if (encoders[ENC_RED].delta) {
-                seq_idx += encoders[ENC_RED].delta;
-                seq_idx %= NUM_SEQ_NOTES;
-            }
+            // if (encoders[ENC_RED].delta) {
+            //     seq_idx += encoders[ENC_RED].delta;
+            //     seq_idx %= NUM_SEQ_NOTES;
+            // }
             redraw = true;
             break;
 

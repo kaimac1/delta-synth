@@ -19,15 +19,36 @@ int main(void) {
     build_font_index();
     gen_note_table();
     create_wave_tables();
-    synth_start();
+    //synth_start();
 
     cfgnew.volume = 70;
+    
 
     pin_cfg_output(GPIOA, 1<<5);    // Nucleo LED
     pin_set(GPIOA, 1<<5, 1);
 
+    char buf[32];
+
+    uint32_t start;
+    uint32_t total=0;
+    uint32_t ctr=0;
+
     while (1) {
-        ui_update();
+        draw_rect(0, 0, 128, 64, 0);
+        sprintf(buf, "%lu ms, ctr=%lu", total, ctr);
+        draw_text(0, 32, buf, 1);
+
+        pin_set(GPIOA, 1<<5, 1);
+
+        start = NOW_US();
+        display_draw();
+        total = NOW_US() - start;
+        total /= 1000;
+
+        pin_set(GPIOA, 1<<5, 0);
+
+        //HAL_Delay(10);
+        ctr++;
     }
 
         //         // Legato

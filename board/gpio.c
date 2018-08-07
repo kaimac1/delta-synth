@@ -57,6 +57,21 @@ void pin_cfg_af(GPIO_TypeDef *port, uint32_t pin, uint32_t af) {
 
 }
 
+// Configure pin as alternate function
+void pin_cfg_i2c(GPIO_TypeDef *port, uint32_t pin) {
+
+    LL_GPIO_InitTypeDef gpio;
+    gpio.Mode       = LL_GPIO_MODE_ALTERNATE;
+    gpio.Speed      = LL_GPIO_SPEED_FREQ_VERY_HIGH;
+    gpio.OutputType = LL_GPIO_OUTPUT_OPENDRAIN;
+    gpio.Alternate  = 4;
+    gpio.Pull       = LL_GPIO_PULL_UP;
+    gpio.Pin        = pin;
+    LL_GPIO_Init(port, &gpio);
+
+}
+
+
 void pin_cfg_an(GPIO_TypeDef *port, uint32_t pin) {
 
     LL_GPIO_InitTypeDef gpio;

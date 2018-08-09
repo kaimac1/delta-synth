@@ -15,11 +15,10 @@ int main(void) {
 
     HAL_Init();
     hardware_init();
-    printf("Running.\r\n");
     build_font_index();
     gen_note_table();
     create_wave_tables();
-    //synth_start();
+    synth_start();
 
     cfgnew.volume = 70;
     
@@ -32,10 +31,13 @@ int main(void) {
     while (1) {
 
         uint32_t sw = read_buttons();
+        //read_encoder();
 
         draw_rect(0, 0, 128, 64, 0);
-        sprintf(buf, "ctr=%lu, sw=%lu", ctr, sw);
-        draw_text(0, (ctr/64)%64, buf, 1);
+        sprintf(buf, "sw=%lu", sw);
+        draw_text(0, (ctr/4)%32, buf, 1);
+        sprintf(buf, "enc=%d", encoder.value);
+        draw_text(0, 16+(ctr/4)%32, buf, 1);
         
         display_draw();
         HAL_Delay(25);
@@ -74,8 +76,8 @@ void hardware_init(void) {
     __HAL_RCC_SYSCFG_CLK_ENABLE();
 
     uart_init();
-    input_init();
     timer_init();
+    input_init();
     display_init();
 
 }

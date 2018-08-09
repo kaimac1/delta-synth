@@ -11,7 +11,7 @@
 #define I2S3_SCK_SD_WS_AF               GPIO_AF6_SPI3
 #define I2S3_SCK_SD_CLK_ENABLE()        __HAL_RCC_GPIOC_CLK_ENABLE()
 #define I2S3_WS_CLK_ENABLE()            __HAL_RCC_GPIOA_CLK_ENABLE()
-#define I2S3_WS_PIN                     GPIO_PIN_4
+#define I2S3_WS_PIN                     GPIO_PIN_15
 #define I2S3_SCK_PIN                    GPIO_PIN_10
 #define I2S3_SD_PIN                     GPIO_PIN_12
 #define I2S3_SCK_SD_GPIO_PORT           GPIOC

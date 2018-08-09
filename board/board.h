@@ -46,21 +46,16 @@ typedef enum {
 } ButtonState;
 extern ButtonState buttons[NUM_BUTTONS];
 
-typedef enum {
-    ENC_GREEN,
-    NUM_ENCODERS
-} EncoderName;
-
 typedef struct {
     int value;
     int last_value;
     int delta;
 } EncoderState;
-extern EncoderState encoders[NUM_ENCODERS];
+extern EncoderState encoder;
 
 void input_init(void);
 uint8_t read_buttons(void);
-bool read_encoders(void);
+bool read_encoder(void);
 
 
 // display

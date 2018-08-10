@@ -351,11 +351,6 @@ void synth_start(void) {
     cfg.osc[1].gain = 0.5f;
     cfg.osc[1].detune = 1.0f;    
 
-    cfg.osc[2].waveform = WAVE_SQUARE;
-    cfg.osc[2].folding = 2.0f;
-    cfg.osc[2].gain = 0.5f;
-    cfg.osc[2].detune = 1.0f;        
-
     cfg.attack_rate  = 0.0005;
     cfg.decay_rate   = 0.005;
     cfg.sustain_level = 1.0;

@@ -7,33 +7,8 @@
 #include "synth.h"
 #include "stm32f4xx_ll_tim.h"
 #include "stm32f4xx_ll_adc.h"
-#include <math.h>
-
-#define COL_RED     0x00F8
-#define COL_GREEN   0xE007
-#define COL_BLUE    0x1F00
-#define COL_WHITE   0x18C6
-#define CRED rgb(192,10,10)
-#define CGRN rgb(10,192,10)
-#define CBLU rgb(10,10,192)
-#define CWHT rgb(192,192,192)
-#define CGREY 0x8210
-
-#define TWOPI 6.2831853f
-
-typedef enum {
-    PAGE_OSC,
-    PAGE_ENV,
-    PAGE_FILTER,
-    PAGE_FILTER_ENV,
-    PAGE_FX,
-    PAGE_LFO,
-    PAGE_SEQ,
-    NUM_PAGES
-} UIPage;
 
 typedef struct {
-    UIPage page;
     int selected_osc;
 } UIState;
 UIState ui;
@@ -65,9 +40,6 @@ InputSettings input;
 unsigned int seq_idx;
 float seq_note_input;
 
-
-
-
 bool redraw = true;
 void draw_screen(void);
 
@@ -80,32 +52,49 @@ void draw_screen(void);
 void ui_update(void) {
 
     bool evt = read_buttons();
+
     if (evt) {
-        if (buttons[BUTTON_ENVELOPE] == BTN_PRESSED) {
-            ui.page++;
-            ui.page %= NUM_PAGES;
+        if (buttons[BTN_OSC_SEL] == BTN_DOWN) {
+            ui.selected_osc++;
+            ui.selected_osc %= NUM_OSCILLATOR;
             redraw = true;
         }
-        if (buttons[BUTTON_FILTER] == BTN_PRESSED) {
-            cfgnew.seq_play = !cfgnew.seq_play;
-            if (ui.page != PAGE_FILTER) {
-                ui.page = PAGE_FILTER;
-            } else {
-                ui.page = PAGE_FILTER_ENV;
-            }
-            redraw = true;
-        }
-        if (buttons[BUTTON_OSC] == BTN_PRESSED) {
-            if (ui.page != PAGE_OSC) {
-                ui.page = PAGE_OSC;
-                ui.selected_osc = 0;
-            } else {
-                ui.selected_osc++;
-                ui.selected_osc %= NUM_OSCILLATOR;
-            }
-            redraw = true;
-        }
+        // if (buttons[BUTTON_FILTER] == BTN_PRESSED) {
+        //     cfgnew.seq_play = !cfgnew.seq_play;
+        //     if (ui.page != PAGE_FILTER) {
+        //         ui.page = PAGE_FILTER;
+        //     } else {
+        //         ui.page = PAGE_FILTER_ENV;
+        //     }
+        //     redraw = true;
+        // }
+        // if (buttons[BUTTON_OSC] == BTN_PRESSED) {
+        //     if (ui.page != PAGE_OSC) {
+        //         ui.page = PAGE_OSC;
+        //         ui.selected_osc = 0;
+        //     } else {
+        //         ui.selected_osc++;
+        //         ui.selected_osc %= NUM_OSCILLATOR;
+        //     }
+        //     redraw = true;
+        // }
     }
+
+
+    cfgnew.osc[0].gain = (float)LL_ADC_REG_ReadConversionData12(ADC1) / 4095.0f;
+    cfgnew.osc[1].gain = 0.0f;
+    LL_ADC_REG_StartConversionSWStart(ADC1);
+
+    // Redraw display if required
+    redraw = true;
+    if (redraw) {
+        draw_screen();
+        display_draw();
+        redraw = false;
+    }
+
+    
+
 
     // evt = read_encoders();
     // if (evt) {
@@ -237,65 +226,26 @@ void ui_update(void) {
     //     seq.note[seq_idx] = seq_note_input;
     // }
 
-    // // Redraw if required
-    // if (redraw) {
-    //     draw_screen();
-    //     display_draw();
-    //     redraw = false;
-    // }
-
-    // LL_ADC_REG_StartConversionSWStart(ADC1);
-    // HAL_Delay(10);
-
-}
-
-inline float fast_sin(float arg) {
-    size_t idx = (size_t)(SINE_TABLE_SIZE * arg/TWOPI) + 1;
-    return sine_table[idx] / 32768.0f;
-}
-inline float fast_cos(float arg) {
-    size_t idx = (size_t)(SINE_TABLE_SIZE * arg/TWOPI) + 1;
-    idx += SINE_TABLE_SIZE >> 2;
-    idx %= SINE_TABLE_SIZE;
-    return sine_table[idx] / 32768.0f;
-}
-
-void draw_gauge(uint16_t x, uint16_t y, float amount, uint16_t colour) {
-
-    int radius = 16;
-    int thickness = 23-radius;
-
-    float start = TWOPI * 0.1f;
-    float end = TWOPI * 0.9f;
-
-    float angle = start + (end-start) * amount;
-
-    int segments = 284; // Tune this so there are no gaps
-    float step = TWOPI / segments;
-    float xf = x + 0.5f;
-    float yf = y + 0.5f;
-    
-    for (float a=start; a<end; a+=step) {
-        float sina = -fast_sin(a);
-        float cosa = fast_cos(a);
-        float rad1 = radius;
-        float rad2 = radius + thickness;
-        uint16_t col = (a < angle) ? colour : CGREY;
-        draw_line(xf + rad1*sina, yf + rad1*cosa, xf + rad2*sina, yf + rad2*cosa, col);
-    }    
 
 }
 
 void draw_screen(void) {
 
     char buf[32];
-    char *wave;
 
     if (display_busy) return;
 
-    draw_rect(0, 0, 128, 128, 0x0000);
+    draw_rect(0, 0, 128, 64, 0);
 
-    //float load = LL_ADC_REG_ReadConversionData12(ADC1) / 4095.0;
+    sprintf(buf, "Osc %d", ui.selected_osc + 1);
+    draw_text(0, 0, buf, 1);
+
+    sprintf(buf, "enc=%d", encoder.value);
+    draw_text(0, 16, buf, 1);            
+
+    float pot1 = cfgnew.osc[0].gain;
+    sprintf(buf, "pot=%.3f", pot1);
+    draw_text(0, 32, buf, 1);
 
     //float load = 100 * ((float)loop_time / transfer_time);
     //sprintf(buf, "%.3f", (double)load);
@@ -378,22 +328,9 @@ void draw_screen(void) {
 
     //         draw_text_cen(32,  16,   "RATE",  1, CRED);
     //         draw_gauge(32, 52, input.lfo_rate / 127.0f, CRED);
-
     //         draw_text_cen(96, 16, "AMOUNT", 1, CGRN);
     //         draw_gauge(96, 52, input.lfo_amount / 127.0f, CGRN);
     //         break;
-
-
-    //     case PAGE_SEQ:
-    //         draw_text(0, 0, "Seq", 1, COL_WHITE);
-    //         sprintf(buf, "idx=%d", seq_idx);
-    //         draw_text(0, 32, buf, 1, COL_RED);
-    //         break;
-
-
-    //     default:
-    //         break;
-    // }
 
 }
 

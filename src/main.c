@@ -25,23 +25,9 @@ int main(void) {
     pin_cfg_output(GPIOA, 1<<5);    // Nucleo LED
     pin_set(GPIOA, 1<<5, 1);
 
-    char buf[32];
-    uint32_t ctr=0;
-
     while (1) {
-
-        uint32_t sw = read_buttons();
-        //read_encoder();
-
-        draw_rect(0, 0, 128, 64, 0);
-        sprintf(buf, "sw=%lu", sw);
-        draw_text(0, (ctr/4)%32, buf, 1);
-        sprintf(buf, "enc=%d", encoder.value);
-        draw_text(0, 16+(ctr/4)%32, buf, 1);
-        
-        display_draw();
+        ui_update();
         HAL_Delay(25);
-        ctr++;
     }
 
         //         // Legato

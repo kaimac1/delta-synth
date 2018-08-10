@@ -33,7 +33,7 @@ typedef enum {
 
 #define MAX_ARP 5
 #define NUM_VOICE 4
-#define NUM_OSCILLATOR 3
+#define NUM_OSCILLATOR 2
 
 typedef struct {
     Wave waveform;

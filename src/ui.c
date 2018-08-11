@@ -54,11 +54,23 @@ void ui_update(void) {
     bool evt = read_buttons();
 
     if (evt) {
+
+        // Oscillator select
         if (buttons[BTN_OSC_SEL] == BTN_DOWN) {
             ui.selected_osc++;
             ui.selected_osc %= NUM_OSCILLATOR;
             redraw = true;
         }
+
+        // Oscillator waveform
+        if (buttons[BTN_OSC_WAVE] == BTN_DOWN) {
+            Wave new = cfgnew.osc[ui.selected_osc].waveform;
+            new++;
+            new %= NUM_WAVE;
+            cfgnew.osc[ui.selected_osc].waveform = new;
+            redraw = true;
+        }
+
         // if (buttons[BUTTON_FILTER] == BTN_PRESSED) {
         //     cfgnew.seq_play = !cfgnew.seq_play;
         //     if (ui.page != PAGE_FILTER) {
@@ -80,11 +92,10 @@ void ui_update(void) {
         // }
     }
 
-
-    cfgnew.osc[0].gain = (float)LL_ADC_REG_ReadConversionData12(ADC1) / 4095.0f;
-    cfgnew.osc[1].gain = 0.0f;
-    LL_ADC_REG_StartConversionSWStart(ADC1);
-
+    // Pots
+    cfgnew.osc[0].gain = pots[0] / 4095.0f;
+    cfgnew.osc[1].gain = pots[1] / 4095.0f;
+    
     // Redraw display if required
     redraw = true;
     if (redraw) {
@@ -151,14 +162,6 @@ void ui_update(void) {
     //         break;
 
     //     case PAGE_OSC:
-    //         // // Waveform selector
-    //         // if (encoders[ENC_RED].delta) {
-    //         //     ADD_DELTA_WRAPPED(input.osc[ui.selected_osc].wave, encoders[ENC_RED].delta);
-    //         //     Wave w = input.osc[ui.selected_osc].wave / 16;
-    //         //     w %= NUM_WAVE;
-    //         //     cfgnew.osc[ui.selected_osc].waveform = w;
-    //         // }
-
     //         if (encoders[ENC_GREEN].delta) {
     //             ADD_DELTA_CLAMPED(input.osc[ui.selected_osc].folding, encoders[ENC_GREEN].delta);
     //             cfgnew.osc[ui.selected_osc].folding = 2.0f * (float)input.osc[ui.selected_osc].folding/127;
@@ -168,16 +171,6 @@ void ui_update(void) {
     //         //     ADD_DELTA_CLAMPED(input.osc[ui.selected_osc].detune, encoders[ENC_BLUE].delta);
     //         //     cfgnew.osc[ui.selected_osc].detune = 1.0f + 0.1f * (float)input.osc[ui.selected_osc].detune/127;
     //         // }
-    //         // // Gain
-    //         // if (encoders[ENC_WHITE].delta) {
-    //         //     ADD_DELTA_CLAMPED(input.osc[ui.selected_osc].gain, encoders[ENC_WHITE].delta);
-    //         //     cfgnew.osc[ui.selected_osc].gain = (float)input.osc[ui.selected_osc].gain/127;
-    //         // }
-
-
-
-    //         redraw = true;
-    //         break;
 
     //     case PAGE_FX:
     //         if (encoders[ENC_GREEN].delta) {
@@ -232,20 +225,43 @@ void ui_update(void) {
 void draw_screen(void) {
 
     char buf[32];
+    char *wave = "";
 
     if (display_busy) return;
 
     draw_rect(0, 0, 128, 64, 0);
 
+    // Osc
     sprintf(buf, "Osc %d", ui.selected_osc + 1);
-    draw_text(0, 0, buf, 1);
+    draw_text(0, 1, buf, 1);
 
-    sprintf(buf, "enc=%d", encoder.value);
-    draw_text(0, 16, buf, 1);            
+    switch (cfg.osc[ui.selected_osc].waveform) {
+        case WAVE_SAW: wave = "Saw"; break;
+        case WAVE_SQUARE: wave = "Square"; break;
+        case WAVE_TRI: wave = "Tri"; break;
+        default: break;
+    }
+    draw_text(64, 1, wave, 1);
 
-    float pot1 = cfgnew.osc[0].gain;
-    sprintf(buf, "pot=%.3f", pot1);
+
+    for (int i=0; i<16; i++) {
+        buf[i] = 0x30 + buttons[i];
+    }
+    buf[16] = 0;
+    draw_text(0, 16, buf, 1);
+
+
+    // sprintf(buf, "enc=%d", encoder.value);
+    // draw_text(0, 16, buf, 1);            
+
+    sprintf(buf, "pot0=%d", pots[3] / 10);
     draw_text(0, 32, buf, 1);
+
+    // sprintf(buf, "pot1=%d", pots[4] / 10);
+    // draw_text(0, 32, buf, 1);
+
+    // sprintf(buf, "pot2=%d", pots[5] / 10);
+    // draw_text(0, 48, buf, 1);
 
     //float load = 100 * ((float)loop_time / transfer_time);
     //sprintf(buf, "%.3f", (double)load);

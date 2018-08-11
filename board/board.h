@@ -53,6 +53,9 @@ typedef struct {
 } EncoderState;
 extern EncoderState encoder;
 
+#define NUM_POTS 6
+extern uint16_t pots[NUM_POTS];
+
 void input_init(void);
 bool read_buttons(void);
 bool read_encoder(void);

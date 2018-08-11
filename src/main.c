@@ -27,7 +27,7 @@ int main(void) {
 
     while (1) {
         ui_update();
-        HAL_Delay(25);
+        HAL_Delay(30);
     }
 
         //         // Legato

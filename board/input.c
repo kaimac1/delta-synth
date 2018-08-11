@@ -210,6 +210,13 @@ void adc_init(void) {
     pin_cfg_an(GPIOC, LL_GPIO_PIN_1);   // ch11 Env1 attack
     pin_cfg_an(GPIOC, LL_GPIO_PIN_2);   // ch12 Env1 
     pin_cfg_an(GPIOC, LL_GPIO_PIN_3);   // ch13 Env1
+    pin_cfg_an(GPIOB, LL_GPIO_PIN_0);   // ch8
+    pin_cfg_an(GPIOA, LL_GPIO_PIN_4);   // ch4
+    pin_cfg_an(GPIOB, LL_GPIO_PIN_1);   // ch9
+    pin_cfg_an(GPIOC, LL_GPIO_PIN_4);   // ch14
+    pin_cfg_an(GPIOA, LL_GPIO_PIN_2);   // ch2
+    pin_cfg_an(GPIOA, LL_GPIO_PIN_3);   // ch3
+
 
 
     __HAL_RCC_ADC1_CLK_ENABLE();
@@ -230,7 +237,7 @@ void adc_init(void) {
 
     LL_ADC_REG_InitTypeDef reg;
     reg.TriggerSource = LL_ADC_REG_TRIG_SOFTWARE;
-    reg.SequencerLength = LL_ADC_REG_SEQ_SCAN_ENABLE_6RANKS;
+    reg.SequencerLength = LL_ADC_REG_SEQ_SCAN_ENABLE_12RANKS;
     reg.SequencerDiscont = LL_ADC_REG_SEQ_DISCONT_DISABLE;
     reg.ContinuousMode = LL_ADC_REG_CONV_CONTINUOUS;
     reg.DMATransfer = LL_ADC_REG_DMA_TRANSFER_UNLIMITED;
@@ -242,13 +249,25 @@ void adc_init(void) {
     LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_4, LL_ADC_CHANNEL_11);
     LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_5, LL_ADC_CHANNEL_12);
     LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_6, LL_ADC_CHANNEL_13);
-    
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_7, LL_ADC_CHANNEL_8);
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_8, LL_ADC_CHANNEL_4);
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_9, LL_ADC_CHANNEL_9);
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_10, LL_ADC_CHANNEL_14);
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_11, LL_ADC_CHANNEL_2);
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_12, LL_ADC_CHANNEL_3);    
+
     LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_0, LL_ADC_SAMPLINGTIME_480CYCLES);
     LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_1, LL_ADC_SAMPLINGTIME_480CYCLES);
     LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_10, LL_ADC_SAMPLINGTIME_480CYCLES);
     LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_11, LL_ADC_SAMPLINGTIME_480CYCLES);
     LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_12, LL_ADC_SAMPLINGTIME_480CYCLES);
     LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_13, LL_ADC_SAMPLINGTIME_480CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_8, LL_ADC_SAMPLINGTIME_480CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_4, LL_ADC_SAMPLINGTIME_480CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_9, LL_ADC_SAMPLINGTIME_480CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_14, LL_ADC_SAMPLINGTIME_480CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_2, LL_ADC_SAMPLINGTIME_480CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_3, LL_ADC_SAMPLINGTIME_480CYCLES);
 
     LL_ADC_Enable(ADC1);
 

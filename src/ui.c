@@ -244,24 +244,17 @@ void draw_screen(void) {
     draw_text(64, 1, wave, 1);
 
 
-    for (int i=0; i<16; i++) {
-        buf[i] = 0x30 + buttons[i];
-    }
-    buf[16] = 0;
-    draw_text(0, 16, buf, 1);
-
-
     // sprintf(buf, "enc=%d", encoder.value);
     // draw_text(0, 16, buf, 1);            
 
-    sprintf(buf, "pot0=%d", pots[3] / 10);
+    sprintf(buf, "pot0=%d", pots[9] / 10);
+    draw_text(0, 16, buf, 1);
+
+    sprintf(buf, "pot1=%d", pots[10] / 10);
     draw_text(0, 32, buf, 1);
 
-    // sprintf(buf, "pot1=%d", pots[4] / 10);
-    // draw_text(0, 32, buf, 1);
-
-    // sprintf(buf, "pot2=%d", pots[5] / 10);
-    // draw_text(0, 48, buf, 1);
+    sprintf(buf, "pot2=%d", pots[11] / 10);
+    draw_text(0, 48, buf, 1);
 
     //float load = 100 * ((float)loop_time / transfer_time);
     //sprintf(buf, "%.3f", (double)load);

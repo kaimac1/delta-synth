@@ -14,8 +14,8 @@ void SystemClock_Config(void);
 int main(void) { 
 
     HAL_Init();
-    hardware_init();
     build_font_index();
+    hardware_init();
     gen_note_table();
     create_wave_tables();
     synth_start();
@@ -27,7 +27,6 @@ int main(void) {
 
     while (1) {
         ui_update();
-        HAL_Delay(30);
     }
 
         //         // Legato
@@ -61,10 +60,11 @@ void hardware_init(void) {
     __HAL_RCC_GPIOE_CLK_ENABLE();
     __HAL_RCC_SYSCFG_CLK_ENABLE();
 
+    display_init();
     uart_init();
     timer_init();
     input_init();
-    display_init();
+    
 
 }
 

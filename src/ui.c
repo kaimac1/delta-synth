@@ -7,6 +7,9 @@
 #include "synth.h"
 #include "stm32f4xx_ll_tim.h"
 #include "stm32f4xx_ll_adc.h"
+#include <math.h>
+
+#include "stm32f4xx_ll_dma.h"
 
 typedef struct {
     int selected_osc;
@@ -29,7 +32,7 @@ typedef struct {
     int cutoff;
     int resonance;
     int env_mod;
-    OscSettings osc[NUM_OSCILLATOR];
+    //OscSettings osc[NUM_OSCILLATOR];
     int lfo_rate;
     int lfo_amount;
     int fx_damping;
@@ -43,11 +46,15 @@ float seq_note_input;
 bool redraw = true;
 void draw_screen(void);
 
-
 #define ADD_DELTA_CLAMPED(x, y) {(x) += (y); if ((x) > 127) (x) = 127; if ((x) < 0) (x) = 0;}
 #define ADD_DELTA_WRAPPED(x, y) {(x) += (y); if ((x) > 127) (x) -= 127; if ((x) < 0) (x) += 127;}
 #define MAP_ENCODER(enc, var, block) if(encoders[enc].delta) { ADD_DELTA_CLAMPED(var, encoders[enc].delta); block; };
 
+#define POTMAX 4095.0f
+#define POTFILT 0.9f;
+
+
+float env1_sustain = 0.0f;
 
 void ui_update(void) {
 
@@ -92,53 +99,42 @@ void ui_update(void) {
         // }
     }
 
-    // Pots
-    cfgnew.osc[0].gain = pots[0] / 4095.0f;
-    cfgnew.osc[1].gain = pots[1] / 4095.0f;
+    // Source
+    cfgnew.osc[0].gain = pots[0] / POTMAX;
+    cfgnew.osc[1].gain = pots[1] / POTMAX;
+
+    // Env1
+    cfgnew.attack_time = pots[3]/POTMAX + 0.001f;
+    cfgnew.attack_rate = 1.0f/(cfgnew.attack_time * SAMPLE_RATE);
+
+    float decay = pots[4]/POTMAX;
+    decay = decay*decay*decay;
+    cfgnew.decay_time = decay * 5;
+    cfgnew.decay_rate = 1.0 - exp(cfgnew.env_curve / (cfgnew.decay_time * SAMPLE_RATE));
+    cfgnew.release_time = cfgnew.decay_time;
+    cfgnew.release_rate = cfgnew.decay_rate;
+
+
+    
+    // cfgnew.sustain_level = (1.0f-FILT)*(pots[5]/POTMAX) + FILT*env1_sustain;
+    // env1_sustain = cfgnew.sustain_level;
+    cfgnew.sustain_level = pots[5]/POTMAX;
+
+    
+    // Filter
+    cfgnew.cutoff = 10000.0f * (pots[9] / POTMAX);
+    cfgnew.resonance = 3.99f * (pots[10] / POTMAX);
+
     
     // Redraw display if required
-    redraw = true;
     if (redraw) {
         draw_screen();
-        display_draw();
-        redraw = false;
+        if (display_draw()) redraw = false;
     }
 
-    
+    HAL_Delay(5);
 
 
-    // evt = read_encoders();
-    // if (evt) {
-    //     switch (ui.page) {
-    //     case PAGE_ENV:
-
-    //         // // Attack
-    //         // MAP_ENCODER(ENC_RED, input.attack, {
-    //         //     cfgnew.attack_time = (float)input.attack/127 + 0.001f;
-    //         //     cfgnew.attack_rate = 1.0f/(cfgnew.attack_time * SAMPLE_RATE);
-    //         // });
-    //         // Decay
-    //         MAP_ENCODER(ENC_GREEN, input.decay, {
-    //             float value = (float)input.decay/127;
-    //             value = value*value*value;
-    //             cfgnew.decay_time = value * 5;
-    //             cfgnew.decay_rate = 1.0 - exp(cfgnew.env_curve / (cfgnew.decay_time * SAMPLE_RATE));
-    //         });
-    //         // // Sustain
-    //         // MAP_ENCODER(ENC_BLUE, input.sustain, {
-    //         //     float value = (float)input.sustain/127;
-    //         //     cfgnew.sustain_level = value;
-    //         // });
-    //         // // Release
-    //         // MAP_ENCODER(ENC_WHITE, input.release, {
-    //         //     float value = (float)input.release/127;
-    //         //     value = value*value*value;
-    //         //     cfgnew.release_time = value * 5;
-    //         //     cfgnew.release_rate = 1.0 - exp(cfgnew.env_curve / (cfgnew.release_time * SAMPLE_RATE));
-    //         // });
-
-    //         redraw = true;
-    //         break;
 
     //     case PAGE_FILTER:
 
@@ -235,7 +231,7 @@ void draw_screen(void) {
     sprintf(buf, "Osc %d", ui.selected_osc + 1);
     draw_text(0, 1, buf, 1);
 
-    switch (cfg.osc[ui.selected_osc].waveform) {
+    switch (cfgnew.osc[ui.selected_osc].waveform) {
         case WAVE_SAW: wave = "Saw"; break;
         case WAVE_SQUARE: wave = "Square"; break;
         case WAVE_TRI: wave = "Tri"; break;
@@ -247,14 +243,14 @@ void draw_screen(void) {
     // sprintf(buf, "enc=%d", encoder.value);
     // draw_text(0, 16, buf, 1);            
 
-    sprintf(buf, "pot0=%d", pots[9] / 10);
-    draw_text(0, 16, buf, 1);
+    // sprintf(buf, "pot0=%d", pots[9] / 10);
+    // draw_text(0, 16, buf, 1);
 
-    sprintf(buf, "pot1=%d", pots[10] / 10);
-    draw_text(0, 32, buf, 1);
+    // sprintf(buf, "pot1=%d", pots[10] / 10);
+    // draw_text(0, 32, buf, 1);
 
-    sprintf(buf, "pot2=%d", pots[11] / 10);
-    draw_text(0, 48, buf, 1);
+    // sprintf(buf, "pot2=%d", pots[11] / 10);
+    // draw_text(0, 48, buf, 1);
 
     //float load = 100 * ((float)loop_time / transfer_time);
     //sprintf(buf, "%.3f", (double)load);

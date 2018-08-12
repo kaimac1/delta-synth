@@ -60,7 +60,6 @@ void input_init(void);
 bool read_buttons(void);
 bool read_encoder(void);
 
-
 // display
 void display_init(void);
 bool display_draw(void);

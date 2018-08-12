@@ -107,6 +107,15 @@ void gpio_init(void) {
 // Returns true if any buttons have changed state.
 bool read_buttons(void) {
 
+    // HACK:
+    // Disable ADC readings while reading the GPIOs.
+    // Otherwise the readings are noisy (to be fixed with proper PCB layout)
+    LL_ADC_Disable(ADC1);
+    LL_DMA_DisableStream(DMA2, LL_DMA_STREAM_0); 
+    LL_DMA_ClearFlag_HT0(DMA2);
+    LL_DMA_ClearFlag_TC0(DMA2);
+    LL_DMA_ClearFlag_TE0(DMA2);
+
     uint16_t switches = ~((read_reg(0x13) << 8) | read_reg(0x12));
     bool changed = false;
 
@@ -136,6 +145,11 @@ bool read_buttons(void) {
                 break;
         }
     }
+
+    // Re-enable ADCs
+    LL_DMA_EnableStream(DMA2, LL_DMA_STREAM_0);  
+    LL_ADC_Enable(ADC1);
+    LL_ADC_REG_StartConversionSWStart(ADC1);   
 
     return changed;
 
@@ -201,6 +215,7 @@ void EXTI15_10_IRQHandler(void) {
 // ADC
 
 uint16_t pots[NUM_POTS];
+#define CYCLES LL_ADC_SAMPLINGTIME_480CYCLES
 
 void adc_init(void) {
 
@@ -213,9 +228,9 @@ void adc_init(void) {
     pin_cfg_an(GPIOB, LL_GPIO_PIN_0);   // ch8
     pin_cfg_an(GPIOA, LL_GPIO_PIN_4);   // ch4
     pin_cfg_an(GPIOB, LL_GPIO_PIN_1);   // ch9
-    pin_cfg_an(GPIOC, LL_GPIO_PIN_4);   // ch14
-    pin_cfg_an(GPIOA, LL_GPIO_PIN_2);   // ch2
-    pin_cfg_an(GPIOA, LL_GPIO_PIN_3);   // ch3
+    pin_cfg_an(GPIOC, LL_GPIO_PIN_4);   // ch14 Filt cutoff
+    pin_cfg_an(GPIOA, LL_GPIO_PIN_2);   // ch2  Filt res
+    pin_cfg_an(GPIOA, LL_GPIO_PIN_3);   // ch3 
 
 
 
@@ -223,7 +238,7 @@ void adc_init(void) {
     __HAL_RCC_DMA2_CLK_ENABLE();
 
     LL_ADC_CommonInitTypeDef adc_common;
-    adc_common.CommonClock = LL_ADC_CLOCK_SYNC_PCLK_DIV2;
+    adc_common.CommonClock = LL_ADC_CLOCK_SYNC_PCLK_DIV8;
     adc_common.Multimode = LL_ADC_MULTI_INDEPENDENT;
     adc_common.MultiDMATransfer = LL_ADC_MULTI_REG_DMA_EACH_ADC;
     adc_common.MultiTwoSamplingDelay = LL_ADC_MULTI_TWOSMP_DELAY_5CYCLES;
@@ -256,18 +271,18 @@ void adc_init(void) {
     LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_11, LL_ADC_CHANNEL_2);
     LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_12, LL_ADC_CHANNEL_3);    
 
-    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_0, LL_ADC_SAMPLINGTIME_480CYCLES);
-    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_1, LL_ADC_SAMPLINGTIME_480CYCLES);
-    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_10, LL_ADC_SAMPLINGTIME_480CYCLES);
-    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_11, LL_ADC_SAMPLINGTIME_480CYCLES);
-    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_12, LL_ADC_SAMPLINGTIME_480CYCLES);
-    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_13, LL_ADC_SAMPLINGTIME_480CYCLES);
-    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_8, LL_ADC_SAMPLINGTIME_480CYCLES);
-    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_4, LL_ADC_SAMPLINGTIME_480CYCLES);
-    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_9, LL_ADC_SAMPLINGTIME_480CYCLES);
-    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_14, LL_ADC_SAMPLINGTIME_480CYCLES);
-    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_2, LL_ADC_SAMPLINGTIME_480CYCLES);
-    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_3, LL_ADC_SAMPLINGTIME_480CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_0, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_1, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_10, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_11, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_12, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_13, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_8, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_4, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_9, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_14, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_2, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_3, CYCLES);
 
     LL_ADC_Enable(ADC1);
 

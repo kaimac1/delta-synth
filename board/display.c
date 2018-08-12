@@ -70,6 +70,11 @@ void display_init(void) {
 
     display_reset();
 
+    draw_rect(0, 0, 128, 64, 0);
+    draw_text_cen(64,24,"D E L T A", 1);
+    display_draw();
+    HAL_Delay(500);
+
 }
 
 void ssd1306_command(uint8_t byte) {

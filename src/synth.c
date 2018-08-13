@@ -11,12 +11,21 @@ SynthConfig cfgnew;
 SynthConfig cfg;
 SeqConfig seq;
 
+typedef struct {
+    float z1;
+    float z2;
+    float z3;
+    float z4;
+} Filter;
+
+Filter filter[NUM_VOICE];
+
 float nco[NUM_VOICE][NUM_OSCILLATOR];
 float    env[NUM_VOICE] = {0.0f};
 EnvState env_state[NUM_VOICE] = {ENV_RELEASE};
 float lfo_nco;
 
-float    z1, z2, z3, z4; // filter state
+//float    z1, z2, z3, z4; // filter state
 uint32_t next_beat = 0;
 int      arp_note = 0;
 int seq_note = 0;
@@ -36,6 +45,28 @@ int16_t sine_table[SINE_TABLE_SIZE];
 inline void sequencer_update(void);
 inline void fill_buffer(void);
 inline float sample_drums(void);
+
+uint16_t random_state = 1234;
+
+int bn = 1;
+
+
+inline uint16_t random_uint16(void) {
+
+    uint16_t bit;
+
+    bit  = ((random_state >> 0) ^ (random_state >> 2) ^ (random_state >> 3) ^ (random_state >> 5) ) & 1;
+    random_state =  (random_state >> 1) | (bit << 15);
+    return random_state;
+
+}
+
+float bnoise(void) {
+
+    bn *= 16807;
+    return (float)bn * 4.6566129e-010f;
+
+}
 
 /******************************************************************************/
 // This ISR is called when the DMA transfer of one buffer (A) completes.
@@ -153,12 +184,12 @@ inline void fill_buffer(void) {
         float s = 0.0f;
         float comb_result = 0.0f;
 
-        // LFO
-        lfo_nco += cfg.lfo_rate;
-        if (lfo_nco > 1.0f) lfo_nco -= 1.0f;
-        float lfo_out = (lfo_nco < 0.5f) ? lfo_nco : 1.0f - lfo_nco;
-        //lfo_out = cfg.lfo_amount*(4.0f * lfo_out - 1.0f);
-        lfo_out = 1.0f + cfg.lfo_amount*(2.0f * lfo_out - 0.5f);
+        // // LFO
+        // lfo_nco += cfg.lfo_rate;
+        // if (lfo_nco > 1.0f) lfo_nco -= 1.0f;
+        // float lfo_out = (lfo_nco < 0.5f) ? lfo_nco : 1.0f - lfo_nco;
+        // //lfo_out = cfg.lfo_amount*(4.0f * lfo_out - 1.0f);
+        // lfo_out = 1.0f + cfg.lfo_amount*(2.0f * lfo_out - 0.5f);
 
 
         for (int i=0; i<NUM_VOICE; i++) {
@@ -202,6 +233,10 @@ inline void fill_buffer(void) {
                 osc_mix += s1 * cfg.osc[osc].gain;
             }
 
+            // Noise
+            float noise = bnoise();//(float)random_uint16() / 65535;
+            osc_mix += noise * cfg.noise_gain;
+
             // Envelope
             if (cfg.key[i]) {
                 if (env_state[i] == ENV_RELEASE) {
@@ -234,69 +269,71 @@ inline void fill_buffer(void) {
                 }
             }
 
-            s += osc_mix * env[i];
+            osc_mix *= env[i];
 
+            // Filter
+            //int ei = 0;
+            //for (int i=0; i<NUM_VOICE; i++) if (cfg.key[i]) ei = i;
+            float fc = cfg.cutoff + cfg.env_mod * env[i];
+            float a = PI * fc/SAMPLE_RATE;
+            float ria = 1.0f / (1.0f + a);
+            float g = a * ria;
+            float gg = g * g;
+            float bigS = filter[i].z4 + g*(filter[i].z3 + g*(filter[i].z2 + g*filter[i].z1));
+            bigS = bigS * ria;
+
+            float v;
+            // zero-delay resonance feedback
+            osc_mix = (osc_mix - cfg.resonance*bigS)/(1.0f + cfg.resonance*gg*gg);
+            
+            // 4x 1-pole filters
+            v = (osc_mix - filter[i].z1) * g;
+            osc_mix = v + filter[i].z1;
+            filter[i].z1 = osc_mix + v;
+
+            v = (osc_mix - filter[i].z2) * g;
+            osc_mix = v + filter[i].z2;
+            filter[i].z2 = osc_mix + v;
+
+            v = (osc_mix - filter[i].z3) * g;
+            osc_mix = v + filter[i].z3;
+            filter[i].z3 = osc_mix + v;
+
+            v = (osc_mix - filter[i].z4) * g;
+            osc_mix = v + filter[i].z4;
+            filter[i].z4 = osc_mix + v;
+
+            s += osc_mix;
         }
         s /= (float)NUM_VOICE;
 
 
-        // Filter
-        int ei = 0;
-        for (int i=0; i<NUM_VOICE; i++) if (cfg.key[i]) ei = i;
-        float fc = cfg.cutoff + cfg.env_mod * env[ei];
-        float a = PI * fc/SAMPLE_RATE;
-        float ria = 1.0f / (1.0f + a);
-        float g = a * ria;
-        float gg = g * g;
-        float bigS = z4 + g*(z3 + g*(z2 + g*z1));
-        bigS = bigS * ria;
-
-        float v;
-        // zero-delay resonance feedback
-        s = (s - cfg.resonance*bigS)/(1.0f + cfg.resonance*gg*gg);
-        
-        // 4x 1-pole filters
-        v = (s - z1) * g;
-        s = v + z1;
-        z1 = s + v;
-
-        v = (s - z2) * g;
-        s = v + z2;
-        z2 = s + v;
-
-        v = (s - z3) * g;
-        s = v + z3;
-        z3 = s + v;
-
-        v = (s - z4) * g;
-        s = v + z4;
-        z4 = s + v;
 
 
-        float fx = 0.0f;
+        // float fx = 0.0f;
 
-        COMB_PUT(comb1, s);
-        fx += comb_result;
-        COMB_PUT(comb2, s);
-        fx += comb_result;
-        COMB_PUT(comb3, s);
-        fx += comb_result;
-        COMB_PUT(comb4, s);
-        fx += comb_result;
-        COMB_PUT(comb5, s);
-        fx += comb_result;
-        COMB_PUT(comb6, s);
-        fx += comb_result;
-        COMB_PUT(comb7, s);
-        fx += comb_result;
-        COMB_PUT(comb8, s);
-        fx += comb_result;
+        // COMB_PUT(comb1, s);
+        // fx += comb_result;
+        // COMB_PUT(comb2, s);
+        // fx += comb_result;
+        // COMB_PUT(comb3, s);
+        // fx += comb_result;
+        // COMB_PUT(comb4, s);
+        // fx += comb_result;
+        // COMB_PUT(comb5, s);
+        // fx += comb_result;
+        // COMB_PUT(comb6, s);
+        // fx += comb_result;
+        // COMB_PUT(comb7, s);
+        // fx += comb_result;
+        // COMB_PUT(comb8, s);
+        // fx += comb_result;
 
-        // fx = DELAY_LINE_GET(comb8);
-        // DELAY_LINE_PUT(comb8, s + fx * 0.5f);
+        // // fx = DELAY_LINE_GET(comb8);
+        // // DELAY_LINE_PUT(comb8, s + fx * 0.5f);
 
-        fx *= 0.1f;
-        s = fx + s;
+        // fx *= 0.1f;
+        // s = fx + s;
 
         int16_t s16 = s * 700;
         out_buffer[i] = s16;   // left
@@ -346,10 +383,12 @@ void synth_start(void) {
     cfg.osc[0].gain = 1.0f;
     cfg.osc[0].detune = 1.0f;
 
-    cfg.osc[1].waveform = WAVE_SQUARE;
-    cfg.osc[1].folding = 2.0f;
-    cfg.osc[1].gain = 0.5f;
-    cfg.osc[1].detune = 1.0f;    
+    // cfg.osc[1].waveform = WAVE_SQUARE;
+    // cfg.osc[1].folding = 2.0f;
+    // cfg.osc[1].gain = 0.5f;
+    // cfg.osc[1].detune = 1.0f;    
+
+    cfg.noise_gain = 0.0f;
 
     cfg.attack_rate  = 0.0005;
     cfg.decay_rate   = 0.005;

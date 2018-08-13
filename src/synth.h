@@ -9,6 +9,11 @@
 extern int16_t sine_table[SINE_TABLE_SIZE];
 
 
+#define MAX_ARP 5
+#define NUM_VOICE 1
+#define NUM_OSCILLATOR 1
+
+
 typedef enum {
     ENV_ATTACK,
     ENV_DECAY,
@@ -31,9 +36,7 @@ typedef enum {
 } ArpMode;
 
 
-#define MAX_ARP 5
-#define NUM_VOICE 4
-#define NUM_OSCILLATOR 2
+
 
 typedef struct {
     Wave waveform;
@@ -58,6 +61,7 @@ typedef struct {
     // Oscillators
     float freq[NUM_VOICE];
     Oscillator osc[NUM_OSCILLATOR];
+    float noise_gain;
 
     // ADSR 
     bool key[NUM_VOICE];           // key down?

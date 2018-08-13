@@ -11,10 +11,19 @@
 
 #include "stm32f4xx_ll_dma.h"
 
+typedef enum {
+    UI_DEFAULT,
+    UI_OSC_MOD,
+    UI_OSC_TUNE
+} UIPage;
+
 typedef struct {
     int selected_osc;
+    UIPage page;
 } UIState;
 UIState ui;
+
+int encoder_start = 0;
 
 typedef struct {
     int wave;
@@ -32,7 +41,7 @@ typedef struct {
     int cutoff;
     int resonance;
     int env_mod;
-    //OscSettings osc[NUM_OSCILLATOR];
+    OscSettings osc[NUM_OSCILLATOR];
     int lfo_rate;
     int lfo_amount;
     int fx_damping;
@@ -46,21 +55,18 @@ float seq_note_input;
 bool redraw = true;
 void draw_screen(void);
 
-#define ADD_DELTA_CLAMPED(x, y) {(x) += (y); if ((x) > 127) (x) = 127; if ((x) < 0) (x) = 0;}
-#define ADD_DELTA_WRAPPED(x, y) {(x) += (y); if ((x) > 127) (x) -= 127; if ((x) < 0) (x) += 127;}
-#define MAP_ENCODER(enc, var, block) if(encoders[enc].delta) { ADD_DELTA_CLAMPED(var, encoders[enc].delta); block; };
+#define MAP_ENCODER_CLAMP(x) {(x) += encoder.delta; if ((x) > 127) (x) = 127; if ((x) < 0) (x) = 0;}
+//#define ADD_DELTA_WRAPPED(x, y) {(x) += (y); if ((x) > 127) (x) -= 127; if ((x) < 0) (x) += 127;}
 
 #define POTMAX 4095.0f
-#define POTFILT 0.9f;
 
-
-float env1_sustain = 0.0f;
 
 void ui_update(void) {
 
-    bool evt = read_buttons();
+    bool btn = read_buttons();
+    bool enc = read_encoder();
 
-    if (evt) {
+    if (btn) {
 
         // Oscillator select
         if (buttons[BTN_OSC_SEL] == BTN_DOWN) {
@@ -78,30 +84,76 @@ void ui_update(void) {
             redraw = true;
         }
 
-        // if (buttons[BUTTON_FILTER] == BTN_PRESSED) {
-        //     cfgnew.seq_play = !cfgnew.seq_play;
-        //     if (ui.page != PAGE_FILTER) {
-        //         ui.page = PAGE_FILTER;
-        //     } else {
-        //         ui.page = PAGE_FILTER_ENV;
-        //     }
-        //     redraw = true;
-        // }
-        // if (buttons[BUTTON_OSC] == BTN_PRESSED) {
-        //     if (ui.page != PAGE_OSC) {
-        //         ui.page = PAGE_OSC;
-        //         ui.selected_osc = 0;
-        //     } else {
-        //         ui.selected_osc++;
-        //         ui.selected_osc %= NUM_OSCILLATOR;
-        //     }
-        //     redraw = true;
-        // }
+        // Oscillator mod
+        // Pressing and releasing the button without moving the encoder will keep the UI in OSCMOD mode,
+        // until the button is pressed again.
+        // If the encoder is moved while the button is held, the UI will leave OSCMOD mode when the button is released.
+        if (buttons[BTN_OSC_MOD] == BTN_DOWN) {
+            if (ui.page != UI_OSC_MOD) {
+                encoder_start = encoder.value;
+                ui.page = UI_OSC_MOD;
+            } else {
+                ui.page = UI_DEFAULT;
+            }
+            redraw = true;
+        }
+        if (buttons[BTN_OSC_MOD] == BTN_UP) {
+            if (ui.page == UI_OSC_MOD) {
+                if (encoder.value != encoder_start) {
+                    ui.page = UI_DEFAULT;        
+                }
+            }
+            redraw = true;
+        }
+
+        // Oscillator tune
+        if (buttons[BTN_OSC_TUNE] == BTN_DOWN) {
+            if (ui.page != UI_OSC_TUNE) {
+                encoder_start = encoder.value;
+                ui.page = UI_OSC_TUNE;
+            } else {
+                ui.page = UI_DEFAULT;
+            }
+            redraw = true;
+        }
+        if (buttons[BTN_OSC_TUNE] == BTN_UP) {
+            if (ui.page == UI_OSC_TUNE) {
+                if (encoder.value != encoder_start) {
+                    ui.page = UI_DEFAULT;        
+                }
+            }
+            redraw = true;            
+        }
+
+
+
     }
+
+    if (enc) {
+
+        switch (ui.page) {
+            case UI_DEFAULT:
+                break;
+
+            case UI_OSC_MOD:
+                MAP_ENCODER_CLAMP(input.osc[ui.selected_osc].folding);
+                cfgnew.osc[ui.selected_osc].folding = 2.0f * (float)input.osc[ui.selected_osc].folding/127;
+                redraw = true;
+                break;
+
+            case UI_OSC_TUNE:
+                break;
+
+
+        }
+
+    }
+
 
     // Source
     cfgnew.osc[0].gain = pots[0] / POTMAX;
-    cfgnew.osc[1].gain = pots[1] / POTMAX;
+    //cfgnew.osc[1].gain = pots[1] / POTMAX;
+    cfgnew.noise_gain = pots[2] / POTMAX;
 
     // Env1
     cfgnew.attack_time = pots[3]/POTMAX + 0.001f;
@@ -114,19 +166,16 @@ void ui_update(void) {
     cfgnew.release_time = cfgnew.decay_time;
     cfgnew.release_rate = cfgnew.decay_rate;
 
-
-    
-    // cfgnew.sustain_level = (1.0f-FILT)*(pots[5]/POTMAX) + FILT*env1_sustain;
-    // env1_sustain = cfgnew.sustain_level;
     cfgnew.sustain_level = pots[5]/POTMAX;
-
     
     // Filter
     cfgnew.cutoff = 10000.0f * (pots[9] / POTMAX);
     cfgnew.resonance = 3.99f * (pots[10] / POTMAX);
+    cfgnew.env_mod = 5000.0f * (pots[11]/ POTMAX);
 
     
     // Redraw display if required
+    redraw = true;
     if (redraw) {
         draw_screen();
         if (display_draw()) redraw = false;
@@ -136,32 +185,24 @@ void ui_update(void) {
 
 
 
-    //     case PAGE_FILTER:
 
-    //         // // Cutoff
-    //         // if (encoders[ENC_RED].delta) {
-    //         //     ADD_DELTA_CLAMPED(input.cutoff, encoders[ENC_RED].delta);
-    //         //     cfgnew.cutoff = 10000.0f * (float)input.cutoff/127;
-    //         // }
-    //         // Resonance
-    //         if (encoders[ENC_GREEN].delta) {
-    //             ADD_DELTA_CLAMPED(input.resonance, encoders[ENC_GREEN].delta);
-    //             cfgnew.resonance = 3.99f * (float)input.resonance/127;
-    //         }
+        // if (buttons[BUTTON_FILTER] == BTN_PRESSED) {
+        //     cfgnew.seq_play = !cfgnew.seq_play;
+        //     if (ui.page != PAGE_FILTER) {
+        //         ui.page = PAGE_FILTER;
+        //     } else {
+        //         ui.page = PAGE_FILTER_ENV;
+        //     }
+
+
+
     //         // // Envelope modulation
     //         // if (encoders[ENC_BLUE].delta) {
     //         //     ADD_DELTA_CLAMPED(input.env_mod, encoders[ENC_BLUE].delta);
     //         //     cfgnew.env_mod = 5000.0f * (float)input.env_mod/127;
     //         // }
 
-    //         redraw = true;
-    //         break;
-
     //     case PAGE_OSC:
-    //         if (encoders[ENC_GREEN].delta) {
-    //             ADD_DELTA_CLAMPED(input.osc[ui.selected_osc].folding, encoders[ENC_GREEN].delta);
-    //             cfgnew.osc[ui.selected_osc].folding = 2.0f * (float)input.osc[ui.selected_osc].folding/127;
-    //         }
     //         // // Detune
     //         // if (encoders[ENC_BLUE].delta) {
     //         //     ADD_DELTA_CLAMPED(input.osc[ui.selected_osc].detune, encoders[ENC_BLUE].delta);
@@ -181,8 +222,6 @@ void ui_update(void) {
     //         //     float fb = 1.0f - expf(((float)input.fx_amount - b) / (a*b));
     //         //     cfgnew.fx_combg = fb;
     //         // }            
-    //         redraw = true;
-    //         break;
 
     //     case PAGE_LFO:
     //         // if (encoders[ENC_RED].delta) {
@@ -193,23 +232,14 @@ void ui_update(void) {
     //             ADD_DELTA_CLAMPED(input.lfo_amount, encoders[ENC_GREEN].delta);
     //             cfgnew.lfo_amount = (float)input.lfo_amount/127;
     //         }            
-    //         redraw = true;
-    //         break;
+
+
 
     //     case PAGE_SEQ:
     //         // if (encoders[ENC_RED].delta) {
     //         //     seq_idx += encoders[ENC_RED].delta;
     //         //     seq_idx %= NUM_SEQ_NOTES;
     //         // }
-    //         redraw = true;
-    //         break;
-
-    //     default:
-    //         break;
-    //     }
-    // }
-
-    // cfgnew.cutoff = 10000.0f * LL_ADC_REG_ReadConversionData12(ADC1) / 4095.0f;
 
     // if (cfgnew.seq_play && seq_note_input != 0.0f) {
     //     seq.note[seq_idx] = seq_note_input;
@@ -217,6 +247,8 @@ void ui_update(void) {
 
 
 }
+
+extern float    env[NUM_VOICE];
 
 void draw_screen(void) {
 
@@ -240,17 +272,29 @@ void draw_screen(void) {
     draw_text(64, 1, wave, 1);
 
 
-    // sprintf(buf, "enc=%d", encoder.value);
-    // draw_text(0, 16, buf, 1);            
+    switch (ui.page) {
+        case UI_DEFAULT:
+            break;
 
-    // sprintf(buf, "pot0=%d", pots[9] / 10);
-    // draw_text(0, 16, buf, 1);
+        case UI_OSC_MOD:
+            sprintf(buf, "Mod: %f", cfgnew.osc[ui.selected_osc].folding);
+            draw_text(0, 16, buf, 1);
+            break;
 
-    // sprintf(buf, "pot1=%d", pots[10] / 10);
-    // draw_text(0, 32, buf, 1);
+        case UI_OSC_TUNE:
+            sprintf(buf, "Tune: %f", cfgnew.osc[ui.selected_osc].detune);
+            draw_text(0, 16, buf, 1);
+            break;
+    }
 
-    // sprintf(buf, "pot2=%d", pots[11] / 10);
-    // draw_text(0, 48, buf, 1);
+    sprintf(buf, "key%d env%.2f", cfg.key[0], env[0]);
+    draw_text(0, 32, buf, 1);
+
+    float load = 100 * (float)(loop_time) / transfer_time;
+    sprintf(buf, "load %.1f", load);
+    draw_text(0, 48, buf, 1);
+
+
 
     //float load = 100 * ((float)loop_time / transfer_time);
     //sprintf(buf, "%.3f", (double)load);

@@ -35,7 +35,8 @@ bool pin_read(GPIO_TypeDef *port, uint32_t pin);
 typedef enum {
     BTN_OSC_SEL = 0,
     BTN_OSC_WAVE,
-    BTN_OSC_MOD
+    BTN_OSC_MOD,
+    BTN_OSC_TUNE
 } ButtonName;
 
 typedef enum {

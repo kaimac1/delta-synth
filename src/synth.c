@@ -46,27 +46,14 @@ inline void sequencer_update(void);
 inline void fill_buffer(void);
 inline float sample_drums(void);
 
-uint16_t random_state = 1234;
-
 int bn = 1;
-
-
-inline uint16_t random_uint16(void) {
-
-    uint16_t bit;
-
-    bit  = ((random_state >> 0) ^ (random_state >> 2) ^ (random_state >> 3) ^ (random_state >> 5) ) & 1;
-    random_state =  (random_state >> 1) | (bit << 15);
-    return random_state;
-
-}
-
 float bnoise(void) {
-
     bn *= 16807;
     return (float)bn * 4.6566129e-010f;
-
 }
+
+
+
 
 /******************************************************************************/
 // This ISR is called when the DMA transfer of one buffer (A) completes.
@@ -130,8 +117,10 @@ inline void sequencer_update(void) {
     }
 
     if (cfg.seq_play) {
-        cfg.key[0] = true;
-        cfg.freq[0] = seq.note[seq_note];
+        if (seq.note[seq_note] != 0.0f) {
+            cfg.key[0] = true;
+            cfg.freq[0] = seq.note[seq_note];
+        }
     }
 
     // if (cfg.arp) {
@@ -241,7 +230,6 @@ inline void fill_buffer(void) {
             if (cfg.key[i]) {
                 if (env_state[i] == ENV_RELEASE) {
                     env_state[i] = ENV_ATTACK;
-                    env[i] = 0.0f;
                 }
 
                 if (env_state[i] == ENV_ATTACK) {
@@ -274,7 +262,7 @@ inline void fill_buffer(void) {
             // Filter
             //int ei = 0;
             //for (int i=0; i<NUM_VOICE; i++) if (cfg.key[i]) ei = i;
-            float fc = cfg.cutoff + cfg.env_mod * env[i];
+            /*float fc = cfg.cutoff + cfg.env_mod * env[i];
             float a = PI * fc/SAMPLE_RATE;
             float ria = 1.0f / (1.0f + a);
             float g = a * ria;
@@ -301,7 +289,7 @@ inline void fill_buffer(void) {
 
             v = (osc_mix - filter[i].z4) * g;
             osc_mix = v + filter[i].z4;
-            filter[i].z4 = osc_mix + v;
+            filter[i].z4 = osc_mix + v;*/
 
             s += osc_mix;
         }
@@ -335,7 +323,12 @@ inline void fill_buffer(void) {
         // fx *= 0.1f;
         // s = fx + s;
 
+        s += sample_drums();
+
+        s += bnoise() * 0.001f; // Dither
+
         int16_t s16 = s * 700;
+
         out_buffer[i] = s16;   // left
         out_buffer[i+1] = s16; // right        
 
@@ -343,11 +336,53 @@ inline void fill_buffer(void) {
 
 }
 
+float nco_bass = 0.0f;
+bool trig_bass;
+bool bass_attack = false;
+float env_bass = 0.0f;
+
+float bass_gain = 3.0f;
+float bass_freq = 0.0f;
+
 inline float sample_drums(void) {
 
-    float s;
+    float s = 0.0f;
+    
 
-    s = 0.0f;
+    if (trig_bass) {
+        nco_bass = 0.0f;
+        env_bass = 0.0f;
+        trig_bass = false;
+        bass_attack = true;
+        bass_freq = cfg.bass_pitch;
+    }
+
+   
+    nco_bass += bass_freq;
+    bass_freq *= (1.0f - cfg.bass_punch);
+
+    if (nco_bass > 1.0f) nco_bass -= 1.0f;
+    float phase = nco_bass;
+    float s1 = 0.0f;
+
+    s1 = (phase < 0.5f) ? phase : 1.0f - phase;
+    s1 = 8.0f * s1 - 2.0f;
+    s1 *= bass_gain;
+
+
+    if (bass_attack) {
+        env_bass += cfg.bass_click;
+        if (env_bass > 1.0f) {
+            env_bass = 1.0f;
+            bass_attack = false;
+        }
+    } else {
+        env_bass -= cfg.release_rate * (ENV_OVERSHOOT + env_bass);
+        if (env_bass < 0.0f) env_bass = 0.0f;        
+    }
+
+
+    s = s1 * env_bass;
     return s;
 
 }
@@ -376,7 +411,7 @@ void synth_start(void) {
     cfg.arp_freqs[3] = 0;
     cfg.arp_freqs[4] = 0;
 
-    cfg.tempo = 165;
+    cfg.tempo = 30;
 
     cfg.osc[0].waveform = WAVE_SQUARE;
     cfg.osc[0].folding = 2.0f;

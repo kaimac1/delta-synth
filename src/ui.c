@@ -126,6 +126,10 @@ void ui_update(void) {
         }
 
 
+        // Drum testing
+        if (buttons[8] == BTN_DOWN) trig_bass = true;
+
+
 
     }
 
@@ -156,7 +160,7 @@ void ui_update(void) {
     cfgnew.noise_gain = pots[2] / POTMAX;
 
     // Env1
-    cfgnew.attack_time = pots[3]/POTMAX + 0.001f;
+    cfgnew.attack_time = pots[3]/POTMAX + MIN_ATTACK;
     cfgnew.attack_rate = 1.0f/(cfgnew.attack_time * SAMPLE_RATE);
 
     float decay = pots[4]/POTMAX;
@@ -173,9 +177,19 @@ void ui_update(void) {
     cfgnew.resonance = 3.99f * (pots[10] / POTMAX);
     cfgnew.env_mod = 5000.0f * (pots[11]/ POTMAX);
 
+
+    cfgnew.bass_pitch = 0.002f * (pots[6] / POTMAX);
+    cfgnew.bass_click = 0.02f + 0.5f * (pots[7] / POTMAX);
+    cfgnew.bass_punch = 0.0005f * (pots[8] / POTMAX);
+
+    // cfgnew.seq_play = true;
+
+    // if (cfgnew.seq_play && seq_note_input != 0.0f) {
+    //     seq.note[seq_idx] = seq_note_input;
+    // }
+
     
     // Redraw display if required
-    redraw = true;
     if (redraw) {
         draw_screen();
         if (display_draw()) redraw = false;
@@ -241,9 +255,6 @@ void ui_update(void) {
     //         //     seq_idx %= NUM_SEQ_NOTES;
     //         // }
 
-    // if (cfgnew.seq_play && seq_note_input != 0.0f) {
-    //     seq.note[seq_idx] = seq_note_input;
-    // }
 
 
 }

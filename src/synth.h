@@ -3,10 +3,13 @@
 
 #define SAMPLE_RATE 44100
 #define ENV_OVERSHOOT 0.05f
+#define MIN_ATTACK 0.005f;
 
 #define SINE_TABLE_WIDTH 11 // bits
 #define SINE_TABLE_SIZE (1<<SINE_TABLE_WIDTH)
 extern int16_t sine_table[SINE_TABLE_SIZE];
+
+
 
 
 #define MAX_ARP 5
@@ -89,9 +92,14 @@ typedef struct {
     float fx_damping;
     float fx_combg;
 
+    // Bass drum
+    float bass_pitch;
+    float bass_click;
+    float bass_punch;
+
 } SynthConfig;
 
-#define NUM_SEQ_NOTES 8
+#define NUM_SEQ_NOTES 2
 typedef struct {
     float note[NUM_SEQ_NOTES];
 
@@ -103,6 +111,8 @@ extern SeqConfig seq;
 
 extern uint32_t loop_time;
 extern uint32_t transfer_time;
+
+extern bool trig_bass;
 
 void create_wave_tables(void);
 void synth_start(void);

@@ -168,7 +168,7 @@ DELAY_LINE(comb8, 1131);
 
 inline void fill_buffer(void) {
 
-    for (int i=0; i<OUT_BUFFER_SAMPLES; i += 2) {
+    for (int j=0; j<OUT_BUFFER_SAMPLES; j += 2) {
         
         float s = 0.0f;
         float comb_result = 0.0f;
@@ -228,6 +228,11 @@ inline void fill_buffer(void) {
 
             // Envelope
             if (cfg.key[i]) {
+                if (cfg.key_retrigger[i]) {
+                    cfgnew.key_retrigger[i] = false;
+                    cfg.key_retrigger[i] = false;
+                    env_state[i] = ENV_ATTACK;
+                }
                 if (env_state[i] == ENV_RELEASE) {
                     env_state[i] = ENV_ATTACK;
                 }
@@ -262,7 +267,7 @@ inline void fill_buffer(void) {
             // Filter
             //int ei = 0;
             //for (int i=0; i<NUM_VOICE; i++) if (cfg.key[i]) ei = i;
-            /*float fc = cfg.cutoff + cfg.env_mod * env[i];
+            float fc = cfg.cutoff + cfg.env_mod * env[i];
             float a = PI * fc/SAMPLE_RATE;
             float ria = 1.0f / (1.0f + a);
             float g = a * ria;
@@ -289,7 +294,7 @@ inline void fill_buffer(void) {
 
             v = (osc_mix - filter[i].z4) * g;
             osc_mix = v + filter[i].z4;
-            filter[i].z4 = osc_mix + v;*/
+            filter[i].z4 = osc_mix + v;
 
             s += osc_mix;
         }
@@ -329,25 +334,30 @@ inline void fill_buffer(void) {
 
         int16_t s16 = s * 700;
 
-        out_buffer[i] = s16;   // left
-        out_buffer[i+1] = s16; // right        
+        out_buffer[j] = s16;   // left
+        out_buffer[j+1] = s16; // right        
 
     }
 
 }
 
-float nco_bass = 0.0f;
+
 bool trig_bass;
+bool trig_snare;
+
+float nco_bass = 0.0f;
 bool bass_attack = false;
 float env_bass = 0.0f;
-
 float bass_gain = 3.0f;
 float bass_freq = 0.0f;
+
+float env_snare = 0.0f;
 
 inline float sample_drums(void) {
 
     float s = 0.0f;
     
+    // Bass
 
     if (trig_bass) {
         nco_bass = 0.0f;
@@ -357,7 +367,6 @@ inline float sample_drums(void) {
         bass_freq = cfg.bass_pitch;
     }
 
-   
     nco_bass += bass_freq;
     bass_freq *= (1.0f - cfg.bass_punch);
 
@@ -381,8 +390,23 @@ inline float sample_drums(void) {
         if (env_bass < 0.0f) env_bass = 0.0f;        
     }
 
-
     s = s1 * env_bass;
+
+    // Snare
+
+    if (trig_snare) {
+        env_snare = 1.0f;
+        trig_snare = false;
+    }
+    float s2 = bnoise();
+    //env_snare -= cfg.re
+
+    s += s2 * env_snare;
+
+
+
+
+    
     return s;
 
 }
@@ -418,10 +442,10 @@ void synth_start(void) {
     cfg.osc[0].gain = 1.0f;
     cfg.osc[0].detune = 1.0f;
 
-    // cfg.osc[1].waveform = WAVE_SQUARE;
-    // cfg.osc[1].folding = 2.0f;
-    // cfg.osc[1].gain = 0.5f;
-    // cfg.osc[1].detune = 1.0f;    
+    cfg.osc[1].waveform = WAVE_SQUARE;
+    cfg.osc[1].folding = 2.0f;
+    cfg.osc[1].gain = 0.5f;
+    cfg.osc[1].detune = 1.0f;    
 
     cfg.noise_gain = 0.0f;
 

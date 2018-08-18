@@ -14,7 +14,7 @@ extern int16_t sine_table[SINE_TABLE_SIZE];
 
 #define MAX_ARP 5
 #define NUM_VOICE 1
-#define NUM_OSCILLATOR 1
+#define NUM_OSCILLATOR 2
 
 
 typedef enum {
@@ -68,12 +68,13 @@ typedef struct {
 
     // ADSR 
     bool key[NUM_VOICE];           // key down?
+    bool key_retrigger[NUM_VOICE];
     float attack_rate;
     float decay_rate;
     float sustain_level;
     float release_rate;
     float env_curve;    // linearity
-    bool env_retrigger; // retrigger now?
+    
 
     float attack_time;
     float decay_time;

@@ -66,6 +66,7 @@ void display_init(void);
 bool display_draw(void);
 void draw_pixel(uint16_t x, uint16_t y, bool col);
 void draw_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, bool fillcolor);
+void draw_box(uint16_t x, uint16_t y, uint16_t w, uint16_t h);
 void draw_line(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, bool col);
 void draw_text(uint16_t x, uint16_t y, char* text, int size);
 void draw_text_rj(uint16_t x, uint16_t y, char* text, int size);

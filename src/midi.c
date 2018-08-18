@@ -47,6 +47,10 @@ void poly_add(float freq) {
             break;
         }
     }
+    if (idx < 0) {
+        idx = 0;
+        cfgnew.key_retrigger[idx] = true;
+    }
     if (idx >= 0) {
         cfgnew.freq[idx] = freq;
         cfgnew.key[idx] = true;
@@ -59,6 +63,7 @@ void poly_del(float freq) {
     for (int i=0; i<NUM_VOICE; i++) {
         if (cfgnew.freq[i] == freq) {
             cfgnew.key[i] = false;
+            cfgnew.key_retrigger[i] = false;
         }
     }
     cfgnew.busy = false;

@@ -246,6 +246,15 @@ void draw_text(uint16_t x, uint16_t y, char* text, int size) {
     }
 }
 
+void draw_box(uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
+
+    draw_line(x, y, x+w, y, 1);
+    draw_line(x, y, x, y+h, 1);
+    draw_line(x, y+h, x+w, y+h, 1);
+    draw_line(x+w, y, x+w, y+h, 1);
+
+}
+
 
 void draw_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, bool fillcolor) {
 

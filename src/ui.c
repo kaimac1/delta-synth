@@ -8,8 +8,13 @@
 #include "stm32f4xx_ll_tim.h"
 #include "stm32f4xx_ll_adc.h"
 #include <math.h>
+#include <string.h>
 
-#include "stm32f4xx_ll_dma.h"
+typedef enum {
+    PART_LEAD,
+    PART_DRUMS,
+    NUM_PARTS
+} UIPart;
 
 typedef enum {
     UI_DEFAULT,
@@ -17,13 +22,27 @@ typedef enum {
     UI_OSC_TUNE
 } UIPage;
 
-typedef struct {
-    int selected_osc;
-    UIPage page;
-} UIState;
-UIState ui;
+// UI state
+int selected_osc;
+UIPage page;
+UIPart part;
 
+uint16_t saved_pots[NUM_PARTS][NUM_POTS];
+bool pot_sync[NUM_POTS];
 int encoder_start = 0;
+int pot_moved = -1;
+int pot_show_timer;
+
+char *pot_names[NUM_PARTS][NUM_POTS] = {
+    {"Osc 1", "Osc 2", "Noise",
+    "Attack", "Decay", "Sustain",
+    "??", "??", "??",
+    "Cutoff", "Peak", "Env. mod"},
+    {"Bass pitch", "Bass click", "Bass punch"}};
+
+
+
+
 
 typedef struct {
     int wave;
@@ -57,8 +76,60 @@ void draw_screen(void);
 
 #define MAP_ENCODER_CLAMP(x) {(x) += encoder.delta; if ((x) > 127) (x) = 127; if ((x) < 0) (x) = 0;}
 //#define ADD_DELTA_WRAPPED(x, y) {(x) += (y); if ((x) > 127) (x) -= 127; if ((x) < 0) (x) += 127;}
-
 #define POTMAX 4095.0f
+#define ABS(a,b) ((a) > (b) ? ((a)-(b)) : ((b)-(a)))
+
+#define POT_IS_SYNCED(i) (ABS(pots[(i)], saved_pots[part][(i)]) < 50)
+
+void update_lead(void) {
+
+    // Source
+    cfgnew.osc[0].gain = saved_pots[part][0] / POTMAX;
+    cfgnew.osc[1].gain = saved_pots[part][1] / POTMAX;
+    cfgnew.noise_gain = saved_pots[part][2] / POTMAX;
+
+    // Env1
+    cfgnew.attack_time = saved_pots[part][3]/POTMAX + MIN_ATTACK;
+    cfgnew.attack_rate = 1.0f/(cfgnew.attack_time * SAMPLE_RATE);
+
+    float decay = saved_pots[part][4]/POTMAX;
+    decay = decay*decay*decay;
+    cfgnew.decay_time = decay * 5;
+    cfgnew.decay_rate = 1.0 - exp(cfgnew.env_curve / (cfgnew.decay_time * SAMPLE_RATE));
+    cfgnew.release_time = cfgnew.decay_time;
+    cfgnew.release_rate = cfgnew.decay_rate;
+
+    cfgnew.sustain_level = saved_pots[part][5]/POTMAX;
+    
+    // Filter
+    cfgnew.cutoff = 10000.0f * (saved_pots[part][9] / POTMAX);
+    cfgnew.resonance = 3.99f * (saved_pots[part][10] / POTMAX);
+    cfgnew.env_mod = 5000.0f * (saved_pots[part][11]/ POTMAX);
+
+}
+
+void update_drums(void) {
+
+    cfgnew.bass_pitch = 0.002f * (saved_pots[PART_DRUMS][0] / POTMAX);
+    cfgnew.bass_click = 0.02f + 0.5f * (saved_pots[PART_DRUMS][1] / POTMAX);
+    cfgnew.bass_punch = 0.0005f * (saved_pots[PART_DRUMS][2] / POTMAX);
+
+}
+
+void ui_init(void) {
+
+    for (int i=0; i<NUM_POTS; i++) {
+        pot_sync[i] = true;
+    }
+
+    // Initial drums settings
+    saved_pots[PART_DRUMS][0] = 2048;
+    saved_pots[PART_DRUMS][1] = 2048;
+    saved_pots[PART_DRUMS][2] = 2048;
+    update_drums();
+
+
+}
 
 
 void ui_update(void) {
@@ -66,21 +137,48 @@ void ui_update(void) {
     bool btn = read_buttons();
     bool enc = read_encoder();
 
+    // Work out if the pots are synced to the original values of the current part.
+    // Update saved_pots with the current pot values, for pots that are synced.
+    for (int i=0; i<NUM_POTS; i++) {
+        if (POT_IS_SYNCED(i)) {
+            if (!pot_sync[i]) {
+                // Pot was just synced
+                pot_moved = i;
+                redraw = true;
+            }
+            pot_sync[i] = true;
+            
+        }
+        if (pot_sync[i]) saved_pots[part][i] = pots[i];        
+    }
+
+    // Briefly show that pot is synced
+    if (pot_moved != -1) {
+        pot_show_timer++;
+        if (pot_show_timer == 100) {
+            pot_show_timer = 0;
+            pot_moved = -1;
+            redraw = true;
+        }
+    }
+
+
+
     if (btn) {
 
         // Oscillator select
         if (buttons[BTN_OSC_SEL] == BTN_DOWN) {
-            ui.selected_osc++;
-            ui.selected_osc %= NUM_OSCILLATOR;
+            selected_osc++;
+            selected_osc %= NUM_OSCILLATOR;
             redraw = true;
         }
 
         // Oscillator waveform
         if (buttons[BTN_OSC_WAVE] == BTN_DOWN) {
-            Wave new = cfgnew.osc[ui.selected_osc].waveform;
+            Wave new = cfgnew.osc[selected_osc].waveform;
             new++;
             new %= NUM_WAVE;
-            cfgnew.osc[ui.selected_osc].waveform = new;
+            cfgnew.osc[selected_osc].waveform = new;
             redraw = true;
         }
 
@@ -89,18 +187,18 @@ void ui_update(void) {
         // until the button is pressed again.
         // If the encoder is moved while the button is held, the UI will leave OSCMOD mode when the button is released.
         if (buttons[BTN_OSC_MOD] == BTN_DOWN) {
-            if (ui.page != UI_OSC_MOD) {
+            if (page != UI_OSC_MOD) {
                 encoder_start = encoder.value;
-                ui.page = UI_OSC_MOD;
+                page = UI_OSC_MOD;
             } else {
-                ui.page = UI_DEFAULT;
+                page = UI_DEFAULT;
             }
             redraw = true;
         }
         if (buttons[BTN_OSC_MOD] == BTN_UP) {
-            if (ui.page == UI_OSC_MOD) {
+            if (page == UI_OSC_MOD) {
                 if (encoder.value != encoder_start) {
-                    ui.page = UI_DEFAULT;        
+                    page = UI_DEFAULT;        
                 }
             }
             redraw = true;
@@ -108,18 +206,18 @@ void ui_update(void) {
 
         // Oscillator tune
         if (buttons[BTN_OSC_TUNE] == BTN_DOWN) {
-            if (ui.page != UI_OSC_TUNE) {
+            if (page != UI_OSC_TUNE) {
                 encoder_start = encoder.value;
-                ui.page = UI_OSC_TUNE;
+                page = UI_OSC_TUNE;
             } else {
-                ui.page = UI_DEFAULT;
+                page = UI_DEFAULT;
             }
             redraw = true;
         }
         if (buttons[BTN_OSC_TUNE] == BTN_UP) {
-            if (ui.page == UI_OSC_TUNE) {
+            if (page == UI_OSC_TUNE) {
                 if (encoder.value != encoder_start) {
-                    ui.page = UI_DEFAULT;        
+                    page = UI_DEFAULT;        
                 }
             }
             redraw = true;            
@@ -129,58 +227,51 @@ void ui_update(void) {
         // Drum testing
         if (buttons[8] == BTN_DOWN) trig_bass = true;
 
+        // Part select
+        if (buttons[15] == BTN_DOWN) {
+            // Next part
+            part++;
+            part %= NUM_PARTS;
+            redraw = true;
+
+            // Reset pot sync
+            for (int i=0; i<NUM_POTS; i++) {
+                pot_sync[i] = POT_IS_SYNCED(i);
+            }
+        }
+
 
 
     }
 
-    if (enc) {
 
-        switch (ui.page) {
-            case UI_DEFAULT:
-                break;
+    if (part == PART_LEAD) {
 
-            case UI_OSC_MOD:
-                MAP_ENCODER_CLAMP(input.osc[ui.selected_osc].folding);
-                cfgnew.osc[ui.selected_osc].folding = 2.0f * (float)input.osc[ui.selected_osc].folding/127;
-                redraw = true;
-                break;
+        if (enc) {
 
-            case UI_OSC_TUNE:
-                break;
+            switch (page) {
+                case UI_DEFAULT:
+                    break;
 
+                case UI_OSC_MOD:
+                    MAP_ENCODER_CLAMP(input.osc[selected_osc].folding);
+                    cfgnew.osc[selected_osc].folding = 2.0f * (float)input.osc[selected_osc].folding/127;
+                    redraw = true;
+                    break;
+
+                case UI_OSC_TUNE:
+                    break;
+
+
+            }
 
         }
 
+        update_lead();
+
+    } else if (part == PART_DRUMS) {
+        update_drums();
     }
-
-
-    // Source
-    cfgnew.osc[0].gain = pots[0] / POTMAX;
-    //cfgnew.osc[1].gain = pots[1] / POTMAX;
-    cfgnew.noise_gain = pots[2] / POTMAX;
-
-    // Env1
-    cfgnew.attack_time = pots[3]/POTMAX + MIN_ATTACK;
-    cfgnew.attack_rate = 1.0f/(cfgnew.attack_time * SAMPLE_RATE);
-
-    float decay = pots[4]/POTMAX;
-    decay = decay*decay*decay;
-    cfgnew.decay_time = decay * 5;
-    cfgnew.decay_rate = 1.0 - exp(cfgnew.env_curve / (cfgnew.decay_time * SAMPLE_RATE));
-    cfgnew.release_time = cfgnew.decay_time;
-    cfgnew.release_rate = cfgnew.decay_rate;
-
-    cfgnew.sustain_level = pots[5]/POTMAX;
-    
-    // Filter
-    cfgnew.cutoff = 10000.0f * (pots[9] / POTMAX);
-    cfgnew.resonance = 3.99f * (pots[10] / POTMAX);
-    cfgnew.env_mod = 5000.0f * (pots[11]/ POTMAX);
-
-
-    cfgnew.bass_pitch = 0.002f * (pots[6] / POTMAX);
-    cfgnew.bass_click = 0.02f + 0.5f * (pots[7] / POTMAX);
-    cfgnew.bass_punch = 0.0005f * (pots[8] / POTMAX);
 
     // cfgnew.seq_play = true;
 
@@ -200,35 +291,17 @@ void ui_update(void) {
 
 
 
-        // if (buttons[BUTTON_FILTER] == BTN_PRESSED) {
-        //     cfgnew.seq_play = !cfgnew.seq_play;
-        //     if (ui.page != PAGE_FILTER) {
-        //         ui.page = PAGE_FILTER;
-        //     } else {
-        //         ui.page = PAGE_FILTER_ENV;
-        //     }
-
-
-
-    //         // // Envelope modulation
-    //         // if (encoders[ENC_BLUE].delta) {
-    //         //     ADD_DELTA_CLAMPED(input.env_mod, encoders[ENC_BLUE].delta);
-    //         //     cfgnew.env_mod = 5000.0f * (float)input.env_mod/127;
-    //         // }
-
     //     case PAGE_OSC:
     //         // // Detune
     //         // if (encoders[ENC_BLUE].delta) {
     //         //     ADD_DELTA_CLAMPED(input.osc[ui.selected_osc].detune, encoders[ENC_BLUE].delta);
     //         //     cfgnew.osc[ui.selected_osc].detune = 1.0f + 0.1f * (float)input.osc[ui.selected_osc].detune/127;
     //         // }
-
     //     case PAGE_FX:
     //         if (encoders[ENC_GREEN].delta) {
     //             ADD_DELTA_CLAMPED(input.fx_damping, encoders[ENC_GREEN].delta);
     //             cfgnew.fx_damping = (float)input.fx_damping/127;
     //         }
-
     //         // if (encoders[ENC_BLUE].delta) {
     //         //     ADD_DELTA_CLAMPED(input.fx_amount, encoders[ENC_BLUE].delta);
     //         //     float a = -1.0f / logf(1.0f - 0.3f);
@@ -236,7 +309,6 @@ void ui_update(void) {
     //         //     float fb = 1.0f - expf(((float)input.fx_amount - b) / (a*b));
     //         //     cfgnew.fx_combg = fb;
     //         // }            
-
     //     case PAGE_LFO:
     //         // if (encoders[ENC_RED].delta) {
     //         //     ADD_DELTA_CLAMPED(input.lfo_rate, encoders[ENC_RED].delta);
@@ -246,16 +318,6 @@ void ui_update(void) {
     //             ADD_DELTA_CLAMPED(input.lfo_amount, encoders[ENC_GREEN].delta);
     //             cfgnew.lfo_amount = (float)input.lfo_amount/127;
     //         }            
-
-
-
-    //     case PAGE_SEQ:
-    //         // if (encoders[ENC_RED].delta) {
-    //         //     seq_idx += encoders[ENC_RED].delta;
-    //         //     seq_idx %= NUM_SEQ_NOTES;
-    //         // }
-
-
 
 }
 
@@ -270,11 +332,28 @@ void draw_screen(void) {
 
     draw_rect(0, 0, 128, 64, 0);
 
+
+    if (pot_moved != -1) {
+        draw_box(16,16,96,32);
+
+        sprintf(buf, "%s", pot_names[part][pot_moved]);
+        draw_text_cen(64, 18, buf, 1);       
+        sprintf(buf, "Original value");//, pot_moved, pot_sync[pot_moved]);
+        draw_text_cen(64, 34, buf, 1);
+    }
+
+
+    if (part == PART_DRUMS) {
+        sprintf(buf, "Drums");
+        draw_text(0, 1, buf, 1);
+        return;
+    }
+
     // Osc
-    sprintf(buf, "Osc %d", ui.selected_osc + 1);
+    sprintf(buf, "Osc %d", selected_osc + 1);
     draw_text(0, 1, buf, 1);
 
-    switch (cfgnew.osc[ui.selected_osc].waveform) {
+    switch (cfgnew.osc[selected_osc].waveform) {
         case WAVE_SAW: wave = "Saw"; break;
         case WAVE_SQUARE: wave = "Square"; break;
         case WAVE_TRI: wave = "Tri"; break;
@@ -283,27 +362,24 @@ void draw_screen(void) {
     draw_text(64, 1, wave, 1);
 
 
-    switch (ui.page) {
+    switch (page) {
         case UI_DEFAULT:
             break;
 
         case UI_OSC_MOD:
-            sprintf(buf, "Mod: %f", cfgnew.osc[ui.selected_osc].folding);
+            sprintf(buf, "Mod: %f", cfgnew.osc[selected_osc].folding);
             draw_text(0, 16, buf, 1);
             break;
 
         case UI_OSC_TUNE:
-            sprintf(buf, "Tune: %f", cfgnew.osc[ui.selected_osc].detune);
+            sprintf(buf, "Tune: %f", cfgnew.osc[selected_osc].detune);
             draw_text(0, 16, buf, 1);
             break;
     }
 
-    sprintf(buf, "key%d env%.2f", cfg.key[0], env[0]);
-    draw_text(0, 32, buf, 1);
-
-    float load = 100 * (float)(loop_time) / transfer_time;
-    sprintf(buf, "load %.1f", load);
-    draw_text(0, 48, buf, 1);
+    // float load = 100 * (float)(loop_time) / transfer_time;
+    // sprintf(buf, "load %.1f", load);
+    // draw_text(0, 48, buf, 1);
 
 
 

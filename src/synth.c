@@ -226,6 +226,36 @@ inline void fill_buffer(void) {
             float noise = bnoise();//(float)random_uint16() / 65535;
             osc_mix += noise * cfg.noise_gain;
 
+            // Filter
+            float fc = cfg.cutoff + cfg.env_mod * env[i];
+            float a = PI * fc/SAMPLE_RATE;
+            float ria = 1.0f / (1.0f + a);
+            float g = a * ria;
+            float gg = g * g;
+            float bigS = filter[i].z4 + g*(filter[i].z3 + g*(filter[i].z2 + g*filter[i].z1));
+            bigS = bigS * ria;
+
+            float v;
+            // zero-delay resonance feedback
+            osc_mix = (osc_mix - cfg.resonance*bigS)/(1.0f + cfg.resonance*gg*gg);
+            
+            // 4x 1-pole filters
+            v = (osc_mix - filter[i].z1) * g;
+            osc_mix = v + filter[i].z1;
+            filter[i].z1 = osc_mix + v;
+
+            v = (osc_mix - filter[i].z2) * g;
+            osc_mix = v + filter[i].z2;
+            filter[i].z2 = osc_mix + v;
+
+            v = (osc_mix - filter[i].z3) * g;
+            osc_mix = v + filter[i].z3;
+            filter[i].z3 = osc_mix + v;
+
+            v = (osc_mix - filter[i].z4) * g;
+            osc_mix = v + filter[i].z4;
+            filter[i].z4 = osc_mix + v;
+
             // Envelope
             if (cfg.key[i]) {
                 if (cfg.key_retrigger[i]) {
@@ -263,41 +293,10 @@ inline void fill_buffer(void) {
             }
 
             osc_mix *= env[i];
-
-            // Filter
-            //int ei = 0;
-            //for (int i=0; i<NUM_VOICE; i++) if (cfg.key[i]) ei = i;
-            float fc = cfg.cutoff + cfg.env_mod * env[i];
-            float a = PI * fc/SAMPLE_RATE;
-            float ria = 1.0f / (1.0f + a);
-            float g = a * ria;
-            float gg = g * g;
-            float bigS = filter[i].z4 + g*(filter[i].z3 + g*(filter[i].z2 + g*filter[i].z1));
-            bigS = bigS * ria;
-
-            float v;
-            // zero-delay resonance feedback
-            osc_mix = (osc_mix - cfg.resonance*bigS)/(1.0f + cfg.resonance*gg*gg);
-            
-            // 4x 1-pole filters
-            v = (osc_mix - filter[i].z1) * g;
-            osc_mix = v + filter[i].z1;
-            filter[i].z1 = osc_mix + v;
-
-            v = (osc_mix - filter[i].z2) * g;
-            osc_mix = v + filter[i].z2;
-            filter[i].z2 = osc_mix + v;
-
-            v = (osc_mix - filter[i].z3) * g;
-            osc_mix = v + filter[i].z3;
-            filter[i].z3 = osc_mix + v;
-
-            v = (osc_mix - filter[i].z4) * g;
-            osc_mix = v + filter[i].z4;
-            filter[i].z4 = osc_mix + v;
-
             s += osc_mix;
+
         }
+
         s /= (float)NUM_VOICE;
 
 
@@ -351,7 +350,10 @@ float env_bass = 0.0f;
 float bass_gain = 3.0f;
 float bass_freq = 0.0f;
 
+float nco_snare_lo = 0.0f;
+float nco_snare_hi = 0.0f;
 float env_snare = 0.0f;
+float env_snare2 = 0.0f;
 
 inline float sample_drums(void) {
 
@@ -369,15 +371,10 @@ inline float sample_drums(void) {
 
     nco_bass += bass_freq;
     bass_freq *= (1.0f - cfg.bass_punch);
-
     if (nco_bass > 1.0f) nco_bass -= 1.0f;
-    float phase = nco_bass;
-    float s1 = 0.0f;
-
-    s1 = (phase < 0.5f) ? phase : 1.0f - phase;
-    s1 = 8.0f * s1 - 2.0f;
-    s1 *= bass_gain;
-
+    float part = (nco_bass < 0.5f) ? nco_bass : 1.0f - nco_bass;
+    part = 8.0f * part - 2.0f;
+    part *= bass_gain;
 
     if (bass_attack) {
         env_bass += cfg.bass_click;
@@ -386,22 +383,42 @@ inline float sample_drums(void) {
             bass_attack = false;
         }
     } else {
-        env_bass -= cfg.release_rate * (ENV_OVERSHOOT + env_bass);
+        env_bass -= cfg.bass_decay * (ENV_OVERSHOOT + env_bass);
         if (env_bass < 0.0f) env_bass = 0.0f;        
     }
 
-    s = s1 * env_bass;
+    s = part * env_bass;
 
     // Snare
 
     if (trig_snare) {
         env_snare = 1.0f;
+        env_snare2 = 1.0f;
         trig_snare = false;
     }
-    float s2 = bnoise();
-    //env_snare -= cfg.re
 
-    s += s2 * env_snare;
+    // 180 Hz
+    nco_snare_lo += 0.00408f;
+    if (nco_snare_lo > 1.0f) nco_snare_lo -= 1.0f;
+    float snare_lo = (nco_snare_lo < 0.5f) ? nco_snare_lo : 1.0f - nco_snare_lo;
+    snare_lo = 8.0f * snare_lo - 2.0f;    
+
+    // 330 Hz
+    nco_snare_hi += 0.00748f;
+    if (nco_snare_hi > 1.0f) nco_snare_hi -= 1.0f;
+    float snare_hi = (nco_snare_hi < 0.5f) ? nco_snare_hi : 1.0f - nco_snare_hi;
+    snare_hi = 8.0f * snare_hi - 2.0f;
+
+    // Tone mix
+    part = cfg.snare_tone * snare_hi + (1.0f - cfg.snare_tone) * snare_lo;
+    env_snare -= 2.0f * cfg.snare_decay * (ENV_OVERSHOOT + env_snare);
+    if (env_snare < 0.0f) env_snare = 0.0f;        
+    s += part * env_snare;
+
+    // Noise
+    env_snare2 -= cfg.snare_decay * (ENV_OVERSHOOT + env_snare2);
+    if (env_snare2 < 0.0f) env_snare2 = 0.0f;            
+    s += bnoise() * env_snare2;
 
 
 

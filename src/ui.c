@@ -81,6 +81,9 @@ void draw_screen(void);
 
 #define POT_IS_SYNCED(i) (ABS(pots[(i)], saved_pots[part][(i)]) < 50)
 
+#define DECAY_MIN 0.001f
+#define LEAD_DECAY_CONST 0.000014f
+
 void update_lead(void) {
 
     // Source
@@ -89,14 +92,11 @@ void update_lead(void) {
     cfgnew.noise_gain = saved_pots[part][2] / POTMAX;
 
     // Env1
-    cfgnew.attack_time = saved_pots[part][3]/POTMAX + MIN_ATTACK;
-    cfgnew.attack_rate = 1.0f/(cfgnew.attack_time * SAMPLE_RATE);
+    float attack = saved_pots[part][3]/POTMAX + MIN_ATTACK;
+    cfgnew.attack_rate = 1.0f/(attack * SAMPLE_RATE);
 
-    float decay = saved_pots[part][4]/POTMAX;
-    decay = decay*decay*decay;
-    cfgnew.decay_time = decay * 5;
-    cfgnew.decay_rate = 1.0 - exp(cfgnew.env_curve / (cfgnew.decay_time * SAMPLE_RATE));
-    cfgnew.release_time = cfgnew.decay_time;
+    float decay = saved_pots[part][4]/POTMAX + DECAY_MIN;
+    cfgnew.decay_rate = LEAD_DECAY_CONST / (decay * decay * decay);
     cfgnew.release_rate = cfgnew.decay_rate;
 
     cfgnew.sustain_level = saved_pots[part][5]/POTMAX;
@@ -112,7 +112,16 @@ void update_drums(void) {
 
     cfgnew.bass_pitch = 0.002f * (saved_pots[PART_DRUMS][0] / POTMAX);
     cfgnew.bass_click = 0.02f + 0.5f * (saved_pots[PART_DRUMS][1] / POTMAX);
-    cfgnew.bass_punch = 0.0005f * (saved_pots[PART_DRUMS][2] / POTMAX);
+    cfgnew.bass_punch = 0.0002f * (saved_pots[PART_DRUMS][2] / POTMAX);
+
+    float decay = saved_pots[PART_DRUMS][3]/POTMAX + DECAY_MIN;
+    cfgnew.bass_decay = LEAD_DECAY_CONST / (decay * decay * decay);
+
+    decay = 0.3f * saved_pots[PART_DRUMS][4]/POTMAX + 0.1f;
+    cfgnew.snare_decay = LEAD_DECAY_CONST / (decay * decay * decay); // FIXME: RANGE
+
+    cfgnew.snare_tone = saved_pots[PART_DRUMS][5]/POTMAX;
+
 
 }
 
@@ -126,6 +135,8 @@ void ui_init(void) {
     saved_pots[PART_DRUMS][0] = 2048;
     saved_pots[PART_DRUMS][1] = 2048;
     saved_pots[PART_DRUMS][2] = 2048;
+    saved_pots[PART_DRUMS][3] = 2048;
+    saved_pots[PART_DRUMS][4] = 2048;
     update_drums();
 
 
@@ -133,6 +144,9 @@ void ui_init(void) {
 
 
 void ui_update(void) {
+
+    static int ctr = 0;
+    static int beat = 0;
 
     bool btn = read_buttons();
     bool enc = read_encoder();
@@ -164,63 +178,69 @@ void ui_update(void) {
 
 
 
+
+
     if (btn) {
 
-        // Oscillator select
-        if (buttons[BTN_OSC_SEL] == BTN_DOWN) {
-            selected_osc++;
-            selected_osc %= NUM_OSCILLATOR;
-            redraw = true;
-        }
 
-        // Oscillator waveform
-        if (buttons[BTN_OSC_WAVE] == BTN_DOWN) {
-            Wave new = cfgnew.osc[selected_osc].waveform;
-            new++;
-            new %= NUM_WAVE;
-            cfgnew.osc[selected_osc].waveform = new;
-            redraw = true;
-        }
+        if (part == PART_LEAD) {
 
-        // Oscillator mod
-        // Pressing and releasing the button without moving the encoder will keep the UI in OSCMOD mode,
-        // until the button is pressed again.
-        // If the encoder is moved while the button is held, the UI will leave OSCMOD mode when the button is released.
-        if (buttons[BTN_OSC_MOD] == BTN_DOWN) {
-            if (page != UI_OSC_MOD) {
-                encoder_start = encoder.value;
-                page = UI_OSC_MOD;
-            } else {
-                page = UI_DEFAULT;
+            // Oscillator select
+            if (buttons[BTN_OSC_SEL] == BTN_DOWN) {
+                selected_osc++;
+                selected_osc %= NUM_OSCILLATOR;
+                redraw = true;
             }
-            redraw = true;
-        }
-        if (buttons[BTN_OSC_MOD] == BTN_UP) {
-            if (page == UI_OSC_MOD) {
-                if (encoder.value != encoder_start) {
-                    page = UI_DEFAULT;        
+
+            // Oscillator waveform
+            if (buttons[BTN_OSC_WAVE] == BTN_DOWN) {
+                Wave new = cfgnew.osc[selected_osc].waveform;
+                new++;
+                new %= NUM_WAVE;
+                cfgnew.osc[selected_osc].waveform = new;
+                redraw = true;
+            }
+
+            // Oscillator mod
+            // Pressing and releasing the button without moving the encoder will keep the UI in OSCMOD mode,
+            // until the button is pressed again.
+            // If the encoder is moved while the button is held, the UI will leave OSCMOD mode when the button is released.
+            if (buttons[BTN_OSC_MOD] == BTN_DOWN) {
+                if (page != UI_OSC_MOD) {
+                    encoder_start = encoder.value;
+                    page = UI_OSC_MOD;
+                } else {
+                    page = UI_DEFAULT;
                 }
+                redraw = true;
             }
-            redraw = true;
-        }
-
-        // Oscillator tune
-        if (buttons[BTN_OSC_TUNE] == BTN_DOWN) {
-            if (page != UI_OSC_TUNE) {
-                encoder_start = encoder.value;
-                page = UI_OSC_TUNE;
-            } else {
-                page = UI_DEFAULT;
-            }
-            redraw = true;
-        }
-        if (buttons[BTN_OSC_TUNE] == BTN_UP) {
-            if (page == UI_OSC_TUNE) {
-                if (encoder.value != encoder_start) {
-                    page = UI_DEFAULT;        
+            if (buttons[BTN_OSC_MOD] == BTN_UP) {
+                if (page == UI_OSC_MOD) {
+                    if (encoder.value != encoder_start) {
+                        page = UI_DEFAULT;        
+                    }
                 }
+                redraw = true;
             }
-            redraw = true;            
+
+            // Oscillator tune
+            if (buttons[BTN_OSC_TUNE] == BTN_DOWN) {
+                if (page != UI_OSC_TUNE) {
+                    encoder_start = encoder.value;
+                    page = UI_OSC_TUNE;
+                } else {
+                    page = UI_DEFAULT;
+                }
+                redraw = true;
+            }
+            if (buttons[BTN_OSC_TUNE] == BTN_UP) {
+                if (page == UI_OSC_TUNE) {
+                    if (encoder.value != encoder_start) {
+                        page = UI_DEFAULT;        
+                    }
+                }
+                redraw = true;            
+            }
         }
 
 
@@ -286,7 +306,40 @@ void ui_update(void) {
         if (display_draw()) redraw = false;
     }
 
+    ctr++;
+    if (ctr == 40) {
+        ctr = 0;
+        beat++;
+        if (beat == 8) beat = 0;
+
+        switch (beat) {
+            case 0:
+                trig_bass = true;
+                break;
+            case 2:
+                trig_bass = true;
+                trig_snare = true;
+                break;
+            case 4: 
+                trig_bass = true;
+                break;
+            case 6:
+                trig_bass = true;
+                trig_snare = true;
+                break;
+            case 7:
+                trig_snare = true;
+                break;
+        }
+    }
+
+    
+
     HAL_Delay(5);
+
+
+
+
 
 
 

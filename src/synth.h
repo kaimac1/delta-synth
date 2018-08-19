@@ -75,11 +75,6 @@ typedef struct {
     float release_rate;
     float env_curve;    // linearity
     
-
-    float attack_time;
-    float decay_time;
-    float release_time;
-
     // Filter
     float cutoff;       // fs
     float resonance;    // 0-4
@@ -93,10 +88,13 @@ typedef struct {
     float fx_damping;
     float fx_combg;
 
-    // Bass drum
+    // Drums
     float bass_pitch;
     float bass_click;
     float bass_punch;
+    float bass_decay;
+    float snare_decay;
+    float snare_tone;
 
 } SynthConfig;
 
@@ -114,6 +112,7 @@ extern uint32_t loop_time;
 extern uint32_t transfer_time;
 
 extern bool trig_bass;
+extern bool trig_snare;
 
 void create_wave_tables(void);
 void synth_start(void);

@@ -110,7 +110,7 @@ void update_lead(void) {
 
 void update_drums(void) {
 
-    cfgnew.bass_pitch = 0.002f * (saved_pots[PART_DRUMS][0] / POTMAX);
+    cfgnew.bass_pitch = 0.0005f + 0.0015f * (saved_pots[PART_DRUMS][0] / POTMAX);
     cfgnew.bass_click = 0.02f + 0.5f * (saved_pots[PART_DRUMS][1] / POTMAX);
     cfgnew.bass_punch = 0.0002f * (saved_pots[PART_DRUMS][2] / POTMAX);
 
@@ -121,6 +121,9 @@ void update_drums(void) {
     cfgnew.snare_decay = LEAD_DECAY_CONST / (decay * decay * decay); // FIXME: RANGE
 
     cfgnew.snare_tone = saved_pots[PART_DRUMS][5]/POTMAX;
+
+    cfgnew.clap_decay = 0.0004f + 0.0016f * saved_pots[PART_DRUMS][6]/POTMAX;
+    cfgnew.clap_filt = 3000.0f * saved_pots[PART_DRUMS][8]/POTMAX;
 
 
 }
@@ -301,35 +304,35 @@ void ui_update(void) {
 
     
     // Redraw display if required
+    if (enc) redraw = true;
     if (redraw) {
         draw_screen();
         if (display_draw()) redraw = false;
     }
 
     ctr++;
-    if (ctr == 40) {
+    if (ctr == 18) {
         ctr = 0;
         beat++;
-        if (beat == 8) beat = 0;
+        if (beat == 16) beat = 0;
+
+        if (beat % 2 == 0) trig_clap = true;
 
         switch (beat) {
-            case 0:
-                trig_bass = true;
-                break;
-            case 2:
-                trig_bass = true;
-                trig_snare = true;
-                break;
             case 4: 
-                trig_bass = true;
-                break;
-            case 6:
-                trig_bass = true;
-                trig_snare = true;
-                break;
             case 7:
+            case 9:
+            case 12:
+            case 15:
                 trig_snare = true;
                 break;
+            case 0:                
+            case 2:
+            case 10:
+            case 11:
+                trig_bass = true;
+                break;
+
         }
     }
 
@@ -399,6 +402,11 @@ void draw_screen(void) {
     if (part == PART_DRUMS) {
         sprintf(buf, "Drums");
         draw_text(0, 1, buf, 1);
+
+        sprintf(buf, "%f", cfgnew.clap_decay);
+        draw_text(0, 16, buf, 1);
+        sprintf(buf, "%f", cfgnew.clap_filt);
+        draw_text(0, 48, buf, 1);        
         return;
     }
 
@@ -430,15 +438,12 @@ void draw_screen(void) {
             break;
     }
 
-    // float load = 100 * (float)(loop_time) / transfer_time;
-    // sprintf(buf, "load %.1f", load);
-    // draw_text(0, 48, buf, 1);
+    float load = 100 * (float)(loop_time) / transfer_time;
+    sprintf(buf, "load %.1f", load);
+    draw_text(0, 48, buf, 1);
 
 
 
-    //float load = 100 * ((float)loop_time / transfer_time);
-    //sprintf(buf, "%.3f", (double)load);
-    //draw_text(64,0, buf, 1, COL_WHITE);
    
 
     // switch (ui.page) {

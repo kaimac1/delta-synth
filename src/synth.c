@@ -46,10 +46,10 @@ inline void sequencer_update(void);
 inline void fill_buffer(void);
 inline float sample_drums(void);
 
-int bn = 1;
-float bnoise(void) {
-    bn *= 16807;
-    return (float)bn * 4.6566129e-010f;
+int wn = 1;
+inline float whitenoise(void) {
+    wn *= 16807;
+    return (float)wn * 4.6566129e-010f;
 }
 
 
@@ -131,6 +131,58 @@ inline void sequencer_update(void) {
 
 }
 
+
+inline float ladder_filter(Filter * f, float in, float cutoff, float peak) {
+
+    float a = PI * cutoff/SAMPLE_RATE;
+    float ria = 1.0f / (1.0f + a);
+    float g = a * ria;
+    float gg = g * g;
+    float bigS = f->z4 + g*(f->z3 + g*(f->z2 + g*f->z1));
+    bigS = bigS * ria;
+
+    float v;
+    // zero-delay resonance feedback
+    in = (in - peak*bigS)/(1.0f + peak*gg*gg);
+    
+    // 4x 1-pole filters
+    v = (in - f->z1) * g;
+    in = v + f->z1;
+    f->z1 = in + v;
+
+    v = (in - f->z2) * g;
+    in = v + f->z2;
+    f->z2 = in + v;
+
+    v = (in - f->z3) * g;
+    in = v + f->z3;
+    f->z3 = in + v;
+
+    v = (in - f->z4) * g;
+    in = v + f->z4;
+    f->z4 = in + v;
+
+    return in;
+
+}
+
+inline float bandpass(Filter *f, float in, float cutoff) {
+
+    float a = PI * cutoff/SAMPLE_RATE;
+    float ria = 1.0f / (1.0f + a);
+    float g = a*ria;
+
+    float hpout = (in - f->z1) * g;       
+    float out = hpout + f->z1;
+    f->z1 = out + hpout;
+
+    float v = (hpout - f->z2) * g;
+    out = v + f->z2;
+    f->z2 = out + v;
+
+    return out;
+}
+
 /******************************************************************************/
 // PolyBLEP (polynomial band-limited step)
 // t: phase, [0,1]
@@ -156,15 +208,15 @@ float polyblep(float t, float dt) {
 #define DELAY_LINE_GET(name) name.dl[name.idx]
 #define COMB_PUT(name, value) {comb_result = DELAY_LINE_GET(name); name.s = comb_result + (name.s - comb_result)*cfg.fx_damping; DELAY_LINE_PUT(name, value + cfg.fx_combg * name.s);}
 
-DELAY_LINE(comb1, 781);
-DELAY_LINE(comb2, 831);
-DELAY_LINE(comb3, 893);
-DELAY_LINE(comb4, 949);
-DELAY_LINE(comb5, 995);
-DELAY_LINE(comb6, 1043);
-DELAY_LINE(comb7, 1089);
-DELAY_LINE(comb8, 1131);
-//DELAY_LINE(comb8, 6000);
+// DELAY_LINE(comb1, 781);
+// DELAY_LINE(comb2, 831);
+// DELAY_LINE(comb3, 893);
+// DELAY_LINE(comb4, 949);
+// DELAY_LINE(comb5, 995);
+// DELAY_LINE(comb6, 1043);
+// DELAY_LINE(comb7, 1089);
+// DELAY_LINE(comb8, 1131);
+// DELAY_LINE(comb8, 10000);
 
 inline void fill_buffer(void) {
 
@@ -223,38 +275,12 @@ inline void fill_buffer(void) {
             }
 
             // Noise
-            float noise = bnoise();//(float)random_uint16() / 65535;
+            float noise = whitenoise();
             osc_mix += noise * cfg.noise_gain;
 
             // Filter
             float fc = cfg.cutoff + cfg.env_mod * env[i];
-            float a = PI * fc/SAMPLE_RATE;
-            float ria = 1.0f / (1.0f + a);
-            float g = a * ria;
-            float gg = g * g;
-            float bigS = filter[i].z4 + g*(filter[i].z3 + g*(filter[i].z2 + g*filter[i].z1));
-            bigS = bigS * ria;
-
-            float v;
-            // zero-delay resonance feedback
-            osc_mix = (osc_mix - cfg.resonance*bigS)/(1.0f + cfg.resonance*gg*gg);
-            
-            // 4x 1-pole filters
-            v = (osc_mix - filter[i].z1) * g;
-            osc_mix = v + filter[i].z1;
-            filter[i].z1 = osc_mix + v;
-
-            v = (osc_mix - filter[i].z2) * g;
-            osc_mix = v + filter[i].z2;
-            filter[i].z2 = osc_mix + v;
-
-            v = (osc_mix - filter[i].z3) * g;
-            osc_mix = v + filter[i].z3;
-            filter[i].z3 = osc_mix + v;
-
-            v = (osc_mix - filter[i].z4) * g;
-            osc_mix = v + filter[i].z4;
-            filter[i].z4 = osc_mix + v;
+            osc_mix = ladder_filter(&filter[i], osc_mix, fc, cfg.resonance);
 
             // Envelope
             if (cfg.key[i]) {
@@ -300,9 +326,9 @@ inline void fill_buffer(void) {
         s /= (float)NUM_VOICE;
 
 
+        s += sample_drums();
 
-
-        // float fx = 0.0f;
+        float fx = 0.0f;
 
         // COMB_PUT(comb1, s);
         // fx += comb_result;
@@ -321,15 +347,15 @@ inline void fill_buffer(void) {
         // COMB_PUT(comb8, s);
         // fx += comb_result;
 
-        // // fx = DELAY_LINE_GET(comb8);
-        // // DELAY_LINE_PUT(comb8, s + fx * 0.5f);
+        // fx = DELAY_LINE_GET(comb8);
+        // DELAY_LINE_PUT(comb8, s + fx * 0.7f);
 
         // fx *= 0.1f;
         // s = fx + s;
 
-        s += sample_drums();
+        
 
-        s += bnoise() * 0.001f; // Dither
+        s += whitenoise() * 0.001f; // Dither
 
         int16_t s16 = s * 700;
 
@@ -340,9 +366,9 @@ inline void fill_buffer(void) {
 
 }
 
-
 bool trig_bass;
 bool trig_snare;
+bool trig_clap;
 
 float nco_bass = 0.0f;
 bool bass_attack = false;
@@ -352,8 +378,14 @@ float bass_freq = 0.0f;
 
 float nco_snare_lo = 0.0f;
 float nco_snare_hi = 0.0f;
-float env_snare = 0.0f;
-float env_snare2 = 0.0f;
+float env_snare_tone = 0.0f;
+float env_snare_noise = 0.0f;
+
+float env_clap = 0.0f;
+int clap_num = 0;
+int clap_ctr = 0;
+
+Filter fclap;
 
 inline float sample_drums(void) {
 
@@ -392,8 +424,8 @@ inline float sample_drums(void) {
     // Snare
 
     if (trig_snare) {
-        env_snare = 1.0f;
-        env_snare2 = 1.0f;
+        env_snare_tone = 1.0f;
+        env_snare_noise = 1.0f;
         trig_snare = false;
     }
 
@@ -411,14 +443,38 @@ inline float sample_drums(void) {
 
     // Tone mix
     part = cfg.snare_tone * snare_hi + (1.0f - cfg.snare_tone) * snare_lo;
-    env_snare -= 2.0f * cfg.snare_decay * (ENV_OVERSHOOT + env_snare);
-    if (env_snare < 0.0f) env_snare = 0.0f;        
-    s += part * env_snare;
+    env_snare_tone -= 2.0f * cfg.snare_decay * (ENV_OVERSHOOT + env_snare_tone);
+    if (env_snare_tone < 0.0f) env_snare_tone = 0.0f;        
+    s += part * env_snare_tone;
 
     // Noise
-    env_snare2 -= cfg.snare_decay * (ENV_OVERSHOOT + env_snare2);
-    if (env_snare2 < 0.0f) env_snare2 = 0.0f;            
-    s += bnoise() * env_snare2;
+    env_snare_noise -= cfg.snare_decay * (ENV_OVERSHOOT + env_snare_noise);
+    if (env_snare_noise < 0.0f) env_snare_noise = 0.0f;            
+    s += whitenoise() * env_snare_noise;
+
+    // Clap
+
+    if (trig_clap) {
+        trig_clap = false;
+        env_clap = 1.0f;
+        clap_num = 0;
+        clap_ctr = 0;
+    }
+
+    env_clap -= cfg.clap_decay * (ENV_OVERSHOOT + env_clap);
+    float thresh = 0.4f / (cfg.clap_decay/0.0005f);
+    if (env_clap < 0.0f) env_clap = 0.0f;
+    if (clap_num < 3) {
+        clap_ctr++;
+        if (clap_ctr > thresh * SAMPLE_RATE * 0.05f) {
+            clap_ctr = 0;
+            clap_num++;
+            env_clap = 1.0f;
+        }
+    }
+
+    float c = 60.0f * bandpass(&fclap, whitenoise(), cfg.clap_filt);
+    s += c * env_clap;
 
 
 

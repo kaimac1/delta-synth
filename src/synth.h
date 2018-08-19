@@ -96,6 +96,9 @@ typedef struct {
     float snare_decay;
     float snare_tone;
 
+    float clap_decay;
+    float clap_filt;
+
 } SynthConfig;
 
 #define NUM_SEQ_NOTES 2
@@ -113,6 +116,7 @@ extern uint32_t transfer_time;
 
 extern bool trig_bass;
 extern bool trig_snare;
+extern bool trig_clap;
 
 void create_wave_tables(void);
 void synth_start(void);

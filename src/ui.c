@@ -5,8 +5,6 @@
 #include "audio.h"
 #include "board.h"
 #include "synth.h"
-#include "stm32f4xx_ll_tim.h"
-#include "stm32f4xx_ll_adc.h"
 #include <math.h>
 #include <string.h>
 
@@ -135,8 +133,8 @@ void ui_init(void) {
     }
 
     // Initial drums settings
-    saved_pots[PART_DRUMS][0] = 2048;
-    saved_pots[PART_DRUMS][1] = 2048;
+    saved_pots[PART_DRUMS][0] = 1000;
+    saved_pots[PART_DRUMS][1] = 0;
     saved_pots[PART_DRUMS][2] = 2048;
     saved_pots[PART_DRUMS][3] = 2048;
     saved_pots[PART_DRUMS][4] = 2048;
@@ -316,7 +314,8 @@ void ui_update(void) {
         beat++;
         if (beat == 16) beat = 0;
 
-        if (beat % 2 == 0) trig_clap = true;
+        if (beat == 14) trig_hat_op = true;
+        else if (beat % 2 == 0) trig_hat_cl = true;
 
         switch (beat) {
             case 4: 
@@ -331,6 +330,9 @@ void ui_update(void) {
             case 10:
             case 11:
                 trig_bass = true;
+                break;
+            case 14:
+                //trig_clap = true;
                 break;
 
         }
@@ -402,11 +404,6 @@ void draw_screen(void) {
     if (part == PART_DRUMS) {
         sprintf(buf, "Drums");
         draw_text(0, 1, buf, 1);
-
-        sprintf(buf, "%f", cfgnew.clap_decay);
-        draw_text(0, 16, buf, 1);
-        sprintf(buf, "%f", cfgnew.clap_filt);
-        draw_text(0, 48, buf, 1);        
         return;
     }
 
@@ -428,65 +425,23 @@ void draw_screen(void) {
             break;
 
         case UI_OSC_MOD:
-            sprintf(buf, "Mod: %f", cfgnew.osc[selected_osc].folding);
+            sprintf(buf, "Mod: %f", (double)cfgnew.osc[selected_osc].folding);
             draw_text(0, 16, buf, 1);
             break;
 
         case UI_OSC_TUNE:
-            sprintf(buf, "Tune: %f", cfgnew.osc[selected_osc].detune);
+            sprintf(buf, "Tune: %f", (double)cfgnew.osc[selected_osc].detune);
             draw_text(0, 16, buf, 1);
             break;
     }
 
     float load = 100 * (float)(loop_time) / transfer_time;
-    sprintf(buf, "load %.1f", load);
+    sprintf(buf, "load %.1f", (double)load);
     draw_text(0, 48, buf, 1);
 
 
 
-   
 
-    // switch (ui.page) {
-    //     case PAGE_ENV:
-    //         draw_text(0,  0,   "Envelope",  1, COL_WHITE);
-
-    //         draw_text_cen(32,  16,   "ATTACK",  1, CRED);
-    //         draw_gauge(32, 52, input.attack / 127.0f, CRED);
-
-    //         draw_text_cen(96, 16,   "DECAY",   1, CGRN);
-    //         draw_gauge(96, 52, input.decay / 127.0f, CGRN);
-            
-    //         draw_text_cen(32,   116, "SUSTAIN", 1, CBLU);
-    //         draw_gauge(32, 94, input.sustain / 127.0f, CBLU);
-            
-    //         draw_text_cen(96,  116, "RELEASE", 1, CWHT);
-    //         draw_gauge(96, 94, input.release / 127.0f, CWHT);
-    //         break;
-
-
-    //     case PAGE_FILTER:
-    //         draw_text(0,  0,   "Filter",  1, COL_WHITE);
-
-    //         draw_text_cen(32,  16,   "CUTOFF",  1, CRED);
-    //         draw_gauge(32, 52, input.cutoff / 127.0f, CRED);
-
-    //         draw_text_cen(96, 16,   "RESONANCE",   1, CGRN);
-    //         draw_gauge(96, 52, input.resonance / 127.0f, CGRN);
-
-    //         draw_text_cen(32,   116, "ENV MOD", 1, CBLU);
-    //         draw_gauge(32, 94, input.env_mod / 127.0f, CBLU);
-    //         break;
-
-    //     case PAGE_FILTER_ENV:
-    //         draw_text(0,  0,   "Filter Env",  1, COL_WHITE);
-    //         break;
-
-
-    //     case PAGE_OSC:
-    //         sprintf(buf, "Osc %d", ui.selected_osc+1);
-    //         draw_text(0,  0,   buf,  1, COL_WHITE);
-
-    //         draw_text_cen(32,  16,   "WAVEFORM",  1, CRED);
     //         if (cfg.osc[ui.selected_osc].waveform == WAVE_SAW) {
     //             wave = "Saw";
     //         } else if (cfg.osc[ui.selected_osc].waveform == WAVE_SQUARE) {
@@ -499,32 +454,5 @@ void draw_screen(void) {
     //             draw_gauge(96, 52, input.osc[ui.selected_osc].folding / 127.0f, CGRN);                
     //         }
     //         draw_text_cen(32,  40, wave,  1, CRED);
-
-    //         draw_text_cen(32,   116, "DETUNE", 1, CBLU);
-    //         draw_gauge(32, 94, input.osc[ui.selected_osc].detune / 127.0f, CBLU);
-            
-    //         draw_text_cen(96,  116, "GAIN", 1, CWHT);
-    //         draw_gauge(96, 94, input.osc[ui.selected_osc].gain / 127.0f, CWHT);
-    //         break;
-
-
-    //     case PAGE_FX:
-    //         draw_text_cen(96, 16, "DAMPING", 1, CGRN);
-    //         draw_gauge(96, 52, input.fx_damping / 127.0f, CGRN);
-
-    //         draw_text_cen(32,   116, "AMOUNT", 1, CBLU);
-    //         draw_gauge(32, 94, input.fx_amount / 127.0f, CBLU);
-    //         break;
-
-
-    //     case PAGE_LFO:
-    //         draw_text(0, 0, "LFO", 1, COL_WHITE);
-
-    //         draw_text_cen(32,  16,   "RATE",  1, CRED);
-    //         draw_gauge(32, 52, input.lfo_rate / 127.0f, CRED);
-    //         draw_text_cen(96, 16, "AMOUNT", 1, CGRN);
-    //         draw_gauge(96, 52, input.lfo_amount / 127.0f, CGRN);
-    //         break;
-
 }
 

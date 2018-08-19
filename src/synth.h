@@ -117,6 +117,8 @@ extern uint32_t transfer_time;
 extern bool trig_bass;
 extern bool trig_snare;
 extern bool trig_clap;
+extern bool trig_hat_cl;
+extern bool trig_hat_op;
 
 void create_wave_tables(void);
 void synth_start(void);

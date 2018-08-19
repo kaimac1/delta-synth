@@ -369,6 +369,8 @@ inline void fill_buffer(void) {
 bool trig_bass;
 bool trig_snare;
 bool trig_clap;
+bool trig_hat_cl;
+bool trig_hat_op;
 
 float nco_bass = 0.0f;
 bool bass_attack = false;
@@ -384,8 +386,11 @@ float env_snare_noise = 0.0f;
 float env_clap = 0.0f;
 int clap_num = 0;
 int clap_ctr = 0;
-
 Filter fclap;
+
+float env_hat = 0.0f;
+bool hat_open;
+Filter fhat;
 
 inline float sample_drums(void) {
 
@@ -477,9 +482,25 @@ inline float sample_drums(void) {
     s += c * env_clap;
 
 
+    // Hi hat (closed)
 
+    if (trig_hat_cl) {
+        trig_hat_cl = false;
+        hat_open = false;
+        env_hat = 1.0f;
+    }
+    else if (trig_hat_op) {
+        trig_hat_op = false;
+        hat_open = true;
+        env_hat = 1.0f;
+    }
 
-    
+    float dec = hat_open ? 0.0004f : 0.002f;
+    env_hat -= dec * (ENV_OVERSHOOT + env_hat);
+    if (env_hat < 0.0f) env_hat = 0.0f;
+    //s += 0.5f * whitenoise() * env_hat;
+    s += 2.0f * bandpass(&fhat, whitenoise(), 15000.0f) * env_hat;
+
     return s;
 
 }

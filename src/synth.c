@@ -7,7 +7,7 @@
 #include "notes.h"
 #define PI 3.1415926f
 
-SynthConfig cfgnew;
+SynthConfig synth;
 SynthConfig cfg;
 SeqConfig seq;
 
@@ -18,14 +18,16 @@ typedef struct {
     float z4;
 } Filter;
 
+typedef struct {
+    float level;
+    EnvState state;
+} Envelope;
+
 Filter filter[NUM_VOICE];
+Envelope env[NUM_VOICE][NUM_ENV];
 
 float nco[NUM_VOICE][NUM_OSCILLATOR];
-float    env[NUM_VOICE] = {0.0f};
-EnvState env_state[NUM_VOICE] = {ENV_RELEASE};
 float lfo_nco;
-
-//float    z1, z2, z3, z4; // filter state
 uint32_t next_beat = 0;
 int      arp_note = 0;
 int seq_note = 0;
@@ -74,9 +76,9 @@ void HAL_I2S_TxCpltCallback(I2S_HandleTypeDef *hi2s) {
 
     pin_set(GPIOA, 1<<5, 0);
 
-    // Copy new settings: cfgnew -> cfg
-    if (!cfgnew.busy) {
-        memcpy(&cfg, &cfgnew, sizeof(SynthConfig));
+    // Copy new settings: synth -> cfg
+    if (!synth.busy) {
+        memcpy(&cfg, &synth, sizeof(SynthConfig));
         // if (cfg.env_retrigger) {
         //     cfgnew.env_retrigger = false;
         //     cfg.env_retrigger = false;
@@ -103,7 +105,7 @@ inline void sequencer_update(void) {
         next_beat += 15000000/cfg.tempo;
 
         if (cfg.seq_play) {
-            env_state[0] = ENV_RELEASE;
+            //env[0].state = ENV_RELEASE;
             pin_set(GPIOA, 1<<5, 1);
             seq_note++;
             if (seq_note == NUM_SEQ_NOTES) seq_note = 0;
@@ -216,7 +218,9 @@ float polyblep(float t, float dt) {
 // DELAY_LINE(comb6, 1043);
 // DELAY_LINE(comb7, 1089);
 // DELAY_LINE(comb8, 1131);
-// DELAY_LINE(comb8, 10000);
+ DELAY_LINE(comb8, 2000);
+
+ float f2[NUM_VOICE];
 
 inline void fill_buffer(void) {
 
@@ -233,18 +237,23 @@ inline void fill_buffer(void) {
         // lfo_out = 1.0f + cfg.lfo_amount*(2.0f * lfo_out - 0.5f);
 
 
-        for (int i=0; i<NUM_VOICE; i++) {
+        for (int voice=0; voice<NUM_VOICE; voice++) {
             float osc_mix = 0.0f;
+
+            // portamento
+            //f2[i] += 0.0008f * (cfg.freq[i] - f2[i]);
+            f2[voice] = cfg.freq[voice];
 
             // Oscillators
             for (int osc=0; osc<NUM_OSCILLATOR; osc++) {
 
                 // Advance oscillator phase according to (detuned) frequency
-                float freq = (cfg.osc[osc].detune) * cfg.freq[i];
+
+                float freq = (cfg.osc[osc].detune) * f2[voice];
                 //freq *= lfo_out;
-                nco[i][osc] += freq;
-                if (nco[i][osc] > 1.0f) nco[i][osc] -= 1.0f;
-                float phase = nco[i][osc];
+                nco[voice][osc] += freq;
+                if (nco[voice][osc] > 1.0f) nco[voice][osc] -= 1.0f;
+                float phase = nco[voice][osc];
                 float s1 = 0.0f;
 
                 // Generate waveform from phase
@@ -253,13 +262,14 @@ inline void fill_buffer(void) {
                     s1 -= polyblep(phase, freq);
 
                 } else if (cfg.osc[osc].waveform == WAVE_SQUARE) {
+                    float width = 0.5f + 0.5f*cfg.osc[osc].modifier;
                     float phase2;
-                    if (phase < 0.5f) {
+                    if (phase < width) {
                         s1 = -1.0f;
-                        phase2 = phase + 0.5f;
+                        phase2 = phase + (1.0f-width);
                     } else {
                         s1 = 1.0f;
-                        phase2 = phase - 0.5f;
+                        phase2 = phase - width;
                     }
                     s1 -= polyblep(phase, freq);
                     s1 += polyblep(phase2, freq);
@@ -267,8 +277,9 @@ inline void fill_buffer(void) {
                 } else if (cfg.osc[osc].waveform == WAVE_TRI) {
                     s1 = (phase < 0.5f) ? phase : 1.0f - phase;
                     s1 = 8.0f * s1 - 2.0f;
-                    if (s1 > cfg.osc[osc].folding) s1 = cfg.osc[osc].folding - (s1-cfg.osc[osc].folding);
-                    if (s1 < -cfg.osc[osc].folding) s1 = -cfg.osc[osc].folding - (s1-cfg.osc[osc].folding);
+                    float fold = 2.0f * cfg.osc[osc].modifier;
+                    if (s1 > fold) s1 = fold - (s1-fold);
+                    else if (s1 < -fold) s1 = -fold - (s1-fold);
                 }
 
                 osc_mix += s1 * cfg.osc[osc].gain;
@@ -279,46 +290,48 @@ inline void fill_buffer(void) {
             osc_mix += noise * cfg.noise_gain;
 
             // Filter
-            float fc = cfg.cutoff + cfg.env_mod * env[i];
-            osc_mix = ladder_filter(&filter[i], osc_mix, fc, cfg.resonance);
+            float fc = cfg.cutoff + cfg.env_mod * env[voice][1].level;
+            osc_mix = ladder_filter(&filter[voice], osc_mix, fc, cfg.resonance);
 
             // Envelope
-            if (cfg.key[i]) {
-                if (cfg.key_retrigger[i]) {
-                    cfgnew.key_retrigger[i] = false;
-                    cfg.key_retrigger[i] = false;
-                    env_state[i] = ENV_ATTACK;
-                }
-                if (env_state[i] == ENV_RELEASE) {
-                    env_state[i] = ENV_ATTACK;
-                }
-
-                if (env_state[i] == ENV_ATTACK) {
-                    env[i] += cfg.attack_rate;
-                    if (env[i] > 1.0f) {
-                        env[i] = 1.0f;
-                        env_state[i] = ENV_DECAY;
+            for (int e=0; e<NUM_ENV; e++) {
+                if (cfg.key[voice]) {
+                    if (cfg.key_retrigger[voice]) {
+                        synth.key_retrigger[voice] = false;
+                        cfg.key_retrigger[voice] = false;
+                        env[voice][e].state = ENV_ATTACK;
                     }
-                } else if (env_state[i] == ENV_DECAY) {
-                    env[i] += cfg.decay_rate * (cfg.sustain_level - ENV_OVERSHOOT - env[i]);
-                    if (env[i] < cfg.sustain_level) {
-                        env[i] = cfg.sustain_level;
-                        env_state[i] = ENV_SUSTAIN;
+                    if (env[voice][e].state == ENV_RELEASE) {
+                        env[voice][e].state = ENV_ATTACK;
                     }
-                } else if (env_state[i] == ENV_SUSTAIN) {
-                    env[i] = cfg.sustain_level;
-                }
 
-            } else {
-                env_state[i] = ENV_RELEASE;
-                if (env[i] > 0.0f) {
-                    env[i] -= cfg.release_rate * (ENV_OVERSHOOT + env[i]);
+                    if (env[voice][e].state == ENV_ATTACK) {
+                        env[voice][e].level += cfg.env[e].attack;
+                        if (env[voice][e].level > 1.0f) {
+                            env[voice][e].level = 1.0f;
+                            env[voice][e].state = ENV_DECAY;
+                        }
+                    } else if (env[voice][e].state == ENV_DECAY) {
+                        env[voice][e].level += cfg.env[e].decay * (cfg.env[e].sustain - ENV_OVERSHOOT - env[voice][e].level);
+                        if (env[voice][e].level < cfg.env[e].sustain) {
+                            env[voice][e].level = cfg.env[e].sustain;
+                            env[voice][e].state = ENV_SUSTAIN;
+                        }
+                    } else if (env[voice][e].state == ENV_SUSTAIN) {
+                        env[voice][e].level = cfg.env[e].sustain;
+                    }
+
                 } else {
-                    env[i] = 0.0f;
+                    env[voice][e].state = ENV_RELEASE;
+                    if (env[voice][e].level > 0.0f) {
+                        env[voice][e].level -= cfg.env[e].release * (ENV_OVERSHOOT + env[voice][e].level);
+                    } else {
+                        env[voice][e].level = 0.0f;
+                    }
                 }
             }
 
-            osc_mix *= env[i];
+            osc_mix *= env[voice][0].level;
             s += osc_mix;
 
         }
@@ -326,7 +339,7 @@ inline void fill_buffer(void) {
         s /= (float)NUM_VOICE;
 
 
-        s += sample_drums();
+        //s += sample_drums();
 
         float fx = 0.0f;
 
@@ -348,9 +361,9 @@ inline void fill_buffer(void) {
         // fx += comb_result;
 
         // fx = DELAY_LINE_GET(comb8);
-        // DELAY_LINE_PUT(comb8, s + fx * 0.7f);
+        // DELAY_LINE_PUT(comb8, s + fx * 0.75f);
 
-        // fx *= 0.1f;
+        // fx *= 0.2f;
         // s = fx + s;
 
         
@@ -532,34 +545,38 @@ void synth_start(void) {
     cfg.tempo = 30;
 
     cfg.osc[0].waveform = WAVE_SQUARE;
-    cfg.osc[0].folding = 2.0f;
+    cfg.osc[0].modifier = 0.0f;
     cfg.osc[0].gain = 1.0f;
     cfg.osc[0].detune = 1.0f;
 
     cfg.osc[1].waveform = WAVE_SQUARE;
-    cfg.osc[1].folding = 2.0f;
+    cfg.osc[1].modifier = 0.0f;
     cfg.osc[1].gain = 0.5f;
     cfg.osc[1].detune = 1.0f;    
 
     cfg.noise_gain = 0.0f;
 
-    cfg.attack_rate  = 0.0005;
-    cfg.decay_rate   = 0.005;
-    cfg.sustain_level = 1.0;
-    cfg.release_rate = 0.0005;
+    cfg.env[0].attack  = 0.0005;
+    cfg.env[0].decay   = 0.005;
+    cfg.env[0].sustain = 1.0;
+    cfg.env[0].release = 0.0005;
     
+    cfg.env[1].attack  = 0.0005;
+    cfg.env[1].decay   = 0.005;
+    cfg.env[1].sustain = 1.0;
+    cfg.env[1].release = 0.0005;
+
     cfg.cutoff  = 10000.0;
     cfg.resonance = 0.0;
     cfg.env_mod = 0.0;
-    cfg.env_curve = -log((1 + ENV_OVERSHOOT) / ENV_OVERSHOOT);
-
+    
     cfg.fx_damping = 0.5;
     cfg.fx_combg = 0.881678f;
 
     cfg.lfo_rate = 1.0f;
     cfg.lfo_amount = 0.01f;
 
-    memcpy(&cfgnew, &cfg, sizeof(SynthConfig));
+    memcpy(&synth, &cfg, sizeof(SynthConfig));
 
     
     fill_buffer();

@@ -10,11 +10,10 @@
 extern int16_t sine_table[SINE_TABLE_SIZE];
 
 
-
-
 #define MAX_ARP 5
-#define NUM_VOICE 1
+#define NUM_VOICE 5
 #define NUM_OSCILLATOR 2
+#define NUM_ENV 2
 
 
 typedef enum {
@@ -23,6 +22,8 @@ typedef enum {
     ENV_SUSTAIN,
     ENV_RELEASE
 } EnvState;
+
+
 
 typedef enum {
     WAVE_TRI,
@@ -38,16 +39,20 @@ typedef enum {
     ARP_UP_DOWN,
 } ArpMode;
 
-
-
-
 typedef struct {
     Wave waveform;
-    float folding;
-    float duty;
+    float modifier;
     float detune;
     float gain;
 } Oscillator;
+
+typedef struct {
+    float attack;
+    float decay;
+    float sustain;
+    float release;
+} ADSR;
+
 
 typedef struct {
     bool busy;          // config being updated, don't copy
@@ -61,19 +66,17 @@ typedef struct {
     int tempo;          // bpm
     bool seq_play;
 
-    // Oscillators
+    // Voices
     float freq[NUM_VOICE];
+    bool key[NUM_VOICE];           // key down?
+    bool key_retrigger[NUM_VOICE];
+
+    // Oscillators
     Oscillator osc[NUM_OSCILLATOR];
     float noise_gain;
 
-    // ADSR 
-    bool key[NUM_VOICE];           // key down?
-    bool key_retrigger[NUM_VOICE];
-    float attack_rate;
-    float decay_rate;
-    float sustain_level;
-    float release_rate;
-    float env_curve;    // linearity
+    // Envelope settings
+    ADSR env[NUM_ENV];
     
     // Filter
     float cutoff;       // fs
@@ -108,7 +111,7 @@ typedef struct {
 } SeqConfig;
 
 extern SynthConfig cfg;
-extern SynthConfig cfgnew;
+extern SynthConfig synth;
 extern SeqConfig seq;
 
 extern uint32_t loop_time;

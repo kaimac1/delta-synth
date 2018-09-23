@@ -248,6 +248,8 @@ void draw_text(uint16_t x, uint16_t y, char* text, int size) {
 
 void draw_box(uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
 
+    w -= 1;
+    h -= 1;
     draw_line(x, y, x+w, y, 1);
     draw_line(x, y, x, y+h, 1);
     draw_line(x, y+h, x+w, y+h, 1);
@@ -315,6 +317,20 @@ void draw_line(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, bool col) {
     }
 }
 
+void draw_image(uint16_t x, uint16_t y, uint8_t *array, uint16_t w, uint16_t h, bool invert) {
+
+    for (int px=0; px<w; px++) {
+        for (int py=0; py<h; py++) {
+            if (invert) {
+                draw_pixel(x+px, y+py, !array[py*w+px]);
+            } else {
+                draw_pixel(x+px, y+py, array[py*w+px]);
+            }
+            
+        }
+    }
+}
+
 
 void display_reset(void) {
 
@@ -327,7 +343,7 @@ void display_reset(void) {
     ssd1306_command(SSD1306_SETMULTIPLEX);                  // 0xA8
     ssd1306_command(SSD1306_LCDHEIGHT - 1);
     ssd1306_command(SSD1306_SETDISPLAYOFFSET);              // 0xD3
-    ssd1306_command(0x1);                                   // no offset
+    ssd1306_command(0x0);                                   // no offset
     ssd1306_command(SSD1306_SETSTARTLINE | 0x0);            // line #0
     ssd1306_command(SSD1306_CHARGEPUMP);                    // 0x8D
     ssd1306_command(0x14);

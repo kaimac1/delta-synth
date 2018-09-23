@@ -71,6 +71,7 @@ void draw_line(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, bool col);
 void draw_text(uint16_t x, uint16_t y, char* text, int size);
 void draw_text_rj(uint16_t x, uint16_t y, char* text, int size);
 void draw_text_cen(uint16_t x, uint16_t y, char* text, int size);
+void draw_image(uint16_t x, uint16_t y, uint8_t *array, uint16_t w, uint16_t h, bool invert);
 void build_font_index(void);
 extern volatile bool display_busy;
 

@@ -21,7 +21,7 @@ typedef enum {
 } UIPage;
 
 // UI state
-int selected_osc;
+int this_osc;
 UIPage page;
 UIPart part;
 
@@ -44,10 +44,9 @@ char *pot_names[NUM_PARTS][NUM_POTS] = {
 
 typedef struct {
     int wave;
-    int folding;
-    int duty;
-    int gain;
+    int modifier;
     int detune;
+    int gain;
 } OscSettings;
 
 typedef struct {
@@ -72,6 +71,9 @@ float seq_note_input;
 bool redraw = true;
 void draw_screen(void);
 
+#define OSC_BOTH NUM_OSCILLATOR
+//#define CHANGE_OSC_ATTR(attr, value) synth.osc[this_osc].attr = (value)
+
 #define MAP_ENCODER_CLAMP(x) {(x) += encoder.delta; if ((x) > 127) (x) = 127; if ((x) < 0) (x) = 0;}
 //#define ADD_DELTA_WRAPPED(x, y) {(x) += (y); if ((x) > 127) (x) -= 127; if ((x) < 0) (x) += 127;}
 #define POTMAX 4095.0f
@@ -85,43 +87,50 @@ void draw_screen(void);
 void update_lead(void) {
 
     // Source
-    cfgnew.osc[0].gain = saved_pots[part][0] / POTMAX;
-    cfgnew.osc[1].gain = saved_pots[part][1] / POTMAX;
-    cfgnew.noise_gain = saved_pots[part][2] / POTMAX;
+    synth.osc[0].gain = saved_pots[part][0] / POTMAX;
+    synth.osc[1].gain = saved_pots[part][1] / POTMAX;
+    synth.noise_gain = saved_pots[part][2] / POTMAX;
 
     // Env1
     float attack = saved_pots[part][3]/POTMAX + MIN_ATTACK;
-    cfgnew.attack_rate = 1.0f/(attack * SAMPLE_RATE);
-
+    synth.env[0].attack = 1.0f/(attack * SAMPLE_RATE);
     float decay = saved_pots[part][4]/POTMAX + DECAY_MIN;
-    cfgnew.decay_rate = LEAD_DECAY_CONST / (decay * decay * decay);
-    cfgnew.release_rate = cfgnew.decay_rate;
+    synth.env[0].decay = LEAD_DECAY_CONST / (decay * decay * decay);
+    synth.env[0].release = synth.env[0].decay;
+    synth.env[0].sustain = saved_pots[part][5]/POTMAX;
 
-    cfgnew.sustain_level = saved_pots[part][5]/POTMAX;
+    // Env2
+    attack = saved_pots[part][6]/POTMAX + MIN_ATTACK;
+    synth.env[1].attack = 1.0f/(attack * SAMPLE_RATE);
+    decay = saved_pots[part][7]/POTMAX + DECAY_MIN;
+    synth.env[1].decay = LEAD_DECAY_CONST / (decay * decay * decay);
+    synth.env[1].release = synth.env[1].decay;
+    synth.env[1].sustain = saved_pots[part][8]/POTMAX;
+
     
     // Filter
-    cfgnew.cutoff = 10000.0f * (saved_pots[part][9] / POTMAX);
-    cfgnew.resonance = 3.99f * (saved_pots[part][10] / POTMAX);
-    cfgnew.env_mod = 5000.0f * (saved_pots[part][11]/ POTMAX);
+    synth.cutoff = 10000.0f * (saved_pots[part][9] / POTMAX);
+    synth.resonance = 3.99f * (saved_pots[part][10] / POTMAX);
+    synth.env_mod = 5000.0f * (saved_pots[part][11]/ POTMAX);
 
 }
 
 void update_drums(void) {
 
-    cfgnew.bass_pitch = 0.0005f + 0.0015f * (saved_pots[PART_DRUMS][0] / POTMAX);
-    cfgnew.bass_click = 0.02f + 0.5f * (saved_pots[PART_DRUMS][1] / POTMAX);
-    cfgnew.bass_punch = 0.0002f * (saved_pots[PART_DRUMS][2] / POTMAX);
+    synth.bass_pitch = 0.0005f + 0.0015f * (saved_pots[PART_DRUMS][0] / POTMAX);
+    synth.bass_click = 0.02f + 0.5f * (saved_pots[PART_DRUMS][1] / POTMAX);
+    synth.bass_punch = 0.0002f * (saved_pots[PART_DRUMS][2] / POTMAX);
 
     float decay = saved_pots[PART_DRUMS][3]/POTMAX + DECAY_MIN;
-    cfgnew.bass_decay = LEAD_DECAY_CONST / (decay * decay * decay);
+    synth.bass_decay = LEAD_DECAY_CONST / (decay * decay * decay);
 
     decay = 0.3f * saved_pots[PART_DRUMS][4]/POTMAX + 0.1f;
-    cfgnew.snare_decay = LEAD_DECAY_CONST / (decay * decay * decay); // FIXME: RANGE
+    synth.snare_decay = LEAD_DECAY_CONST / (decay * decay * decay); // FIXME: RANGE
 
-    cfgnew.snare_tone = saved_pots[PART_DRUMS][5]/POTMAX;
+    synth.snare_tone = saved_pots[PART_DRUMS][5]/POTMAX;
 
-    cfgnew.clap_decay = 0.0004f + 0.0016f * saved_pots[PART_DRUMS][6]/POTMAX;
-    cfgnew.clap_filt = 3000.0f * saved_pots[PART_DRUMS][8]/POTMAX;
+    synth.clap_decay = 0.0004f + 0.0016f * saved_pots[PART_DRUMS][6]/POTMAX;
+    synth.clap_filt = 3000.0f * saved_pots[PART_DRUMS][8]/POTMAX;
 
 
 }
@@ -178,9 +187,6 @@ void ui_update(void) {
     }
 
 
-
-
-
     if (btn) {
 
 
@@ -188,18 +194,22 @@ void ui_update(void) {
 
             // Oscillator select
             if (buttons[BTN_OSC_SEL] == BTN_DOWN) {
-                selected_osc++;
-                selected_osc %= NUM_OSCILLATOR;
+                this_osc++;
+                this_osc %= NUM_OSCILLATOR + 1;
                 redraw = true;
             }
 
             // Oscillator waveform
             if (buttons[BTN_OSC_WAVE] == BTN_DOWN) {
-                Wave new = cfgnew.osc[selected_osc].waveform;
-                new++;
-                new %= NUM_WAVE;
-                cfgnew.osc[selected_osc].waveform = new;
-                redraw = true;
+                if (this_osc == OSC_BOTH) {
+                    Wave new = (synth.osc[0].waveform + 1) % NUM_WAVE;
+                    synth.osc[0].waveform = new;
+                    synth.osc[1].waveform = new;
+                } else {
+                    Wave new = (synth.osc[this_osc].waveform + 1) % NUM_WAVE;
+                    synth.osc[this_osc].waveform = new;
+                }
+                    redraw = true;
             }
 
             // Oscillator mod
@@ -275,15 +285,28 @@ void ui_update(void) {
                     break;
 
                 case UI_OSC_MOD:
-                    MAP_ENCODER_CLAMP(input.osc[selected_osc].folding);
-                    cfgnew.osc[selected_osc].folding = 2.0f * (float)input.osc[selected_osc].folding/127;
+                    if (this_osc == OSC_BOTH) {
+                        MAP_ENCODER_CLAMP(input.osc[0].modifier);
+                        input.osc[1].modifier = input.osc[0].modifier;
+                        synth.osc[0].modifier = (float)input.osc[0].modifier/127;
+                        synth.osc[1].modifier = (float)input.osc[1].modifier/127;
+                    } else {
+                        MAP_ENCODER_CLAMP(input.osc[this_osc].modifier);
+                        synth.osc[this_osc].modifier = (float)input.osc[this_osc].modifier/127;
+                    }
                     redraw = true;
                     break;
 
                 case UI_OSC_TUNE:
+                    input.osc[this_osc].detune += encoder.delta;
+                    if ((input.osc[this_osc].detune) > 127) (input.osc[this_osc].detune) = 127;
+                    if ((input.osc[this_osc].detune) < -127) (input.osc[this_osc].detune) = -127;
+                    //synth.osc[this_osc].detune = 1.0f + 0.1f * (float)input.osc[this_osc].detune/127;
+                    const float halfstep = 1.059463f;
+                    float detune = pow(halfstep, input.osc[this_osc].detune);
+                    synth.osc[this_osc].detune = detune;
+                    redraw = true;
                     break;
-
-
             }
 
         }
@@ -294,109 +317,144 @@ void ui_update(void) {
         update_drums();
     }
 
-    // cfgnew.seq_play = true;
+    // synth.seq_play = true;
 
-    // if (cfgnew.seq_play && seq_note_input != 0.0f) {
+    // if (synth.seq_play && seq_note_input != 0.0f) {
     //     seq.note[seq_idx] = seq_note_input;
     // }
 
     
     // Redraw display if required
-    if (enc) redraw = true;
+    //if (enc) redraw = true;
     if (redraw) {
         draw_screen();
         if (display_draw()) redraw = false;
     }
 
-    ctr++;
-    if (ctr == 18) {
-        ctr = 0;
-        beat++;
-        if (beat == 16) beat = 0;
+    // ctr++;
+    // if (ctr == 18) {
+    //     ctr = 0;
+    //     beat++;
+    //     if (beat == 16) beat = 0;
 
-        if (beat == 14) trig_hat_op = true;
-        else if (beat % 2 == 0) trig_hat_cl = true;
+    //     if (beat == 14) trig_hat_op = true;
+    //     else if (beat % 2 == 0) trig_hat_cl = true;
 
-        switch (beat) {
-            case 4: 
-            case 7:
-            case 9:
-            case 12:
-            case 15:
-                trig_snare = true;
-                break;
-            case 0:                
-            case 2:
-            case 10:
-            case 11:
-                trig_bass = true;
-                break;
-            case 14:
-                //trig_clap = true;
-                break;
+    //     switch (beat) {
+    //         // case 4: 
+    //         // case 7:
+    //         // // case 9:
+    //         // // case 12:
+    //         // // case 15:
+    //         //     trig_snare = true;
+    //         //     break;
+    //         case 0:                
+    //         case 3:
+    //         case 11:
+    //             trig_bass = true;
+    //             break;
+    //         // case 8:
+    //         //     trig_clap = true;
+    //         //     break;
 
-        }
-    }
+    //     }
+    // }
 
     
 
     HAL_Delay(5);
 
-
-
-
-
-
-
-
-    //     case PAGE_OSC:
-    //         // // Detune
-    //         // if (encoders[ENC_BLUE].delta) {
-    //         //     ADD_DELTA_CLAMPED(input.osc[ui.selected_osc].detune, encoders[ENC_BLUE].delta);
-    //         //     cfgnew.osc[ui.selected_osc].detune = 1.0f + 0.1f * (float)input.osc[ui.selected_osc].detune/127;
-    //         // }
-    //     case PAGE_FX:
     //         if (encoders[ENC_GREEN].delta) {
     //             ADD_DELTA_CLAMPED(input.fx_damping, encoders[ENC_GREEN].delta);
-    //             cfgnew.fx_damping = (float)input.fx_damping/127;
+    //             synth.fx_damping = (float)input.fx_damping/127;
     //         }
     //         // if (encoders[ENC_BLUE].delta) {
     //         //     ADD_DELTA_CLAMPED(input.fx_amount, encoders[ENC_BLUE].delta);
     //         //     float a = -1.0f / logf(1.0f - 0.3f);
     //         //     float b = 127.0f / (logf(1.0f - 0.98f) * a + 1.0f);
     //         //     float fb = 1.0f - expf(((float)input.fx_amount - b) / (a*b));
-    //         //     cfgnew.fx_combg = fb;
+    //         //     synth.fx_combg = fb;
     //         // }            
     //     case PAGE_LFO:
     //         // if (encoders[ENC_RED].delta) {
     //         //     ADD_DELTA_CLAMPED(input.lfo_rate, encoders[ENC_RED].delta);
-    //         //     cfgnew.lfo_rate = (float)(input.lfo_rate+1) / (6 * SAMPLE_RATE);
+    //         //     synth.lfo_rate = (float)(input.lfo_rate+1) / (6 * SAMPLE_RATE);
     //         // }
     //         if (encoders[ENC_GREEN].delta) {
     //             ADD_DELTA_CLAMPED(input.lfo_amount, encoders[ENC_GREEN].delta);
-    //             cfgnew.lfo_amount = (float)input.lfo_amount/127;
+    //             synth.lfo_amount = (float)input.lfo_amount/127;
     //         }            
 
 }
 
 extern float    env[NUM_VOICE];
 
+uint8_t saw[] = {
+ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0
+,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0
+,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0
+,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,1,1,0,0,0,0,0
+,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,1,1,0,0,0,0,0
+,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,1,1,0,0,0,0,0
+,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0
+,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0
+,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0
+,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0
+,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0
+,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+};
+uint8_t square[] = {
+ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0
+,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0
+,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+};
+uint8_t tri[] = {
+ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0
+,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0
+,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0
+,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,1,1,1,0,0,0,0,0,0,0
+,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,1,1,1,0,0,0,0,0,0
+,0,0,0,0,1,1,1,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,1,1,1,0,0,0,0,0
+,0,0,0,0,0,1,1,1,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0
+,0,0,0,0,0,0,1,1,1,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0
+,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+};
+
+
 void draw_screen(void) {
 
-    char buf[32];
-    char *wave = "";
-
     if (display_busy) return;
-
     draw_rect(0, 0, 128, 64, 0);
 
+    char buf[32];
 
     if (pot_moved != -1) {
         draw_box(16,16,96,32);
 
         sprintf(buf, "%s", pot_names[part][pot_moved]);
         draw_text_cen(64, 18, buf, 1);       
-        sprintf(buf, "Original value");//, pot_moved, pot_sync[pot_moved]);
+        sprintf(buf, "Original value");
         draw_text_cen(64, 34, buf, 1);
     }
 
@@ -408,16 +466,20 @@ void draw_screen(void) {
     }
 
     // Osc
-    sprintf(buf, "Osc %d", selected_osc + 1);
-    draw_text(0, 1, buf, 1);
-
-    switch (cfgnew.osc[selected_osc].waveform) {
-        case WAVE_SAW: wave = "Saw"; break;
-        case WAVE_SQUARE: wave = "Square"; break;
-        case WAVE_TRI: wave = "Tri"; break;
-        default: break;
+    uint8_t *osc_img[2] = {NULL};
+    char *osc_mod[2];
+    for (int i=0; i<2; i++) {
+        switch(synth.osc[i].waveform) {
+            case WAVE_SAW: osc_img[i] = saw; osc_mod[i] = "--"; break;
+            case WAVE_SQUARE: osc_img[i] = square; osc_mod[i] = "Pulse"; break;
+            case WAVE_TRI: osc_img[i] = tri; osc_mod[i] = "Fold"; break;
+            default: break;        
+        }
     }
-    draw_text(64, 1, wave, 1);
+    if (this_osc == 0 || this_osc == OSC_BOTH) draw_box(31, 0, 32, 17);
+    if (this_osc == 1 || this_osc == OSC_BOTH) draw_box(64, 0, 32, 17);
+    draw_image(32, 1, osc_img[0], 30, 15, false);
+    draw_image(65,1, osc_img[1], 30, 15, false);
 
 
     switch (page) {
@@ -425,34 +487,23 @@ void draw_screen(void) {
             break;
 
         case UI_OSC_MOD:
-            sprintf(buf, "Mod: %f", (double)cfgnew.osc[selected_osc].folding);
-            draw_text(0, 16, buf, 1);
+            sprintf(buf, "%d", (int)(127 * synth.osc[0].modifier));
+            draw_text_cen(38, 20, buf, 2);
+            draw_text_cen(38, 50, osc_mod[0], 1);
+            sprintf(buf, "%d", (int)(127 * synth.osc[1].modifier));
+            draw_text_cen(90, 20, buf, 2);
+            draw_text_cen(90, 50, osc_mod[1], 1);
             break;
 
         case UI_OSC_TUNE:
-            sprintf(buf, "Tune: %f", (double)cfgnew.osc[selected_osc].detune);
-            draw_text(0, 16, buf, 1);
+            sprintf(buf, "Tune: %.2f", (double)synth.osc[this_osc].detune);
+            draw_text(0, 16, buf, 2);
             break;
     }
 
-    float load = 100 * (float)(loop_time) / transfer_time;
-    sprintf(buf, "load %.1f", (double)load);
-    draw_text(0, 48, buf, 1);
+    // float load = 100 * (float)(loop_time) / transfer_time;
+    // sprintf(buf, "load %.1f", (double)load);
+    // draw_text(0, 48, buf, 1);
 
-
-
-
-    //         if (cfg.osc[ui.selected_osc].waveform == WAVE_SAW) {
-    //             wave = "Saw";
-    //         } else if (cfg.osc[ui.selected_osc].waveform == WAVE_SQUARE) {
-    //             wave = "Square";
-    //             draw_text_cen(96, 16, "SYMMETRY", 1, CGRN);
-    //             draw_gauge(96, 52, input.osc[ui.selected_osc].duty / 127.0f, CGRN);
-    //         } else {
-    //             wave = "Tri";
-    //             draw_text_cen(96, 16, "FOLDING", 1, CGRN);
-    //             draw_gauge(96, 52, input.osc[ui.selected_osc].folding / 127.0f, CGRN);                
-    //         }
-    //         draw_text_cen(32,  40, wave,  1, CRED);
 }
 

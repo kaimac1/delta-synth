@@ -11,7 +11,7 @@ extern int16_t sine_table[SINE_TABLE_SIZE];
 
 
 #define MAX_ARP 5
-#define NUM_VOICE 5
+#define NUM_VOICE 6
 #define NUM_OSCILLATOR 2
 #define NUM_ENV 2
 

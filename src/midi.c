@@ -37,29 +37,42 @@ void midi_process_byte(uint8_t byte) {
 
 
 void poly_add(float freq) {
+
+    static int st = 0;
+
     int idx = -1;
     synth.busy = true;
     for (int i=0; i<NUM_VOICE; i++) {
-        if (synth.key[i] == false) idx = i;
-        if (synth.key[i] && synth.freq[i] == freq) {
+        int n = i + st;
+        n %= NUM_VOICE;
+
+        if (synth.key[n] == false) {
+            idx = n;
+            break;
+        }
+        if (synth.key[n] && synth.freq[n] == freq) {
             // Note already on
-            idx = i;
+            idx = n;
             break;
         }
     }
     if (idx < 0) {
-        idx = 0;
+        idx = st;
         synth.key_retrigger[idx] = true;
     }
     if (idx >= 0) {
         synth.freq[idx] = freq;
         synth.key[idx] = true;
         synth.key_retrigger[idx] = true;
+        st++;
+        st %= NUM_VOICE;
     }
     synth.busy = false;
+
 }
 
 void poly_del(float freq) {
+
     synth.busy = true;
     for (int i=0; i<NUM_VOICE; i++) {
         if (synth.freq[i] == freq) {
@@ -68,6 +81,7 @@ void poly_del(float freq) {
         }
     }
     synth.busy = false;
+
 }
 
 

@@ -89,7 +89,7 @@ void update_lead(void) {
     // Source
     synth.osc[0].gain = saved_pots[part][0] / POTMAX;
     synth.osc[1].gain = saved_pots[part][1] / POTMAX;
-    synth.noise_gain = saved_pots[part][2] / POTMAX;
+    synth.noise_gain = 0.0f;//saved_pots[part][2] / POTMAX;
 
     // Env1
     float attack = saved_pots[part][3]/POTMAX + MIN_ATTACK;
@@ -106,6 +106,13 @@ void update_lead(void) {
     synth.env[1].decay = LEAD_DECAY_CONST / (decay * decay * decay);
     synth.env[1].release = synth.env[1].decay;
     synth.env[1].sustain = saved_pots[part][8]/POTMAX;
+
+    float fx_amount = saved_pots[part][2]/POTMAX * 127.0f;
+    float a = -1.0f / logf(1.0f - 0.3f);
+    float b = 127.0f / (logf(1.0f - 0.98f) * a + 1.0f);
+    float fb = 1.0f - expf((fx_amount - b) / (a*b));
+    synth.fx_combg = fb;
+
 
     
     // Filter
@@ -326,6 +333,7 @@ void ui_update(void) {
     
     // Redraw display if required
     //if (enc) redraw = true;
+    redraw = true;
     if (redraw) {
         draw_screen();
         if (display_draw()) redraw = false;
@@ -500,6 +508,9 @@ void draw_screen(void) {
             draw_text(0, 16, buf, 2);
             break;
     }
+
+    sprintf(buf, "%d %d %d %d %d %d", synth.key[0], synth.key[1], synth.key[2], synth.key[3], synth.key[4], synth.key[5]);
+    draw_text(0, 32, buf, 1);
 
     // float load = 100 * (float)(loop_time) / transfer_time;
     // sprintf(buf, "load %.1f", (double)load);

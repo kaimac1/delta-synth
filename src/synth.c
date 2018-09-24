@@ -209,6 +209,22 @@ float polyblep(float t, float dt) {
 #define DELAY_LINE_PUT(name, value) name.dl[name.idx--] = value; if (name.idx < 0) name.idx += name##_len;
 #define DELAY_LINE_GET(name) name.dl[name.idx]
 #define COMB_PUT(name, value) {comb_result = DELAY_LINE_GET(name); name.s = comb_result + (name.s - comb_result)*cfg.fx_damping; DELAY_LINE_PUT(name, value + cfg.fx_combg * name.s);}
+#define ALLPASS_PUT(name, value) {allpass_result = DELAY_LINE_GET(name) + ALLPASS_G * value; DELAY_LINE_PUT(value - ALLPASS_G * allpass_result);}
+
+
+DELAY_LINE(allpass1, 225);
+DELAY_LINE(allpass2, 341);
+DELAY_LINE(allpass3, 441);
+DELAY_LINE(allpass4, 556);
+DELAY_LINE(comb1, 1116);
+DELAY_LINE(comb2, 1188);
+DELAY_LINE(comb3, 1277);
+DELAY_LINE(comb4, 1356);
+DELAY_LINE(comb5, 1422);
+DELAY_LINE(comb6, 1491);
+DELAY_LINE(comb7, 1557);
+DELAY_LINE(comb8, 1617);
+
 
 // DELAY_LINE(comb1, 781);
 // DELAY_LINE(comb2, 831);
@@ -218,7 +234,9 @@ float polyblep(float t, float dt) {
 // DELAY_LINE(comb6, 1043);
 // DELAY_LINE(comb7, 1089);
 // DELAY_LINE(comb8, 1131);
- DELAY_LINE(comb8, 2000);
+
+
+//DELAY_LINE(delay1, 20000);
 
  float f2[NUM_VOICE];
 
@@ -228,6 +246,7 @@ inline void fill_buffer(void) {
         
         float s = 0.0f;
         float comb_result = 0.0f;
+        float allpass_result = 0.0f;
 
         // // LFO
         // lfo_nco += cfg.lfo_rate;
@@ -343,28 +362,29 @@ inline void fill_buffer(void) {
 
         float fx = 0.0f;
 
-        // COMB_PUT(comb1, s);
-        // fx += comb_result;
-        // COMB_PUT(comb2, s);
-        // fx += comb_result;
-        // COMB_PUT(comb3, s);
-        // fx += comb_result;
-        // COMB_PUT(comb4, s);
-        // fx += comb_result;
-        // COMB_PUT(comb5, s);
-        // fx += comb_result;
-        // COMB_PUT(comb6, s);
-        // fx += comb_result;
-        // COMB_PUT(comb7, s);
-        // fx += comb_result;
-        // COMB_PUT(comb8, s);
-        // fx += comb_result;
+        COMB_PUT(comb1, s);
+        fx += comb_result;
+        COMB_PUT(comb2, s);
+        fx += comb_result;
+        COMB_PUT(comb3, s);
+        fx += comb_result;
+        COMB_PUT(comb4, s);
+        fx += comb_result;
+        COMB_PUT(comb5, s);
+        fx += comb_result;
+        COMB_PUT(comb6, s);
+        fx += comb_result;
+        COMB_PUT(comb7, s);
+        fx += comb_result;
+        COMB_PUT(comb8, s);
+        fx += comb_result;
 
-        // fx = DELAY_LINE_GET(comb8);
-        // DELAY_LINE_PUT(comb8, s + fx * 0.75f);
+        // fx += DELAY_LINE_GET(delay1);
+        // DELAY_LINE_PUT(delay1, s + fx * 0.75f);
 
-        // fx *= 0.2f;
-        // s = fx + s;
+
+        fx *= 0.25f;
+        s = fx + s;
 
         
 
@@ -570,7 +590,7 @@ void synth_start(void) {
     cfg.resonance = 0.0;
     cfg.env_mod = 0.0;
     
-    cfg.fx_damping = 0.5;
+    cfg.fx_damping = 0.3f;
     cfg.fx_combg = 0.881678f;
 
     cfg.lfo_rate = 1.0f;

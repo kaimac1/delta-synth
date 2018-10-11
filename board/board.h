@@ -31,12 +31,13 @@ void pin_set(GPIO_TypeDef *port, uint32_t pin, bool state);
 bool pin_read(GPIO_TypeDef *port, uint32_t pin);
 
 // input
-#define NUM_BUTTONS 16
+#define NUM_BUTTONS 17
 typedef enum {
     BTN_OSC_SEL = 0,
     BTN_OSC_WAVE,
     BTN_OSC_MOD,
-    BTN_OSC_TUNE
+    BTN_OSC_TUNE,
+    BTN_ENCODER = 16
 } ButtonName;
 
 typedef enum {
@@ -51,6 +52,7 @@ typedef struct {
     int value;
     int last_value;
     int delta;
+    int half_delta;
 } EncoderState;
 extern EncoderState encoder;
 

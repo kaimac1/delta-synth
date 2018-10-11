@@ -11,9 +11,11 @@ extern int16_t sine_table[SINE_TABLE_SIZE];
 
 
 #define MAX_ARP 5
+
 #define NUM_VOICE 6
 #define NUM_OSCILLATOR 2
 #define NUM_ENV 2
+#define NUM_LFO 1
 
 
 typedef enum {
@@ -43,7 +45,6 @@ typedef struct {
     Wave waveform;
     float modifier;
     float detune;
-    float gain;
 } Oscillator;
 
 typedef struct {
@@ -52,6 +53,11 @@ typedef struct {
     float sustain;
     float release;
 } ADSR;
+
+typedef struct {
+    float rate;
+    float amount;
+} LFO;
 
 
 typedef struct {
@@ -73,6 +79,7 @@ typedef struct {
 
     // Oscillators
     Oscillator osc[NUM_OSCILLATOR];
+    float osc_balance;
     float noise_gain;
 
     // Envelope settings
@@ -84,8 +91,7 @@ typedef struct {
     float env_mod;      // Hz at max env
 
     // LFO
-    float lfo_rate;
-    float lfo_amount;
+    LFO lfo[NUM_LFO];
 
     // FX
     float fx_damping;

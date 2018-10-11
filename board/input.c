@@ -36,6 +36,9 @@ void input_init(void) {
 #define MOSI_PORT   GPIOB
 #define MOSI_PIN    LL_GPIO_PIN_15
 
+#define BTN_ENC_PORT GPIOC
+#define BTN_ENC_PIN  LL_GPIO_PIN_6
+
 ButtonState buttons[NUM_BUTTONS];
 
 uint8_t spi_tx(uint8_t byte) {
@@ -80,7 +83,9 @@ void gpio_init(void) {
     pin_set(CS_PORT, CS_PIN, 1);
     pin_cfg_af(SCK_PORT, SCK_PIN, 5);
     pin_cfg_af(MOSI_PORT, MOSI_PIN, 5);
-    pin_cfg_af(MISO_PORT, MISO_PIN, 5);    
+    pin_cfg_af(MISO_PORT, MISO_PIN, 5);
+
+    pin_cfg_input(BTN_ENC_PORT, BTN_ENC_PIN, LL_GPIO_PULL_UP);
 
     // SPI init
     LL_SPI_InitTypeDef spi;
@@ -120,7 +125,13 @@ bool read_buttons(void) {
     bool changed = false;
 
     for (int i=0; i<NUM_BUTTONS; i++) {
-        bool pressed = switches & (1 << i);
+        bool pressed;
+
+        if (i < 16) {
+            pressed = switches & (1 << i);
+        } else if (i == 16) {
+            pressed = !pin_read(BTN_ENC_PORT, BTN_ENC_PIN);
+        }
 
         switch (buttons[i]) {
             case BTN_OFF:
@@ -165,6 +176,7 @@ bool read_buttons(void) {
 #define ENCODER_PIN_A   LL_GPIO_PIN_11
 #define ENCODER_PIN_B   LL_GPIO_PIN_12
 
+
 int enc_states[16] = {0, -1, 1, 0, 1, 0, 0, -1, -1, 0, 0, 1, 0, 1, -1, 0};
 uint8_t enc_history;
 EncoderState encoder;
@@ -189,9 +201,12 @@ bool read_encoder(void) {
 
     bool changed = false;
 
-    encoder.delta = encoder.value - encoder.last_value;
+    int ev = encoder.value;
+
+    encoder.delta = ev - encoder.last_value;
+    encoder.half_delta = (ev/2) - (encoder.last_value/2);
     if (encoder.delta != 0) changed = true;
-    encoder.last_value = encoder.value;
+    encoder.last_value = ev;
 
     return changed;
 
@@ -199,8 +214,11 @@ bool read_encoder(void) {
 
 void EXTI15_10_IRQHandler(void) {
 
-    LL_EXTI_ClearFlag_0_31(LL_EXTI_LINE_ALL);
     uint32_t port = ENCODER_PORT->IDR;
+
+    if (LL_EXTI_IsActiveFlag_0_31(LL_EXTI_LINE_11)) LL_EXTI_ClearFlag_0_31(LL_EXTI_LINE_11);
+    if (LL_EXTI_IsActiveFlag_0_31(LL_EXTI_LINE_12)) LL_EXTI_ClearFlag_0_31(LL_EXTI_LINE_12);
+
     int inca = !!(port & ENCODER_PIN_A);
     int incb = !!(port & ENCODER_PIN_B);
     enc_history <<= 2;

@@ -27,7 +27,7 @@ Filter filter[NUM_VOICE];
 Envelope env[NUM_VOICE][NUM_ENV];
 
 float nco[NUM_VOICE][NUM_OSCILLATOR];
-float lfo_nco;
+float lfo_nco[NUM_LFO];
 uint32_t next_beat = 0;
 int      arp_note = 0;
 int seq_note = 0;
@@ -209,13 +209,13 @@ float polyblep(float t, float dt) {
 #define DELAY_LINE_PUT(name, value) name.dl[name.idx--] = value; if (name.idx < 0) name.idx += name##_len;
 #define DELAY_LINE_GET(name) name.dl[name.idx]
 #define COMB_PUT(name, value) {comb_result = DELAY_LINE_GET(name); name.s = comb_result + (name.s - comb_result)*cfg.fx_damping; DELAY_LINE_PUT(name, value + cfg.fx_combg * name.s);}
-#define ALLPASS_PUT(name, value) {allpass_result = DELAY_LINE_GET(name) + ALLPASS_G * value; DELAY_LINE_PUT(value - ALLPASS_G * allpass_result);}
+#define ALLPASS_PUT(name, value) {allpass_result = DELAY_LINE_GET(name) + ALLPASS_G * value; DELAY_LINE_PUT(name, value - ALLPASS_G * allpass_result);}
 
 
 DELAY_LINE(allpass1, 225);
-DELAY_LINE(allpass2, 341);
+DELAY_LINE(allpass2, 556);
 DELAY_LINE(allpass3, 441);
-DELAY_LINE(allpass4, 556);
+DELAY_LINE(allpass4, 341);
 DELAY_LINE(comb1, 1116);
 DELAY_LINE(comb2, 1188);
 DELAY_LINE(comb3, 1277);
@@ -225,20 +225,21 @@ DELAY_LINE(comb6, 1491);
 DELAY_LINE(comb7, 1557);
 DELAY_LINE(comb8, 1617);
 
-
-// DELAY_LINE(comb1, 781);
-// DELAY_LINE(comb2, 831);
-// DELAY_LINE(comb3, 893);
-// DELAY_LINE(comb4, 949);
-// DELAY_LINE(comb5, 995);
-// DELAY_LINE(comb6, 1043);
-// DELAY_LINE(comb7, 1089);
-// DELAY_LINE(comb8, 1131);
+// DELAY_LINE(comb1, 1116);
+// DELAY_LINE(comb2, 1188);
+// DELAY_LINE(comb3, 1277);
+// DELAY_LINE(comb4, 1356);
+// DELAY_LINE(comb5, 1422);
+// DELAY_LINE(comb6, 1491);
+// DELAY_LINE(comb7, 1557);
+// DELAY_LINE(comb8, 1617);
 
 
 //DELAY_LINE(delay1, 20000);
 
  float f2[NUM_VOICE];
+ float xn1 = 0.0f;
+ float yn1 = 0.0f;
 
 inline void fill_buffer(void) {
 
@@ -247,13 +248,16 @@ inline void fill_buffer(void) {
         float s = 0.0f;
         float comb_result = 0.0f;
         float allpass_result = 0.0f;
+        float lfo_out;
 
-        // // LFO
-        // lfo_nco += cfg.lfo_rate;
-        // if (lfo_nco > 1.0f) lfo_nco -= 1.0f;
-        // float lfo_out = (lfo_nco < 0.5f) ? lfo_nco : 1.0f - lfo_nco;
-        // //lfo_out = cfg.lfo_amount*(4.0f * lfo_out - 1.0f);
-        // lfo_out = 1.0f + cfg.lfo_amount*(2.0f * lfo_out - 0.5f);
+        // LFO
+        for (int id=0; id<NUM_LFO; id++) {
+            lfo_nco[id] += cfg.lfo[id].rate;
+            if (lfo_nco[id] > 1.0f) lfo_nco[id] -= 1.0f;
+            lfo_out = (lfo_nco[id] < 0.5f) ? lfo_nco[id] : 1.0f - lfo_nco[id];
+            //lfo_out = cfg.lfo_amount*(4.0f * lfo_out - 1.0f);
+            lfo_out = 1.0f + cfg.lfo[id].amount*(2.0f * lfo_out - 0.5f);
+        }
 
 
         for (int voice=0; voice<NUM_VOICE; voice++) {
@@ -269,7 +273,7 @@ inline void fill_buffer(void) {
                 // Advance oscillator phase according to (detuned) frequency
 
                 float freq = (cfg.osc[osc].detune) * f2[voice];
-                //freq *= lfo_out;
+                freq *= lfo_out;
                 nco[voice][osc] += freq;
                 if (nco[voice][osc] > 1.0f) nco[voice][osc] -= 1.0f;
                 float phase = nco[voice][osc];
@@ -301,7 +305,7 @@ inline void fill_buffer(void) {
                     else if (s1 < -fold) s1 = -fold - (s1-fold);
                 }
 
-                osc_mix += s1 * cfg.osc[osc].gain;
+                osc_mix += (osc == 0) ? ((1.0f - cfg.osc_balance) * s1) : (cfg.osc_balance * s1);
             }
 
             // Noise
@@ -358,10 +362,13 @@ inline void fill_buffer(void) {
         s /= (float)NUM_VOICE;
 
 
+        s += whitenoise() * 0.001f; // Dither
+
         //s += sample_drums();
 
         float fx = 0.0f;
 
+        // Parallel comb filter bank
         COMB_PUT(comb1, s);
         fx += comb_result;
         COMB_PUT(comb2, s);
@@ -379,18 +386,33 @@ inline void fill_buffer(void) {
         COMB_PUT(comb8, s);
         fx += comb_result;
 
+        // Serial allpass
+        ALLPASS_PUT(allpass1, fx);
+        ALLPASS_PUT(allpass2, allpass_result);
+        ALLPASS_PUT(allpass3, allpass_result);
+        ALLPASS_PUT(allpass4, allpass_result);
+        s = 0.5f * allpass_result + s;
+
+        // simple delay
         // fx += DELAY_LINE_GET(delay1);
         // DELAY_LINE_PUT(delay1, s + fx * 0.75f);
 
 
-        fx *= 0.25f;
-        s = fx + s;
-
         
 
-        s += whitenoise() * 0.001f; // Dither
+        //if (s > 6.0f) s = 6.0f;
+        //if (s < -6.0f) s = -6.0f;
 
-        int16_t s16 = s * 700;
+        // DC filter
+        const float r = 0.997f;
+        float y = s - xn1 + r * yn1;
+        xn1 = s;
+        yn1 = y;
+
+
+        if (y > 30.0f) y = 30.0f + (y-30.0f)*0.1f;
+        if (y < -30.0f) y = -30.0f - (-30.0f-y)*0.1f;
+        int16_t s16 = y * 500;
 
         out_buffer[j] = s16;   // left
         out_buffer[j+1] = s16; // right        
@@ -566,14 +588,11 @@ void synth_start(void) {
 
     cfg.osc[0].waveform = WAVE_SQUARE;
     cfg.osc[0].modifier = 0.0f;
-    cfg.osc[0].gain = 1.0f;
     cfg.osc[0].detune = 1.0f;
-
     cfg.osc[1].waveform = WAVE_SQUARE;
     cfg.osc[1].modifier = 0.0f;
-    cfg.osc[1].gain = 0.5f;
     cfg.osc[1].detune = 1.0f;    
-
+    cfg.osc_balance = 0.5f;
     cfg.noise_gain = 0.0f;
 
     cfg.env[0].attack  = 0.0005;
@@ -593,8 +612,8 @@ void synth_start(void) {
     cfg.fx_damping = 0.3f;
     cfg.fx_combg = 0.881678f;
 
-    cfg.lfo_rate = 1.0f;
-    cfg.lfo_amount = 0.01f;
+    cfg.lfo[0].rate = 0.0f;
+    cfg.lfo[0].amount = 0.0f;
 
     memcpy(&synth, &cfg, sizeof(SynthConfig));
 

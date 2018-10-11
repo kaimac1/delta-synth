@@ -26,8 +26,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef *huart) {
     } else if (huart == &h_uart_midi) {
         __HAL_RCC_USART6_CLK_ENABLE();
 
-        pin_cfg_af(MIDI_PORT, MIDI_TX_PIN, MIDI_AF);
-        pin_cfg_af(MIDI_PORT, MIDI_RX_PIN, MIDI_AF);        
+        pin_cfg_af(MIDI_PORT, MIDI_RX_PIN, MIDI_AF);
         HAL_NVIC_SetPriority(USART6_IRQn, PRIORITY_MIDI, 0);
         HAL_NVIC_EnableIRQ(USART6_IRQn);        
     }

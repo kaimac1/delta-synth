@@ -3,6 +3,7 @@
 #include "stm32f4xx_ll_i2c.h"
 #include "stm32f4xx_ll_dma.h"
 #include "stm32f4xx_ll_rcc.h"
+#include "stm32f4xx_ll_adc.h"
 
 #include "font.h"
 #include <string.h>
@@ -107,6 +108,12 @@ bool display_draw(void) {
     if (display_busy) return false;
     display_busy = true;
 
+    /*LL_ADC_Disable(ADC1);
+    LL_DMA_DisableStream(DMA2, LL_DMA_STREAM_0); 
+    LL_DMA_ClearFlag_HT0(DMA2);
+    LL_DMA_ClearFlag_TC0(DMA2);
+    LL_DMA_ClearFlag_TE0(DMA2);    */
+
     ssd1306_command(SSD1306_COLUMNADDR);
     ssd1306_command(0);   // Column start address
     ssd1306_command(127); // Column end address
@@ -142,6 +149,12 @@ void DMA1_Stream6_IRQHandler(void) {
     LL_DMA_ClearFlag_TE6(DMA1);
     
     LL_I2C_GenerateStopCondition(DISPLAY_I2C);    
+
+    // Re-enable ADCs
+    /*LL_DMA_EnableStream(DMA2, LL_DMA_STREAM_0);  
+    LL_ADC_Enable(ADC1);
+    LL_ADC_REG_StartConversionSWStart(ADC1);   */
+
     
     display_busy = false;
 
@@ -170,35 +183,35 @@ void build_font_index(void) {
 
 }
 
-void draw_text_cen(uint16_t x, uint16_t y, char* text, int size) {
+void draw_text_cen(uint16_t x, uint16_t y, char* text, bool inv) {
 
     uint16_t xlen = 0;
     int len = strlen(text);
 
     for (int i=0; i<len; i++) {
         uint8_t c = text[i] - FONT_FIRST_CHAR;
-        xlen += (font_widths[c] + 1)*size;
+        xlen += font_widths[c] + 1;
     }
 
-    draw_text(x-xlen/2, y, text, size);
+    draw_text(x-xlen/2, y, text, inv);
 
 }
 
-void draw_text_rj(uint16_t x, uint16_t y, char* text, int size) {
+void draw_text_rj(uint16_t x, uint16_t y, char* text, bool inv) {
 
     uint16_t xlen = 0;
     int len = strlen(text);
 
     for (int i=0; i<len; i++) {
         uint8_t c = text[i] - FONT_FIRST_CHAR;
-        xlen += (font_widths[c] + 1)*size;
+        xlen += font_widths[c] + 1;
     }
 
-    draw_text(x-xlen, y, text, size);
+    draw_text(x-xlen, y, text, inv);
 
 }
 
-void draw_text(uint16_t x, uint16_t y, char* text, int size) {
+void draw_text(uint16_t x, uint16_t y, char* text, bool inv) {
 
     uint16_t xoffs = x;
     int len = strlen(text);
@@ -214,34 +227,20 @@ void draw_text(uint16_t x, uint16_t y, char* text, int size) {
             uint8_t data = font_data[font_index[c] + px];
             for (int py=0; py<FONT_HEIGHT; py++) {
                 uint16_t col = data & (1<<py);
-                if (size == 1) {
-                    draw_pixel(xoffs+px, y+py, col);
-                } else {
-                    for (int sx=0; sx<size; sx++) {
-                        for (int sy=0; sy<size; sy++) {
-                            draw_pixel(xoffs+px*size+sx, y+py*size+sy, col);
-                        }
-                    }
-                }
+                if (inv) col = !col;
+                draw_pixel(xoffs+px, y+py, col);
             }
 
             // bottom 4
             data = font_data[font_index[c] + char_width + px];
             for (int py=0; py<4; py++) {
                 uint16_t col = data & (0x10<<py);
-                if (size == 1) {
-                    draw_pixel(xoffs+px, y+py+8, col);
-                } else {
-                    for (int sx=0; sx<size; sx++) {
-                        for (int sy=0; sy<size; sy++) {
-                            draw_pixel(xoffs+px*size+sx, y+(py+8)*size+sy, col);
-                        }
-                    }
-                }
+                if (inv) col = !col;
+                draw_pixel(xoffs+px, y+py+8, col);
             }
         }
 
-        xoffs += (char_width + 1)*size; // 1px space between characters
+        xoffs += char_width + 1; // 1px space between characters
 
     }
 }

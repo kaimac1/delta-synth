@@ -35,8 +35,9 @@ bool pin_read(GPIO_TypeDef *port, uint32_t pin);
 typedef enum {
     BTN_OSC_SEL = 0,
     BTN_OSC_WAVE,
-    BTN_OSC_MOD,
     BTN_OSC_TUNE,
+    BTN_ENV_SEL,
+    BTN_EDIT = 15,
     BTN_ENCODER = 16
 } ButtonName;
 
@@ -70,9 +71,9 @@ void draw_pixel(uint16_t x, uint16_t y, bool col);
 void draw_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, bool fillcolor);
 void draw_box(uint16_t x, uint16_t y, uint16_t w, uint16_t h);
 void draw_line(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, bool col);
-void draw_text(uint16_t x, uint16_t y, char* text, int size);
-void draw_text_rj(uint16_t x, uint16_t y, char* text, int size);
-void draw_text_cen(uint16_t x, uint16_t y, char* text, int size);
+void draw_text(uint16_t x, uint16_t y, char* text, bool inv);
+void draw_text_rj(uint16_t x, uint16_t y, char* text, bool inv);
+void draw_text_cen(uint16_t x, uint16_t y, char* text, bool inv);
 void draw_image(uint16_t x, uint16_t y, uint8_t *array, uint16_t w, uint16_t h, bool invert);
 void build_font_index(void);
 extern volatile bool display_busy;

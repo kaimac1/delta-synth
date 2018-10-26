@@ -17,7 +17,7 @@ extern int16_t sine_table[SINE_TABLE_SIZE];
 #define NUM_ENV 2
 #define NUM_LFO 1
 
-
+// Envelope generator state
 typedef enum {
     ENV_ATTACK,
     ENV_DECAY,
@@ -25,8 +25,18 @@ typedef enum {
     ENV_RELEASE
 } EnvState;
 
+// Envelope destination
+typedef enum {
+    ENVDEST_DUMMY = -1, // So that the enum is signed.
+    ENVDEST_AMP = 0,
+    ENVDEST_PITCH_OSC1,
+    ENVDEST_PITCH_BOTH,
+    ENVDEST_MOD_OSC1,
+    ENVDEST_MOD_BOTH,
+    NUM_ENVDEST
+} EnvDest;
 
-
+// Oscillator waveform
 typedef enum {
     WAVE_TRI,
     WAVE_SQUARE,
@@ -41,12 +51,14 @@ typedef enum {
     ARP_UP_DOWN,
 } ArpMode;
 
+// Oscillator settings
 typedef struct {
     Wave waveform;
     float modifier;
     float detune;
 } Oscillator;
 
+// Envelope generator settings
 typedef struct {
     float attack;
     float decay;
@@ -54,10 +66,12 @@ typedef struct {
     float release;
 } ADSR;
 
+// LFO settings
 typedef struct {
     float rate;
     float amount;
 } LFO;
+
 
 
 typedef struct {
@@ -84,6 +98,8 @@ typedef struct {
 
     // Envelope settings
     ADSR env[NUM_ENV];
+    EnvDest env_dest[NUM_ENV];
+    float env_amount[NUM_ENV];
     
     // Filter
     float cutoff;       // fs
@@ -96,6 +112,7 @@ typedef struct {
     // FX
     float fx_damping;
     float fx_combg;
+    float fx_wet;
 
     // Drums
     float bass_pitch;

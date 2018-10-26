@@ -25,9 +25,9 @@ typedef struct {
 
 Filter filter[NUM_VOICE];
 Envelope env[NUM_VOICE][NUM_ENV];
-
 float nco[NUM_VOICE][NUM_OSCILLATOR];
 float lfo_nco[NUM_LFO];
+
 uint32_t next_beat = 0;
 int      arp_note = 0;
 int seq_note = 0;
@@ -46,15 +46,6 @@ int16_t sine_table[SINE_TABLE_SIZE];
 
 inline void sequencer_update(void);
 inline void fill_buffer(void);
-inline float sample_drums(void);
-
-int wn = 1;
-inline float whitenoise(void) {
-    wn *= 16807;
-    return (float)wn * 4.6566129e-010f;
-}
-
-
 
 
 /******************************************************************************/
@@ -74,8 +65,6 @@ void HAL_I2S_TxCpltCallback(I2S_HandleTypeDef *hi2s) {
     audio_change_buffer(out_buffer, OUT_BUFFER_SAMPLES);
     out_buffer = (out_buffer == out_buffer_1) ? out_buffer_2 : out_buffer_1;
 
-    pin_set(GPIOA, 1<<5, 0);
-
     // Copy new settings: synth -> cfg
     if (!synth.busy) {
         memcpy(&cfg, &synth, sizeof(SynthConfig));
@@ -86,7 +75,7 @@ void HAL_I2S_TxCpltCallback(I2S_HandleTypeDef *hi2s) {
         // }
     }
 
-    sequencer_update();
+    //sequencer_update();
     fill_buffer();
 
     if (i++ > 50) {
@@ -133,7 +122,14 @@ inline void sequencer_update(void) {
 
 }
 
+/******************************************************************************/
+// SYNTHESIS BLOCKS
+/******************************************************************************/
 
+/******************************************************************************/
+// 4-pole low-pass filter.
+// cutoff is in Hz.
+// peak : 0-3.99 (resonance)
 inline float ladder_filter(Filter * f, float in, float cutoff, float peak) {
 
     float a = PI * cutoff/SAMPLE_RATE;
@@ -168,6 +164,8 @@ inline float ladder_filter(Filter * f, float in, float cutoff, float peak) {
 
 }
 
+
+// Basic bandpass filter (unused, was used for drums)
 inline float bandpass(Filter *f, float in, float cutoff) {
 
     float a = PI * cutoff/SAMPLE_RATE;
@@ -184,6 +182,16 @@ inline float bandpass(Filter *f, float in, float cutoff) {
 
     return out;
 }
+
+
+/******************************************************************************/
+// White noise
+int wn = 1;
+inline float whitenoise(void) {
+    wn *= 16807;
+    return (float)wn * 4.6566129e-010f;
+}
+
 
 /******************************************************************************/
 // PolyBLEP (polynomial band-limited step)
@@ -202,15 +210,54 @@ float polyblep(float t, float dt) {
     }
 }
 
+
+/******************************************************************************/
+// ADSR envelope generator
+inline float envelope(Envelope *e, bool gate, ADSR *adsr) {
+
+    if (gate) {
+        if (e->state == ENV_RELEASE) {
+            e->state = ENV_ATTACK;
+        }
+
+        if (e->state == ENV_ATTACK) {
+            e->level += adsr->attack;
+            if (e->level > 1.0f) {
+                e->level = 1.0f;
+                e->state = ENV_DECAY;
+            }
+        } else if (e->state == ENV_DECAY) {
+            e->level += adsr->decay * (adsr->sustain - ENV_OVERSHOOT - e->level);
+            if (e->level < adsr->sustain) {
+                e->level = adsr->sustain;
+                e->state = ENV_SUSTAIN;
+            }
+        } else if (e->state == ENV_SUSTAIN) {
+            e->level = adsr->sustain;
+        }
+
+    } else {
+        e->state = ENV_RELEASE;
+        if (e->level > 0.0f) {
+            e->level -= adsr->release * (ENV_OVERSHOOT + e->level);
+        } else {
+            e->level = 0.0f;
+        }
+    }
+
+    return e->level;
+
+}
+
+/******************************************************************************/
+// Reverb and delay effects
+
 #define ALLPASS_G 0.5f
-
-
 #define DELAY_LINE(name, length) struct { int idx; float s; float dl[length]; } name; int name##_len = length;
 #define DELAY_LINE_PUT(name, value) name.dl[name.idx--] = value; if (name.idx < 0) name.idx += name##_len;
 #define DELAY_LINE_GET(name) name.dl[name.idx]
 #define COMB_PUT(name, value) {comb_result = DELAY_LINE_GET(name); name.s = comb_result + (name.s - comb_result)*cfg.fx_damping; DELAY_LINE_PUT(name, value + cfg.fx_combg * name.s);}
 #define ALLPASS_PUT(name, value) {allpass_result = DELAY_LINE_GET(name) + ALLPASS_G * value; DELAY_LINE_PUT(name, value - ALLPASS_G * allpass_result);}
-
 
 DELAY_LINE(allpass1, 225);
 DELAY_LINE(allpass2, 556);
@@ -224,184 +271,202 @@ DELAY_LINE(comb5, 1422);
 DELAY_LINE(comb6, 1491);
 DELAY_LINE(comb7, 1557);
 DELAY_LINE(comb8, 1617);
+DELAY_LINE(delay1, 5000);
 
-// DELAY_LINE(comb1, 1116);
-// DELAY_LINE(comb2, 1188);
-// DELAY_LINE(comb3, 1277);
-// DELAY_LINE(comb4, 1356);
-// DELAY_LINE(comb5, 1422);
-// DELAY_LINE(comb6, 1491);
-// DELAY_LINE(comb7, 1557);
-// DELAY_LINE(comb8, 1617);
+inline float reverb(float in) {
+
+    float out = 0.0f;
+    float comb_result = 0.0f;
+    float allpass_result = 0.0f;    
+
+    // Parallel comb filter bank
+    COMB_PUT(comb1, in);
+    out += comb_result;
+    COMB_PUT(comb2, in);
+    out += comb_result;
+    COMB_PUT(comb3, in);
+    out += comb_result;
+    COMB_PUT(comb4, in);
+    out += comb_result;
+    COMB_PUT(comb5, in);
+    out += comb_result;
+    COMB_PUT(comb6, in);
+    out += comb_result;
+    COMB_PUT(comb7, in);
+    out += comb_result;
+    COMB_PUT(comb8, in);
+    out += comb_result;
+
+    // Serial allpass filters
+    ALLPASS_PUT(allpass1, out);
+    ALLPASS_PUT(allpass2, allpass_result);
+    ALLPASS_PUT(allpass3, allpass_result);
+    ALLPASS_PUT(allpass4, allpass_result);
+
+    // Wet/dry mix    
+    out = cfg.fx_wet * allpass_result + in;
+    return out;
+
+}
+
+float xn1 = 0.0f;
+float yn1 = 0.0f;
+
+inline float oscillator_square(float phase, float freq, float mod) {
+
+    float out;
+
+    float width = 0.5f + 0.5f*mod;
+    float phase2;
+    if (phase < width) {
+        out = -1.0f;
+        phase2 = phase + (1.0f-width);
+    } else {
+        out = 1.0f;
+        phase2 = phase - width;
+    }
+    out -= polyblep(phase, freq);
+    out += polyblep(phase2, freq);
+    return out;
+
+}
+
+inline float oscillator_tri(float phase, float freq, float mod) {
+
+    float out;
+    out = (phase < 0.5f) ? phase : 1.0f - phase;
+    out = 8.0f * out - 2.0f;
+    float fold = 2.0f * mod;
+    if (out > fold) out = fold - (out-fold);
+    else if (out < -fold) out = -fold - (out-fold);
+    return out;
+
+}
+
+inline float oscillator_saw(float phase, float freq, float mod) {
+
+    float out = 2.0f * phase - 1.0f;
+    out -= polyblep(phase, freq);
+    return out;
+
+}
 
 
-//DELAY_LINE(delay1, 20000);
-
- float f2[NUM_VOICE];
- float xn1 = 0.0f;
- float yn1 = 0.0f;
+/******************************************************************************/
+// SAMPLE GENERATION
+/******************************************************************************/
 
 inline void fill_buffer(void) {
+
+    float pitch_both = 1.0f;
+    float mod_both = 0.0f;
+    float dummy = 0.0f;
+    float *deste1 = &dummy;
+
+    switch (cfg.env_dest[1]) {
+        case ENVDEST_PITCH_BOTH:
+            deste1 = &pitch_both;
+            break;
+        case ENVDEST_MOD_BOTH:
+            deste1 = &mod_both;
+            break;
+        default:
+            break;
+    }
+
+    if (cfg.env_dest[1] == ENVDEST_PITCH_BOTH) {
+        deste1 = &pitch_both;
+    }
 
     for (int j=0; j<OUT_BUFFER_SAMPLES; j += 2) {
         
         float s = 0.0f;
-        float comb_result = 0.0f;
-        float allpass_result = 0.0f;
-        float lfo_out;
+        // float lfo_out = 0.0f;
 
-        // LFO
-        for (int id=0; id<NUM_LFO; id++) {
-            lfo_nco[id] += cfg.lfo[id].rate;
-            if (lfo_nco[id] > 1.0f) lfo_nco[id] -= 1.0f;
-            lfo_out = (lfo_nco[id] < 0.5f) ? lfo_nco[id] : 1.0f - lfo_nco[id];
-            //lfo_out = cfg.lfo_amount*(4.0f * lfo_out - 1.0f);
-            lfo_out = 1.0f + cfg.lfo[id].amount*(2.0f * lfo_out - 0.5f);
-        }
-
+        // // LFO
+        // for (int id=0; id<NUM_LFO; id++) {
+        //     lfo_nco[id] += cfg.lfo[id].rate;
+        //     if (lfo_nco[id] > 1.0f) lfo_nco[id] -= 1.0f;
+        //     lfo_out = (lfo_nco[id] < 0.5f) ? lfo_nco[id] : 1.0f - lfo_nco[id];
+        //     //lfo_out = cfg.lfo_amount*(4.0f * lfo_out - 1.0f);
+        //     lfo_out = 1.0f + cfg.lfo[id].amount*(2.0f * lfo_out - 0.5f);
+        // }
 
         for (int voice=0; voice<NUM_VOICE; voice++) {
-            float osc_mix = 0.0f;
+            float mix = 0.0f;
+            pitch_both = 1.0f;
+            mod_both = 0.0f;
 
-            // portamento
-            //f2[i] += 0.0008f * (cfg.freq[i] - f2[i]);
-            f2[voice] = cfg.freq[voice];
+            // Envelopes
+            for (int e=0; e<NUM_ENV; e++) {
+                if (cfg.key[voice] && cfg.key_retrigger[voice]) {
+                    synth.key_retrigger[voice] = false;
+                    cfg.key_retrigger[voice] = false;
+                    env[voice][e].state = ENV_ATTACK;
+                }
+                envelope(&env[voice][e], cfg.key[voice], &cfg.env[e]);
+            }
+
+            *deste1 += env[voice][1].level * cfg.env_amount[1];
 
             // Oscillators
             for (int osc=0; osc<NUM_OSCILLATOR; osc++) {
 
-                // Advance oscillator phase according to (detuned) frequency
+                float mod = mod_both + cfg.osc[osc].modifier;
+                if (mod > 1.0f) mod = 1.0f;
+                if (mod < 0.0f) mod = 0.0f;                
 
-                float freq = (cfg.osc[osc].detune) * f2[voice];
-                freq *= lfo_out;
+                // Advance oscillator phase according to (detuned) frequency
+                float freq = pitch_both * cfg.osc[osc].detune * cfg.freq[voice];
                 nco[voice][osc] += freq;
                 if (nco[voice][osc] > 1.0f) nco[voice][osc] -= 1.0f;
                 float phase = nco[voice][osc];
-                float s1 = 0.0f;
+                float s1;
 
-                // Generate waveform from phase
-                if (cfg.osc[osc].waveform == WAVE_SAW) {
-                    s1 = 2.0f * phase - 1.0f;
-                    s1 -= polyblep(phase, freq);
-
-                } else if (cfg.osc[osc].waveform == WAVE_SQUARE) {
-                    float width = 0.5f + 0.5f*cfg.osc[osc].modifier;
-                    float phase2;
-                    if (phase < width) {
-                        s1 = -1.0f;
-                        phase2 = phase + (1.0f-width);
-                    } else {
-                        s1 = 1.0f;
-                        phase2 = phase - width;
-                    }
-                    s1 -= polyblep(phase, freq);
-                    s1 += polyblep(phase2, freq);
-
-                } else if (cfg.osc[osc].waveform == WAVE_TRI) {
-                    s1 = (phase < 0.5f) ? phase : 1.0f - phase;
-                    s1 = 8.0f * s1 - 2.0f;
-                    float fold = 2.0f * cfg.osc[osc].modifier;
-                    if (s1 > fold) s1 = fold - (s1-fold);
-                    else if (s1 < -fold) s1 = -fold - (s1-fold);
+                switch (cfg.osc[osc].waveform) {
+                    case WAVE_SAW:
+                        s1 = oscillator_saw(phase, freq, mod);
+                        break;
+                    case WAVE_SQUARE:
+                        s1 = oscillator_square(phase, freq, mod);
+                        break;
+                    case WAVE_TRI:
+                        s1 = oscillator_tri(phase, freq, mod);
+                        break;
+                    default:
+                        break;
                 }
-
-                osc_mix += (osc == 0) ? ((1.0f - cfg.osc_balance) * s1) : (cfg.osc_balance * s1);
+                
+                // Sum oscillators
+                mix += (osc == 0) ? ((1.0f - cfg.osc_balance) * s1) : (cfg.osc_balance * s1);
             }
 
             // Noise
             float noise = whitenoise();
-            osc_mix += noise * cfg.noise_gain;
+            mix += noise * cfg.noise_gain;
 
             // Filter
             float fc = cfg.cutoff + cfg.env_mod * env[voice][1].level;
-            osc_mix = ladder_filter(&filter[voice], osc_mix, fc, cfg.resonance);
+            mix = ladder_filter(&filter[voice], mix, fc, cfg.resonance);
 
-            // Envelope
-            for (int e=0; e<NUM_ENV; e++) {
-                if (cfg.key[voice]) {
-                    if (cfg.key_retrigger[voice]) {
-                        synth.key_retrigger[voice] = false;
-                        cfg.key_retrigger[voice] = false;
-                        env[voice][e].state = ENV_ATTACK;
-                    }
-                    if (env[voice][e].state == ENV_RELEASE) {
-                        env[voice][e].state = ENV_ATTACK;
-                    }
-
-                    if (env[voice][e].state == ENV_ATTACK) {
-                        env[voice][e].level += cfg.env[e].attack;
-                        if (env[voice][e].level > 1.0f) {
-                            env[voice][e].level = 1.0f;
-                            env[voice][e].state = ENV_DECAY;
-                        }
-                    } else if (env[voice][e].state == ENV_DECAY) {
-                        env[voice][e].level += cfg.env[e].decay * (cfg.env[e].sustain - ENV_OVERSHOOT - env[voice][e].level);
-                        if (env[voice][e].level < cfg.env[e].sustain) {
-                            env[voice][e].level = cfg.env[e].sustain;
-                            env[voice][e].state = ENV_SUSTAIN;
-                        }
-                    } else if (env[voice][e].state == ENV_SUSTAIN) {
-                        env[voice][e].level = cfg.env[e].sustain;
-                    }
-
-                } else {
-                    env[voice][e].state = ENV_RELEASE;
-                    if (env[voice][e].level > 0.0f) {
-                        env[voice][e].level -= cfg.env[e].release * (ENV_OVERSHOOT + env[voice][e].level);
-                    } else {
-                        env[voice][e].level = 0.0f;
-                    }
-                }
-            }
-
-            osc_mix *= env[voice][0].level;
-            s += osc_mix;
+            // Amp
+            mix *= env[voice][0].level;
+            s += mix;
 
         }
 
         s /= (float)NUM_VOICE;
 
+        // Dither
+        s += whitenoise() * 0.001f;
 
-        s += whitenoise() * 0.001f; // Dither
+        // Effects
+        s = reverb(s);
 
-        //s += sample_drums();
-
-        float fx = 0.0f;
-
-        // Parallel comb filter bank
-        COMB_PUT(comb1, s);
-        fx += comb_result;
-        COMB_PUT(comb2, s);
-        fx += comb_result;
-        COMB_PUT(comb3, s);
-        fx += comb_result;
-        COMB_PUT(comb4, s);
-        fx += comb_result;
-        COMB_PUT(comb5, s);
-        fx += comb_result;
-        COMB_PUT(comb6, s);
-        fx += comb_result;
-        COMB_PUT(comb7, s);
-        fx += comb_result;
-        COMB_PUT(comb8, s);
-        fx += comb_result;
-
-        // Serial allpass
-        ALLPASS_PUT(allpass1, fx);
-        ALLPASS_PUT(allpass2, allpass_result);
-        ALLPASS_PUT(allpass3, allpass_result);
-        ALLPASS_PUT(allpass4, allpass_result);
-        s = 0.5f * allpass_result + s;
-
-        // simple delay
-        // fx += DELAY_LINE_GET(delay1);
+        // Delay
+        // fx = DELAY_LINE_GET(delay1);
         // DELAY_LINE_PUT(delay1, s + fx * 0.75f);
-
-
-        
-
-        //if (s > 6.0f) s = 6.0f;
-        //if (s < -6.0f) s = -6.0f;
+        // s += fx;
 
         // DC filter
         const float r = 0.997f;
@@ -409,7 +474,7 @@ inline void fill_buffer(void) {
         xn1 = s;
         yn1 = y;
 
-
+        // Ear protection :)
         if (y > 30.0f) y = 30.0f + (y-30.0f)*0.1f;
         if (y < -30.0f) y = -30.0f - (-30.0f-y)*0.1f;
         int16_t s16 = y * 500;
@@ -421,7 +486,7 @@ inline void fill_buffer(void) {
 
 }
 
-bool trig_bass;
+/*bool trig_bass;
 bool trig_snare;
 bool trig_clap;
 bool trig_hat_cl;
@@ -558,7 +623,7 @@ inline float sample_drums(void) {
 
     return s;
 
-}
+}*/
 
 
 void create_wave_tables(void) {
@@ -605,12 +670,18 @@ void synth_start(void) {
     cfg.env[1].sustain = 1.0;
     cfg.env[1].release = 0.0005;
 
+    cfg.env_dest[0] = ENVDEST_AMP;
+    cfg.env_amount[0] = 1.0f;
+    cfg.env_dest[1] = ENVDEST_PITCH_BOTH;
+    cfg.env_amount[1] = 1.0f;
+
     cfg.cutoff  = 10000.0;
     cfg.resonance = 0.0;
     cfg.env_mod = 0.0;
     
     cfg.fx_damping = 0.3f;
     cfg.fx_combg = 0.881678f;
+    cfg.fx_wet = 0.5f;
 
     cfg.lfo[0].rate = 0.0f;
     cfg.lfo[0].amount = 0.0f;

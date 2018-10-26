@@ -228,6 +228,8 @@ void menu_scroll(Menu *menu) {
 
 void ui_update(void) {
 
+    static int ctr;
+
     bool btn = read_buttons();
     bool enc = read_encoder();
 
@@ -334,6 +336,10 @@ void ui_update(void) {
 #ifdef PERFDEBUG
     //redraw = true;
 #endif
+    if (ctr++ == 100) {
+        ctr = 0;
+        redraw = true;
+    }
     if (redraw) {
         draw_screen();
         if (display_draw()) redraw = false;

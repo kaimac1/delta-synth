@@ -212,6 +212,49 @@ float polyblep(float t, float dt) {
 
 
 /******************************************************************************/
+// Oscillators
+
+inline float oscillator_square(float phase, float freq, float mod) {
+
+    float out;
+
+    float width = 0.5f + 0.5f*mod;
+    float phase2;
+    if (phase < width) {
+        out = -1.0f;
+        phase2 = phase + (1.0f-width);
+    } else {
+        out = 1.0f;
+        phase2 = phase - width;
+    }
+    out -= polyblep(phase, freq);
+    out += polyblep(phase2, freq);
+    return out;
+
+}
+
+inline float oscillator_tri(float phase, float freq, float mod) {
+
+    float out;
+    out = (phase < 0.5f) ? phase : 1.0f - phase;
+    out = 8.0f * out - 2.0f;
+    float fold = 2.0f * mod;
+    if (out > fold) out = fold - (out-fold);
+    else if (out < -fold) out = -fold - (out-fold);
+    return out;
+
+}
+
+inline float oscillator_saw(float phase, float freq, float mod) {
+
+    float out = 2.0f * phase - 1.0f;
+    out -= polyblep(phase, freq);
+    return out;
+
+}
+
+
+/******************************************************************************/
 // ADSR envelope generator
 inline float envelope(Envelope *e, bool gate, ADSR *adsr) {
 
@@ -312,45 +355,6 @@ inline float reverb(float in) {
 float xn1 = 0.0f;
 float yn1 = 0.0f;
 
-inline float oscillator_square(float phase, float freq, float mod) {
-
-    float out;
-
-    float width = 0.5f + 0.5f*mod;
-    float phase2;
-    if (phase < width) {
-        out = -1.0f;
-        phase2 = phase + (1.0f-width);
-    } else {
-        out = 1.0f;
-        phase2 = phase - width;
-    }
-    out -= polyblep(phase, freq);
-    out += polyblep(phase2, freq);
-    return out;
-
-}
-
-inline float oscillator_tri(float phase, float freq, float mod) {
-
-    float out;
-    out = (phase < 0.5f) ? phase : 1.0f - phase;
-    out = 8.0f * out - 2.0f;
-    float fold = 2.0f * mod;
-    if (out > fold) out = fold - (out-fold);
-    else if (out < -fold) out = -fold - (out-fold);
-    return out;
-
-}
-
-inline float oscillator_saw(float phase, float freq, float mod) {
-
-    float out = 2.0f * phase - 1.0f;
-    out -= polyblep(phase, freq);
-    return out;
-
-}
-
 
 /******************************************************************************/
 // SAMPLE GENERATION
@@ -411,17 +415,16 @@ inline void fill_buffer(void) {
 
             // Oscillators
             for (int osc=0; osc<NUM_OSCILLATOR; osc++) {
-
-                float mod = mod_both + cfg.osc[osc].modifier;
-                if (mod > 1.0f) mod = 1.0f;
-                if (mod < 0.0f) mod = 0.0f;                
-
                 // Advance oscillator phase according to (detuned) frequency
                 float freq = pitch_both * cfg.osc[osc].detune * cfg.freq[voice];
                 nco[voice][osc] += freq;
                 if (nco[voice][osc] > 1.0f) nco[voice][osc] -= 1.0f;
                 float phase = nco[voice][osc];
                 float s1;
+
+                float mod = mod_both + cfg.osc[osc].modifier;
+                if (mod > 1.0f) mod = 1.0f;
+                if (mod < 0.0f) mod = 0.0f;                
 
                 switch (cfg.osc[osc].waveform) {
                     case WAVE_SAW:

@@ -434,7 +434,7 @@ void menu_fx_draw(Menu *menu, int i) {
 
 void menu_env_draw(Menu *menu, int i) {
 
-    char *dests[] = {"Amp", "Osc1 pitch", "Osc1+2 pitch", "Osc1 mod", "Osc1+2 mod"};
+    char *dests[] = {"Amp", "Osc freq", "Osc mod"};
 
     switch (i) {
         case 0:

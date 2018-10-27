@@ -27,12 +27,10 @@ typedef enum {
 
 // Envelope destination
 typedef enum {
-    ENVDEST_DUMMY = -1, // So that the enum is signed.
+    //ENVDEST_DUMMY = -1, // So that the enum is signed.
     ENVDEST_AMP = 0,
-    ENVDEST_PITCH_OSC1,
-    ENVDEST_PITCH_BOTH,
-    ENVDEST_MOD_OSC1,
-    ENVDEST_MOD_BOTH,
+    ENVDEST_FREQ,
+    ENVDEST_MOD,
     NUM_ENVDEST
 } EnvDest;
 

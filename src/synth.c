@@ -193,18 +193,26 @@ inline float whitenoise(void) {
 }
 
 
+
 /******************************************************************************/
 // PolyBLEP (polynomial band-limited step)
 // t: phase, [0,1]
 // dt: frequency, normalised [0,1]
+
+inline float squ(float x) {
+    return x*x;
+}
+
 float polyblep(float t, float dt) {
 
     if (t < dt) {
-        t /= dt;
-        return t + t - t*t - 1.0f;
+        return -squ(t / dt - 1.0f);
+        //t /= dt;
+        //return t + t - t*t - 1.0f;
     } else if (t > 1.0f - dt) {
-        t = (t - 1.0f)/dt;
-        return t*t + t + t + 1.0f;
+        return squ((t-1.0f) / dt + 1.0f);
+        //t = (t - 1.0f)/dt;
+        //return t*t + t + t + 1.0f;
     } else {
         return 0.0f;
     }
@@ -362,24 +370,35 @@ float yn1 = 0.0f;
 
 inline void fill_buffer(void) {
 
-    float pitch_both = 1.0f;
-    float mod_both = 0.0f;
-    float dummy = 0.0f;
-    float *deste1 = &dummy;
+    float dest_freq = 1.0f;
+    float dest_mod = 0.0f;
+    float dest_amp = 0.0f;
+    float *deste1 = &dest_amp;
 
+    // Envelope retrigger
+    for (int voice=0; voice<NUM_VOICE; voice++) {
+        if (cfg.key[voice] && cfg.key_retrigger[voice]) {
+            synth.key_retrigger[voice] = false;
+            cfg.key_retrigger[voice] = false;            
+            env[voice][0].state = ENV_ATTACK;
+            env[voice][1].state = ENV_ATTACK;
+        }
+    }    
+
+    // Modulation routing
     switch (cfg.env_dest[1]) {
-        case ENVDEST_PITCH_BOTH:
-            deste1 = &pitch_both;
+        case ENVDEST_FREQ:
+            deste1 = &dest_freq;
             break;
-        case ENVDEST_MOD_BOTH:
-            deste1 = &mod_both;
+        case ENVDEST_MOD:
+            deste1 = &dest_mod;
             break;
         default:
             break;
     }
 
-    if (cfg.env_dest[1] == ENVDEST_PITCH_BOTH) {
-        deste1 = &pitch_both;
+    if (cfg.env_dest[1] == ENVDEST_FREQ) {
+        deste1 = &dest_freq;
     }
 
     for (int j=0; j<OUT_BUFFER_SAMPLES; j += 2) {
@@ -398,33 +417,29 @@ inline void fill_buffer(void) {
 
         for (int voice=0; voice<NUM_VOICE; voice++) {
             float mix = 0.0f;
-            pitch_both = 1.0f;
-            mod_both = 0.0f;
+            dest_freq = 1.0f;
+            dest_mod = 0.0f;
 
             // Envelopes
-            for (int e=0; e<NUM_ENV; e++) {
-                if (cfg.key[voice] && cfg.key_retrigger[voice]) {
-                    synth.key_retrigger[voice] = false;
-                    cfg.key_retrigger[voice] = false;
-                    env[voice][e].state = ENV_ATTACK;
-                }
-                envelope(&env[voice][e], cfg.key[voice], &cfg.env[e]);
-            }
+            envelope(&env[voice][0], cfg.key[voice], &cfg.env[0]);
+            envelope(&env[voice][1], cfg.key[voice], &cfg.env[1]);
 
             *deste1 += env[voice][1].level * cfg.env_amount[1];
 
             // Oscillators
+
+
             for (int osc=0; osc<NUM_OSCILLATOR; osc++) {
                 // Advance oscillator phase according to (detuned) frequency
-                float freq = pitch_both * cfg.osc[osc].detune * cfg.freq[voice];
+                float freq = dest_freq * cfg.osc[osc].detune * cfg.freq[voice];
                 nco[voice][osc] += freq;
                 if (nco[voice][osc] > 1.0f) nco[voice][osc] -= 1.0f;
                 float phase = nco[voice][osc];
                 float s1;
 
-                float mod = mod_both + cfg.osc[osc].modifier;
+                float mod = dest_mod + cfg.osc[osc].modifier;
                 if (mod > 1.0f) mod = 1.0f;
-                if (mod < 0.0f) mod = 0.0f;                
+                if (mod < 0.0f) mod = 0.0f;
 
                 switch (cfg.osc[osc].waveform) {
                     case WAVE_SAW:
@@ -445,12 +460,12 @@ inline void fill_buffer(void) {
             }
 
             // Noise
-            float noise = whitenoise();
+            /*float noise = whitenoise();
             mix += noise * cfg.noise_gain;
 
             // Filter
             float fc = cfg.cutoff + cfg.env_mod * env[voice][1].level;
-            mix = ladder_filter(&filter[voice], mix, fc, cfg.resonance);
+            mix = ladder_filter(&filter[voice], mix, fc, cfg.resonance);*/
 
             // Amp
             mix *= env[voice][0].level;
@@ -461,7 +476,7 @@ inline void fill_buffer(void) {
         s /= (float)NUM_VOICE;
 
         // Dither
-        s += whitenoise() * 0.001f;
+        /*s += whitenoise() * 0.001f;
 
         // Effects
         s = reverb(s);
@@ -479,7 +494,8 @@ inline void fill_buffer(void) {
 
         // Ear protection :)
         if (y > 30.0f) y = 30.0f + (y-30.0f)*0.1f;
-        if (y < -30.0f) y = -30.0f - (-30.0f-y)*0.1f;
+        if (y < -30.0f) y = -30.0f - (-30.0f-y)*0.1f;*/
+        float y = s;
         int16_t s16 = y * 500;
 
         out_buffer[j] = s16;   // left
@@ -675,7 +691,7 @@ void synth_start(void) {
 
     cfg.env_dest[0] = ENVDEST_AMP;
     cfg.env_amount[0] = 1.0f;
-    cfg.env_dest[1] = ENVDEST_PITCH_BOTH;
+    cfg.env_dest[1] = ENVDEST_FREQ;
     cfg.env_amount[1] = 1.0f;
 
     cfg.cutoff  = 10000.0;

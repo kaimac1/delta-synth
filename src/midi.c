@@ -36,7 +36,7 @@ void midi_process_byte(uint8_t byte) {
 }
 
 
-void poly_add(float freq) {
+/*void poly_add(float freq) {
 
     static int st = 0;
 
@@ -82,43 +82,23 @@ void poly_del(float freq) {
     }
     synth.busy = false;
 
+}*/
+
+void mono_add(float freq) {
+    synth.busy = true;
+    synth.part[0].freq = freq;
+    synth.part[0].gate = true;
+    synth.part[0].trig = true;
+    synth.busy = false;
 }
 
-
-void arp_add(uint32_t freq) {
-
-    synth.busy = true;
-    for (int i=0; i<MAX_ARP; i++) {
-        if (synth.arp_freqs[i] > freq) {
-            for (int j=MAX_ARP-2; j>=i; j--) {
-                synth.arp_freqs[j+1] = synth.arp_freqs[j];
-            }
-            synth.arp_freqs[i] = freq;
-            break;
-        }
-        if (synth.arp_freqs[i] == 0) {
-            synth.arp_freqs[i] = freq;
-            break;
-        }
+void mono_del(float freq) {
+    if (freq == synth.part[0].freq) {
+        synth.busy = true;
+        synth.part[0].gate = false;
+        synth.part[0].trig = false;
+        synth.busy = false;
     }
-    synth.busy = false;
-
-}
-
-void arp_del(uint32_t freq) {
-
-    synth.busy = true;
-    for (int i=0; i<MAX_ARP; i++) {
-        if (synth.arp_freqs[i] == freq) {
-            for (int j=i; j<MAX_ARP-1; j++) {
-                synth.arp_freqs[j] = synth.arp_freqs[j+1];
-            }
-            synth.arp_freqs[MAX_ARP-1] = 0;
-            break;
-        }
-    }
-    synth.busy = false;
-
 }
 
 void midi_process_command(void) {
@@ -131,17 +111,13 @@ void midi_process_command(void) {
             if (synth.seq_play) {
                 seq_note_input = note[command[1]];
             } else {
-                poly_add(note[command[1]]);
+                //poly_add(note[command[1]]);
+                mono_add(note[command[1]]);
             }
-            // if (synth.arp != ARP_OFF) {
-            //     arp_add(note[command[1]]);
-            //     break;
-            // }
             // Retrigger on new note in normal mode
             // if (!synth.legato && (note[command[1]] != cfg.freq)) {
             //     synth.env_retrigger = true;
             // }
-            // synth.freq = note[command[1]];
             break;
 
         // Note off
@@ -150,15 +126,9 @@ void midi_process_command(void) {
             if (synth.seq_play) {
                 seq_note_input = 0.0f;
             } else {
-                poly_del(note[command[1]]);
+                //poly_del(note[command[1]]);
+                mono_del(note[command[1]]);
             }
-            // if (synth.arp != ARP_OFF) {
-            //     arp_del(note[command[1]]);
-            //     break;
-            // }
-            // if (note[command[1]] == synth.freq) {
-            //     synth.key = false;
-            // }
             break;
 
         // value = (float)(command[2]) / 0x7F;

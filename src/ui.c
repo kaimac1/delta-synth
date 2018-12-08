@@ -12,23 +12,19 @@
 #define PERFDEBUG
 
 typedef enum {
-    PART_LEAD,
-    PART_DRUMS,
-    NUM_PARTS
-} UIPart;
-
-typedef enum {
     UI_DEFAULT,
     UI_OSC_TUNE,
     UI_FX,
-    UI_ENV_MENU
+    UI_ENV_MENU,
+    UI_LFO_MENU,
 } UIPage;
 
 // UI state
+int part;
 int this_osc;
 int this_env;
 UIPage page;
-UIPart part;
+
 
 uint16_t filtered_pot[NUM_POTS];
 uint16_t saved_pot[NUM_POTS];
@@ -42,8 +38,10 @@ bool detune_mode;
 typedef struct {
     int reverb_amount;
     int wet_level;
-    EnvDest env_dest[NUM_ENV];
+    ModDest env_dest[NUM_ENV];
     int env_amount[NUM_ENV];
+    ModDest lfo_dest;
+    int lfo_amount;
 } InputSettings;
 InputSettings input;
 
@@ -52,12 +50,14 @@ float seq_note_input;
 
 Menu menu_fx;
 Menu menu_env;
+Menu menu_lfo;
 
 bool redraw = true;
 
 void draw_screen(void);
 void menu_fx_draw(Menu *menu, int i);
 void menu_env_draw(Menu *menu, int i);
+void menu_lfo_draw(Menu *menu, int i);
 
 #define ADD_CLAMP(x, y, max) {(x) += (y); if ((x) > (max)) (x) = (max); if ((x) < 0) (x) = 0;}
 #define ADD_CLAMP_MINMAX(x, y, min, max) {(x) += (y); if ((x) > (max)) (x) = (max); if ((x) < (min)) (x) = (min);}
@@ -109,59 +109,66 @@ void update_lead(void) {
             switch (i) {
                 // Oscillators
                 case 0:
-                    synth.osc_balance = amount;
+                    synth.part[part].osc_balance = amount;
                     break;
                 case 1:
-                    synth.osc[this_osc].modifier = amount;
+                    synth.part[part].osc[this_osc].modifier = amount;
                     break;
                 case 2:
                     temp = 2 * (amount - 0.5f);
                     temp = pow(halfstep, temp);
-                    synth.osc[this_osc].detune = temp;
+                    synth.part[part].osc[this_osc].detune = temp;
                     break;
 
                 // Enevelope
                 case 3:
                     temp = amount + MIN_ATTACK;
-                    synth.env[this_env].attack = 1.0f/(temp * SAMPLE_RATE);
+                    synth.part[part].env[this_env].attack = 1.0f/(temp * SAMPLE_RATE);
                     break;
                 case 4:
                     temp = amount + DECAY_MIN;
-                    synth.env[this_env].decay = LEAD_DECAY_CONST / (temp*temp*temp);
+                    synth.part[part].env[this_env].decay = LEAD_DECAY_CONST / (temp*temp*temp);
                     break;
                 case 5:
-                    synth.env[this_env].sustain = amount;
+                    synth.part[part].env[this_env].sustain = amount;
                     break;
                 case 6:
                     temp = amount + DECAY_MIN;
-                    synth.env[this_env].release = LEAD_DECAY_CONST / (temp*temp*temp);
+                    synth.part[part].env[this_env].release = LEAD_DECAY_CONST / (temp*temp*temp);
                     break;
 
                 // Filter
                 case 9:
-                    synth.cutoff = 10000.0f * amount;
+                    synth.part[part].cutoff = 10000.0f * amount;
                     break;
                 case 10:
-                    synth.resonance = 3.99f * amount;
+                    synth.part[part].resonance = 3.99f * amount;
                     break;
                 case 11:
-                    synth.env_mod = 5000.0f * amount;
+                    synth.part[part].env_mod = 5000.0f * amount;
                     break;
 
                 // LFO
                 case 7:
                     synth.lfo[0].rate = 0.001f * amount;
                     break;
+
+                case 8:
+                    synth.volume = amount;
+                    break;
             }
         }
     }
 
-    synth.noise_gain = 0.0f;//pots[2] / POTMAX;
+    synth.part[part].noise_gain = 0.0f;//pots[2] / POTMAX;
 
-    synth.env_dest[0] = input.env_dest[0];
-    synth.env_dest[1] = input.env_dest[1];
-    synth.env_amount[0] = input.env_amount[0] / 127.0f;
-    synth.env_amount[1] = input.env_amount[1] / 127.0f;
+    synth.part[part].env_dest[0] = input.env_dest[0];
+    synth.part[part].env_dest[1] = input.env_dest[1];
+    synth.part[part].env_amount[0] = input.env_amount[0] / 127.0f;
+    synth.part[part].env_amount[1] = input.env_amount[1] / 127.0f;
+
+    synth.lfo[0].dest = input.lfo_dest;
+    synth.lfo[0].amount = input.lfo_amount / 127.0f;
 
 }
 
@@ -177,17 +184,32 @@ void ui_init(void) {
 
     menu_fx.draw = (void*)menu_fx_draw;
     menu_fx.num_items = 2;
-    menu_fx.items[0].name = "Reverb amt";
-    menu_fx.items[1].name = "Wet level";
+    strcpy(menu_fx.items[0].name, "Reverb amt");
+    strcpy(menu_fx.items[1].name, "Wet level");
     
     menu_env.draw = (void*)menu_env_draw;
-    menu_env.num_items = 2;
-    menu_env.items[0].name = "Dest 1";
-    menu_env.items[1].name = "Dest 1 amount";
+    menu_env.num_items = 4;
+    strcpy(menu_env.items[0].name, "Env 1 dest");
+    strcpy(menu_env.items[1].name, "Env 1 amt");
+    strcpy(menu_env.items[2].name, "Env 2 dest");
+    strcpy(menu_env.items[3].name, "Env 2 amt");
+
+    menu_lfo.draw = (void*)menu_lfo_draw;
+    menu_lfo.num_items = 2;
+    strcpy(menu_lfo.items[0].name, "LFO dest");
+    strcpy(menu_lfo.items[1].name, "LFO amt");
 
     input.reverb_amount = 64;
-    input.wet_level = 64;
+    input.wet_level = 0;
+    input.env_dest[0] = DEST_AMP;
+    input.env_amount[0] = 127;
+    input.env_dest[1] = DEST_AMP;
+    input.env_amount[1] = 0;
+    input.lfo_dest = DEST_AMP;
+    input.lfo_amount = 0;
     set_reverb();
+
+    //synth.seq_play = true;
 
 }
 
@@ -247,12 +269,16 @@ void ui_update(void) {
 
         // Oscillator waveform
         if (buttons[BTN_OSC_WAVE] == BTN_DOWN) {
-            Wave new = (synth.osc[this_osc].waveform + 1) % NUM_WAVE;
-            synth.osc[this_osc].waveform = new;
+            Wave new = (synth.part[part].osc[this_osc].waveform + 1) % NUM_WAVE;
+            synth.part[part].osc[this_osc].waveform = new;
             redraw = true;
         }
 
         // Tune
+        if (buttons[BTN_OSC_TUNE] == BTN_DOWN) {
+            seq_idx++;
+            if (seq_idx == NUM_SEQ_STEPS) seq_idx = 0;
+        }
         //
 
         // Envelope select
@@ -267,10 +293,13 @@ void ui_update(void) {
         }
 
         // Envelope menu
-        check_button_for_page(4, UI_ENV_MENU);
+        check_button_for_page(BTN_ENV_MENU, UI_ENV_MENU);
 
         // FX menu
         check_button_for_page(5, UI_FX);
+
+        // LFO menu
+        check_button_for_page(6, UI_LFO_MENU);
 
     }
 
@@ -303,13 +332,38 @@ void ui_update(void) {
 
             case UI_ENV_MENU:
                 if (buttons[BTN_EDIT] == BTN_HELD) {
-                    if (menu_env.selected_item == 0) {
-                        ADD_CLAMP(input.env_dest[this_env], encoder.half_delta, NUM_ENVDEST-1);
-                    } else if (menu_env.selected_item == 1) {
-                        ADD_CLAMP_MINMAX(input.env_amount[this_env], encoder.delta, -127, 127);
+                    switch (menu_env.selected_item) {
+                        case 0:
+                            ADD_CLAMP(input.env_dest[0], encoder.half_delta, NUM_DEST-1);
+                            break;
+                        case 1:
+                            ADD_CLAMP_MINMAX(input.env_amount[0], encoder.delta, -127, 127);
+                            break;
+                        case 2:
+                        ADD_CLAMP(input.env_dest[1], encoder.half_delta, NUM_DEST-1);
+                            break;
+                        case 3:
+                            ADD_CLAMP_MINMAX(input.env_amount[1], encoder.delta, -127, 127);
+                            break;
                     }
                 } else {
                     menu_scroll(&menu_env);
+                }
+                redraw = true;
+                break;
+
+            case UI_LFO_MENU:
+                if (buttons[BTN_EDIT] == BTN_HELD) {
+                    switch (menu_lfo.selected_item) {
+                        case 0:
+                            ADD_CLAMP(input.lfo_dest, encoder.half_delta, NUM_DEST-1);
+                            break;
+                        case 1:
+                            ADD_CLAMP_MINMAX(input.lfo_amount, encoder.delta, -127, 127);
+                            break;
+                    }
+                } else {
+                    menu_scroll(&menu_lfo);
                 }
                 redraw = true;
                 break;
@@ -321,6 +375,9 @@ void ui_update(void) {
     }
 
     update_lead();
+    if (seq_note_input > 0.0f) {
+        seq.step[seq_idx].freq = seq_note_input;
+    }
 
     // Briefly show that pot is synced
     if (pot_moved != -1) {
@@ -367,6 +424,10 @@ void draw_screen(void) {
         draw_menu(menu_env);
         return;
     }
+    if (page == UI_LFO_MENU) {
+        draw_menu(menu_lfo);
+        return;
+    }
 
     char buf[32];
 
@@ -379,7 +440,7 @@ void draw_screen(void) {
     // Osc
     uint8_t *osc_img[2] = {NULL};
     for (int i=0; i<2; i++) {
-        switch(synth.osc[i].waveform) {
+        switch(synth.part[part].osc[i].waveform) {
             case WAVE_SAW: osc_img[i] = saw; break;
             case WAVE_SQUARE: osc_img[i] = square; break;
             case WAVE_TRI: osc_img[i] = tri; break;
@@ -434,14 +495,38 @@ void menu_fx_draw(Menu *menu, int i) {
 
 void menu_env_draw(Menu *menu, int i) {
 
-    char *dests[] = {"Amp", "Osc freq", "Osc mod"};
+    char *dests[] = {"Amp", "Osc freq", "Osc mod", "Noise"};
 
     switch (i) {
         case 0:
-            sprintf(menu->value, "%s", dests[input.env_dest[this_env]]);
+            sprintf(menu->value, "%s", dests[input.env_dest[0]]);
             break;
         case 1:
-            sprintf(menu->value, "%d", input.env_amount[this_env]);
+            sprintf(menu->value, "%d", input.env_amount[0]);
+            break;
+        case 2:
+            sprintf(menu->value, "%s", dests[input.env_dest[1]]);
+            break;
+        case 3:
+            sprintf(menu->value, "%d", input.env_amount[1]);
+            break;
+        default:
+            strcpy(menu->value, "");
+            break;            
+    }
+
+}
+
+void menu_lfo_draw(Menu *menu, int i) {
+
+    char *dests[] = {"Amp", "Osc freq", "Osc mod", "Noise"};
+
+    switch (i) {
+        case 0:
+            sprintf(menu->value, "%s", dests[input.lfo_dest]);
+            break;
+        case 1:
+            sprintf(menu->value, "%d", input.lfo_amount);
             break;
         default:
             strcpy(menu->value, "");

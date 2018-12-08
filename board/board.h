@@ -37,6 +37,7 @@ typedef enum {
     BTN_OSC_WAVE,
     BTN_OSC_TUNE,
     BTN_ENV_SEL,
+    BTN_ENV_MENU,
     BTN_EDIT = 15,
     BTN_ENCODER = 16
 } ButtonName;

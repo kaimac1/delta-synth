@@ -19,9 +19,7 @@ int main(void) {
     gen_note_table();
     create_wave_tables();
     synth_start();
-
-    synth.volume = 70;
-    
+   
     pin_cfg_output(GPIOA, 1<<5);    // Nucleo LED
     pin_set(GPIOA, 1<<5, 1);
 

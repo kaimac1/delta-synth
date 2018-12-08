@@ -9,10 +9,7 @@
 #define SINE_TABLE_SIZE (1<<SINE_TABLE_WIDTH)
 extern int16_t sine_table[SINE_TABLE_SIZE];
 
-
-#define MAX_ARP 5
-
-#define NUM_VOICE 6
+#define NUM_PART 1
 #define NUM_OSCILLATOR 2
 #define NUM_ENV 2
 #define NUM_LFO 1
@@ -25,14 +22,15 @@ typedef enum {
     ENV_RELEASE
 } EnvState;
 
-// Envelope destination
+// Modulation destination
 typedef enum {
     //ENVDEST_DUMMY = -1, // So that the enum is signed.
-    ENVDEST_AMP = 0,
-    ENVDEST_FREQ,
-    ENVDEST_MOD,
-    NUM_ENVDEST
-} EnvDest;
+    DEST_AMP = 0,
+    DEST_FREQ,
+    DEST_MOD,
+    DEST_NOISE,
+    NUM_DEST
+} ModDest;
 
 // Oscillator waveform
 typedef enum {
@@ -41,13 +39,6 @@ typedef enum {
     WAVE_SAW,
     NUM_WAVE
 } Wave;
-
-typedef enum {
-    ARP_OFF,
-    ARP_UP,
-    ARP_DOWN,
-    ARP_UP_DOWN,
-} ArpMode;
 
 // Oscillator settings
 typedef struct {
@@ -68,42 +59,46 @@ typedef struct {
 typedef struct {
     float rate;
     float amount;
+    ModDest dest;
 } LFO;
+
+// Single voice
+typedef struct {
+
+    float freq;
+    bool gate;
+    bool trig;
+
+    Oscillator osc[NUM_OSCILLATOR];
+    float osc_balance;
+    float noise_gain;
+    ADSR env[NUM_ENV];
+
+    ModDest env_dest[NUM_ENV];
+    float env_amount[NUM_ENV];
+
+
+    // Filter
+    float cutoff;       // fs
+    float resonance;    // 0-4
+    float env_mod;      // Hz
+
+} MonoSynth;
 
 
 
 typedef struct {
     bool busy;          // config being updated, don't copy
 
-    uint8_t volume;     // 0-100
+    float volume;
     bool legato;
 
     // Sequencer
-    ArpMode arp;        // arpeggio mode
-    uint32_t arp_freqs[MAX_ARP]; // arp notes, normalised
     int tempo;          // bpm
     bool seq_play;
 
-    // Voices
-    float freq[NUM_VOICE];
-    bool key[NUM_VOICE];           // key down?
-    bool key_retrigger[NUM_VOICE];
-
-    // Oscillators
-    Oscillator osc[NUM_OSCILLATOR];
-    float osc_balance;
-    float noise_gain;
-
-    // Envelope settings
-    ADSR env[NUM_ENV];
-    EnvDest env_dest[NUM_ENV];
-    float env_amount[NUM_ENV];
+    MonoSynth part[NUM_PART];
     
-    // Filter
-    float cutoff;       // fs
-    float resonance;    // 0-4
-    float env_mod;      // Hz at max env
-
     // LFO
     LFO lfo[NUM_LFO];
 
@@ -112,23 +107,16 @@ typedef struct {
     float fx_combg;
     float fx_wet;
 
-    // Drums
-    float bass_pitch;
-    float bass_click;
-    float bass_punch;
-    float bass_decay;
-    float snare_decay;
-    float snare_tone;
-
-    float clap_decay;
-    float clap_filt;
-
 } SynthConfig;
 
-#define NUM_SEQ_NOTES 2
 typedef struct {
-    float note[NUM_SEQ_NOTES];
+    float freq;
+    float gate_length;
+} SeqStep;
 
+#define NUM_SEQ_STEPS 16
+typedef struct {
+    SeqStep step[NUM_SEQ_STEPS];
 } SeqConfig;
 
 extern SynthConfig cfg;

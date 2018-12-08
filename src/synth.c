@@ -9,7 +9,6 @@
 
 SynthConfig synth;
 SynthConfig cfg;
-SeqConfig seq;
 
 typedef struct {
     float z1;
@@ -23,17 +22,20 @@ typedef struct {
     EnvState state;
 } Envelope;
 
-Filter filter[NUM_VOICE];
-Envelope env[NUM_VOICE][NUM_ENV];
-float nco[NUM_VOICE][NUM_OSCILLATOR];
+Filter filter[NUM_PART];
+Envelope env[NUM_PART][NUM_ENV];
+float nco[NUM_PART][NUM_OSCILLATOR];
 float lfo_nco[NUM_LFO];
 
-uint32_t next_beat = 0;
-int      arp_note = 0;
-int seq_note = 0;
+
 uint32_t start_time;
 uint32_t loop_time;
 uint32_t transfer_time;
+
+// Sequencer
+SeqConfig seq;
+uint32_t next_beat = 0;
+int seq_step = 0;
 
 // Output buffer
 #define OUT_BUFFER_SAMPLES 512
@@ -44,7 +46,7 @@ uint16_t *out_buffer = out_buffer_1;
 // Sine table
 int16_t sine_table[SINE_TABLE_SIZE];
 
-inline void sequencer_update(void);
+//inline void sequencer_update(void);
 inline void fill_buffer(void);
 
 
@@ -77,6 +79,7 @@ void HAL_I2S_TxCpltCallback(I2S_HandleTypeDef *hi2s) {
 
     //sequencer_update();
     fill_buffer();
+    pin_set(GPIOA, 1<<5, 0);
 
     if (i++ > 50) {
         ltime = NOW_US() - start_time;
@@ -88,39 +91,28 @@ void HAL_I2S_TxCpltCallback(I2S_HandleTypeDef *hi2s) {
 }
 
 // many things broken
-inline void sequencer_update(void) {
+/*inline void sequencer_update(void) {
 
     if (start_time > next_beat) {
         next_beat += 15000000/cfg.tempo;
 
         if (cfg.seq_play) {
-            //env[0].state = ENV_RELEASE;
+            env[0][0].state = ENV_RELEASE;
+            env[0][1].state = ENV_RELEASE;
             pin_set(GPIOA, 1<<5, 1);
-            seq_note++;
-            if (seq_note == NUM_SEQ_NOTES) seq_note = 0;
+            seq_step++;
+            if (seq_step == NUM_SEQ_STEPS) seq_step = 0;
         }
-
-        // if (cfg.arp) {
-        //     //env_state = ENV_RELEASE;
-        //     arp_note++;
-        //     if ((arp_note == MAX_ARP) || (cfg.arp_freqs[arp_note] == 0)) arp_note = 0;           
-        // }
     }
 
     if (cfg.seq_play) {
-        if (seq.note[seq_note] != 0.0f) {
+        if (seq.step[seq_step].freq != 0.0f) {
             cfg.key[0] = true;
-            cfg.freq[0] = seq.note[seq_note];
+            cfg.freq[0] = seq.step[seq_step].freq;
         }
     }
 
-    // if (cfg.arp) {
-    //     //cfg.key = true;
-    //     //cfg.freq = cfg.arp_freqs[arp_note];
-    // }
-
-
-}
+}*/
 
 /******************************************************************************/
 // SYNTHESIS BLOCKS
@@ -370,12 +362,13 @@ float yn1 = 0.0f;
 
 inline void fill_buffer(void) {
 
-    float dest_freq = 1.0f;
-    float dest_mod = 0.0f;
-    float dest_amp = 0.0f;
-    float *deste1 = &dest_amp;
+    float dest_freq;
+    float dest_mod;
+    float dest_amp;
+    float dest_noise;
+    float *dests[] = {&dest_amp, &dest_freq, &dest_mod, &dest_noise};
 
-    // Envelope retrigger
+    /*// Envelope retrigger
     for (int voice=0; voice<NUM_VOICE; voice++) {
         if (cfg.key[voice] && cfg.key_retrigger[voice]) {
             synth.key_retrigger[voice] = false;
@@ -383,65 +376,56 @@ inline void fill_buffer(void) {
             env[voice][0].state = ENV_ATTACK;
             env[voice][1].state = ENV_ATTACK;
         }
-    }    
+    }*/    
 
     // Modulation routing
-    switch (cfg.env_dest[1]) {
-        case ENVDEST_FREQ:
-            deste1 = &dest_freq;
-            break;
-        case ENVDEST_MOD:
-            deste1 = &dest_mod;
-            break;
-        default:
-            break;
-    }
-
-    if (cfg.env_dest[1] == ENVDEST_FREQ) {
-        deste1 = &dest_freq;
-    }
+    float *deste0 = dests[cfg.part[0].env_dest[0]];
+    float *deste1 = dests[cfg.part[0].env_dest[1]];
+    float *destl0 = dests[cfg.lfo[0].dest];
 
     for (int j=0; j<OUT_BUFFER_SAMPLES; j += 2) {
         
         float s = 0.0f;
-        // float lfo_out = 0.0f;
+        float lfo_out = 0.0f;
 
-        // // LFO
-        // for (int id=0; id<NUM_LFO; id++) {
-        //     lfo_nco[id] += cfg.lfo[id].rate;
-        //     if (lfo_nco[id] > 1.0f) lfo_nco[id] -= 1.0f;
-        //     lfo_out = (lfo_nco[id] < 0.5f) ? lfo_nco[id] : 1.0f - lfo_nco[id];
-        //     //lfo_out = cfg.lfo_amount*(4.0f * lfo_out - 1.0f);
-        //     lfo_out = 1.0f + cfg.lfo[id].amount*(2.0f * lfo_out - 0.5f);
-        // }
+        // LFO
+        /*for (int id=0; id<NUM_LFO; id++) {
+            lfo_nco[id] += cfg.lfo[id].rate;
+            if (lfo_nco[id] > 1.0f) lfo_nco[id] -= 1.0f;
+            lfo_out = (lfo_nco[id] < 0.5f) ? lfo_nco[id] : 1.0f - lfo_nco[id];
+            lfo_out = cfg.lfo[id].amount*(4.0f * lfo_out - 1.0f);
+        }*/
 
-        for (int voice=0; voice<NUM_VOICE; voice++) {
+        for (int p=0; p<NUM_PART; p++) {
             float mix = 0.0f;
             dest_freq = 1.0f;
             dest_mod = 0.0f;
+            dest_amp = 0.0f;
+            dest_noise = 0.0f;
 
-            // Envelopes
-            envelope(&env[voice][0], cfg.key[voice], &cfg.env[0]);
-            envelope(&env[voice][1], cfg.key[voice], &cfg.env[1]);
+            *destl0 += lfo_out;
 
-            *deste1 += env[voice][1].level * cfg.env_amount[1];
+            // Update envelopes.
+            // Route envelopes to their destinations.
+            envelope(&env[p][0], cfg.part[p].gate, &cfg.part[p].env[0]);
+            *deste0 += env[p][0].level * cfg.part[p].env_amount[0];
+            envelope(&env[p][1], cfg.part[p].gate, &cfg.part[p].env[1]);
+            *deste1 += env[p][1].level * cfg.part[p].env_amount[1];
 
             // Oscillators
-
-
             for (int osc=0; osc<NUM_OSCILLATOR; osc++) {
                 // Advance oscillator phase according to (detuned) frequency
-                float freq = dest_freq * cfg.osc[osc].detune * cfg.freq[voice];
-                nco[voice][osc] += freq;
-                if (nco[voice][osc] > 1.0f) nco[voice][osc] -= 1.0f;
-                float phase = nco[voice][osc];
-                float s1;
+                float freq = dest_freq * cfg.part[p].osc[osc].detune * cfg.part[p].freq;
+                nco[p][osc] += freq;
+                if (nco[p][osc] > 1.0f) nco[p][osc] -= 1.0f;
+                float phase = nco[p][osc];
+                float s1 = 0.0f;
 
-                float mod = dest_mod + cfg.osc[osc].modifier;
+                float mod = dest_mod + cfg.part[p].osc[osc].modifier;
                 if (mod > 1.0f) mod = 1.0f;
                 if (mod < 0.0f) mod = 0.0f;
 
-                switch (cfg.osc[osc].waveform) {
+                switch (cfg.part[p].osc[osc].waveform) {
                     case WAVE_SAW:
                         s1 = oscillator_saw(phase, freq, mod);
                         break;
@@ -456,27 +440,28 @@ inline void fill_buffer(void) {
                 }
                 
                 // Sum oscillators
-                mix += (osc == 0) ? ((1.0f - cfg.osc_balance) * s1) : (cfg.osc_balance * s1);
+                mix += (osc == 0) ? ((1.0f - cfg.part[p].osc_balance) * s1) : (cfg.part[p].osc_balance * s1);
             }
 
             // Noise
-            /*float noise = whitenoise();
-            mix += noise * cfg.noise_gain;
+            float noise = whitenoise();
+            mix += noise * (cfg.part[p].noise_gain + dest_noise);
 
             // Filter
-            float fc = cfg.cutoff + cfg.env_mod * env[voice][1].level;
-            mix = ladder_filter(&filter[voice], mix, fc, cfg.resonance);*/
+            float fc = cfg.part[p].cutoff + cfg.part[p].env_mod * env[p][1].level;
+            mix = ladder_filter(&filter[p], mix, fc, cfg.part[p].resonance);
 
             // Amp
-            mix *= env[voice][0].level;
+            mix *= dest_amp;
+            // mix *= env[voice][0].level;
             s += mix;
 
         }
 
-        s /= (float)NUM_VOICE;
+        s /= (float)NUM_PART;
 
         // Dither
-        /*s += whitenoise() * 0.001f;
+        s += whitenoise() * 0.001f;
 
         // Effects
         s = reverb(s);
@@ -494,9 +479,8 @@ inline void fill_buffer(void) {
 
         // Ear protection :)
         if (y > 30.0f) y = 30.0f + (y-30.0f)*0.1f;
-        if (y < -30.0f) y = -30.0f - (-30.0f-y)*0.1f;*/
-        float y = s;
-        int16_t s16 = y * 500;
+        if (y < -30.0f) y = -30.0f - (-30.0f-y)*0.1f;
+        int16_t s16 = y * cfg.volume * 1000.0f;
 
         out_buffer[j] = s16;   // left
         out_buffer[j+1] = s16; // right        
@@ -661,48 +645,39 @@ void synth_start(void) {
     cfg.busy    = false;
     cfg.volume  = 0;
     cfg.legato  = false;
-    cfg.arp     = ARP_OFF;
-    cfg.arp_freqs[0] = 0;
-    cfg.arp_freqs[1] = 0;
-    cfg.arp_freqs[2] = 0;
-    cfg.arp_freqs[3] = 0;
-    cfg.arp_freqs[4] = 0;
 
-    cfg.tempo = 30;
+    cfg.tempo = 90;
 
-    cfg.osc[0].waveform = WAVE_SQUARE;
-    cfg.osc[0].modifier = 0.0f;
-    cfg.osc[0].detune = 1.0f;
-    cfg.osc[1].waveform = WAVE_SQUARE;
-    cfg.osc[1].modifier = 0.0f;
-    cfg.osc[1].detune = 1.0f;    
-    cfg.osc_balance = 0.5f;
-    cfg.noise_gain = 0.0f;
+    cfg.part[0].osc[0].waveform = WAVE_SQUARE;
+    cfg.part[0].osc[0].modifier = 0.0f;
+    cfg.part[0].osc[0].detune = 1.0f;
+    cfg.part[0].osc[1].waveform = WAVE_SQUARE;
+    cfg.part[0].osc[1].modifier = 0.0f;
+    cfg.part[0].osc[1].detune = 1.0f;    
+    cfg.part[0].osc_balance = 0.5f;
+    cfg.part[0].noise_gain = 0.0f;
 
-    cfg.env[0].attack  = 0.0005;
-    cfg.env[0].decay   = 0.005;
-    cfg.env[0].sustain = 1.0;
-    cfg.env[0].release = 0.0005;
+    for (int e=0; e<NUM_ENV; e++) {
+        cfg.part[0].env[e].attack  = 0.0005;
+        cfg.part[0].env[e].decay   = 0.005;
+        cfg.part[0].env[e].sustain = 1.0;
+        cfg.part[0].env[e].release = 0.0005;
+        cfg.part[0].env_amount[e] = 1.0f;
+    }
     
-    cfg.env[1].attack  = 0.0005;
-    cfg.env[1].decay   = 0.005;
-    cfg.env[1].sustain = 1.0;
-    cfg.env[1].release = 0.0005;
+    //cfg.part[0].env_dest[0] = DEST_AMP;
+    //cfg.part[0].env_dest[1] = DEST_FREQ;
 
-    cfg.env_dest[0] = ENVDEST_AMP;
-    cfg.env_amount[0] = 1.0f;
-    cfg.env_dest[1] = ENVDEST_FREQ;
-    cfg.env_amount[1] = 1.0f;
-
-    cfg.cutoff  = 10000.0;
-    cfg.resonance = 0.0;
-    cfg.env_mod = 0.0;
+    cfg.part[0].cutoff  = 10000.0;
+    cfg.part[0].resonance = 0.0;
+    cfg.part[0].env_mod = 0.0;
     
     cfg.fx_damping = 0.3f;
     cfg.fx_combg = 0.881678f;
     cfg.fx_wet = 0.5f;
 
     cfg.lfo[0].rate = 0.0f;
+    cfg.lfo[0].dest = DEST_AMP;
     cfg.lfo[0].amount = 0.0f;
 
     memcpy(&synth, &cfg, sizeof(SynthConfig));

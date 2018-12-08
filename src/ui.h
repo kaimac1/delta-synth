@@ -5,7 +5,7 @@
 #include <stdio.h>
 
 typedef struct {
-    char *name;
+    char name[16];
 } MenuItem;
 
 typedef struct {

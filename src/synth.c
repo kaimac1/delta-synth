@@ -43,8 +43,9 @@ uint16_t out_buffer_1[OUT_BUFFER_SAMPLES];
 uint16_t out_buffer_2[OUT_BUFFER_SAMPLES];
 uint16_t *out_buffer = out_buffer_1;
 
-// Sine table
-int16_t sine_table[SINE_TABLE_SIZE];
+// Lookup tables
+#define EXP_TABLE_SIZE 1024
+float exp_table[EXP_TABLE_SIZE];
 
 //inline void sequencer_update(void);
 inline void fill_buffer(void);
@@ -368,15 +369,15 @@ inline void fill_buffer(void) {
     float dest_noise;
     float *dests[] = {&dest_amp, &dest_freq, &dest_mod, &dest_noise};
 
-    /*// Envelope retrigger
-    for (int voice=0; voice<NUM_VOICE; voice++) {
-        if (cfg.key[voice] && cfg.key_retrigger[voice]) {
-            synth.key_retrigger[voice] = false;
-            cfg.key_retrigger[voice] = false;            
-            env[voice][0].state = ENV_ATTACK;
-            env[voice][1].state = ENV_ATTACK;
+    // Envelope retrigger
+    for (int p=0; p<NUM_PART; p++) {
+        if (cfg.part[p].gate && cfg.part[p].trig) {
+            synth.part[p].trig = false;
+            cfg.part[p].trig = false;
+            env[p][0].state = ENV_ATTACK;
+            env[p][1].state = ENV_ATTACK;
         }
-    }*/    
+    }
 
     // Modulation routing
     float *deste0 = dests[cfg.part[0].env_dest[0]];
@@ -449,11 +450,11 @@ inline void fill_buffer(void) {
 
             // Filter
             float fc = cfg.part[p].cutoff + cfg.part[p].env_mod * env[p][1].level;
+            fc = 5000.0f * fc * exp_lookup(fc);
             mix = ladder_filter(&filter[p], mix, fc, cfg.part[p].resonance);
 
             // Amp
             mix *= dest_amp;
-            // mix *= env[voice][0].level;
             s += mix;
 
         }
@@ -629,17 +630,32 @@ inline float sample_drums(void) {
 }*/
 
 
-void create_wave_tables(void) {
+void create_tables(void) {
 
-    // Sine
-    for (int i=0; i<SINE_TABLE_SIZE; i++) {
-        float arg = 2*PI*i / SINE_TABLE_SIZE;
-        sine_table[i] = (int16_t)(sinf(arg) * 32767);
+    // Exp map
+    for (int i=0; i<EXP_TABLE_SIZE; i++) {
+        float arg = (float)i/EXP_TABLE_SIZE;
+        exp_table[i] = expf(arg);
     }
+
+}
+
+float exp_lookup(float arg) {
+
+    int idx = arg * EXP_TABLE_SIZE;
+    if (idx > EXP_TABLE_SIZE-1) {
+        idx = EXP_TABLE_SIZE-1;
+    } else if (idx < 0) {
+        idx = 0;
+    }
+
+    return exp_table[idx];
 }
 
 
 void synth_start(void) {
+
+    create_tables();
 
     // Initial config
     cfg.busy    = false;
@@ -668,9 +684,9 @@ void synth_start(void) {
     //cfg.part[0].env_dest[0] = DEST_AMP;
     //cfg.part[0].env_dest[1] = DEST_FREQ;
 
-    cfg.part[0].cutoff  = 10000.0;
-    cfg.part[0].resonance = 0.0;
-    cfg.part[0].env_mod = 0.0;
+    cfg.part[0].cutoff  = 1.0f;
+    cfg.part[0].resonance = 0.0f;
+    cfg.part[0].env_mod = 0.0f;
     
     cfg.fx_damping = 0.3f;
     cfg.fx_combg = 0.881678f;

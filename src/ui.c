@@ -139,13 +139,13 @@ void update_lead(void) {
 
                 // Filter
                 case 9:
-                    synth.part[part].cutoff = 10000.0f * amount;
+                    synth.part[part].cutoff = amount;
                     break;
                 case 10:
                     synth.part[part].resonance = 3.99f * amount;
                     break;
                 case 11:
-                    synth.part[part].env_mod = 5000.0f * amount;
+                    synth.part[part].env_mod = amount;
                     break;
 
                 // LFO

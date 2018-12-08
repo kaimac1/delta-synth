@@ -5,10 +5,6 @@
 #define ENV_OVERSHOOT 0.05f
 #define MIN_ATTACK 0.005f;
 
-#define SINE_TABLE_WIDTH 11 // bits
-#define SINE_TABLE_SIZE (1<<SINE_TABLE_WIDTH)
-extern int16_t sine_table[SINE_TABLE_SIZE];
-
 #define NUM_PART 1
 #define NUM_OSCILLATOR 2
 #define NUM_ENV 2
@@ -132,7 +128,5 @@ extern bool trig_clap;
 extern bool trig_hat_cl;
 extern bool trig_hat_op;
 
-void create_wave_tables(void);
 void synth_start(void);
-
-
+float exp_lookup(float arg);

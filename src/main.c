@@ -17,7 +17,6 @@ int main(void) {
     build_font_index();
     hardware_init();
     gen_note_table();
-    create_wave_tables();
     synth_start();
    
     pin_cfg_output(GPIOA, 1<<5);    // Nucleo LED

@@ -33,7 +33,7 @@ int encoder_start = 0;
 int pot_moved = -1;
 int pot_show_timer;
 
-bool detune_mode;
+bool tune_semitones;
 
 typedef struct {
     int reverb_amount;
@@ -105,18 +105,30 @@ void update_lead(void) {
         
             float amount = filtered_pot[i] / POTMAX;
             float temp;
+            int temp_int;
 
             switch (i) {
                 // Oscillator
                 case 0: // Osc1/2 mix
-                    synth.part[part].osc_balance = amount;
+                    synth.part[part].osc[0].gain = 1.0f - amount;
+                    synth.part[part].osc[1].gain = amount;
                     break;
                 case 1: // Modifier
                     synth.part[part].osc[this_osc].modifier = amount;
                     break;
                 case 2: // Tune
-                    temp = 2 * (amount - 0.5f);
-                    temp = pow(halfstep, temp);
+                    if (tune_semitones) {
+                        // +/- 1 octave, semitone steps
+                        temp = 24 * (amount - 0.5f);
+                        if (temp > 0.0f) temp += 0.5f;
+                        if (temp < 0.0f) temp -= 0.5f;
+                        temp = (int)temp;
+                        temp = pow(halfstep, temp);
+                    } else {
+                        // +/- 1 semitone, free
+                        temp = 2 * (amount - 0.5f);
+                        temp = pow(halfstep, temp);
+                    }
                     synth.part[part].osc[this_osc].detune = temp;
                     break;
 
@@ -276,8 +288,10 @@ void ui_update(void) {
 
         // Tune
         if (buttons[BTN_OSC_TUNE] == BTN_DOWN) {
-            seq_idx++;
-            if (seq_idx == NUM_SEQ_STEPS) seq_idx = 0;
+            tune_semitones = !tune_semitones;
+            SAVE_POT(2);
+            //seq_idx++;
+            //if (seq_idx == NUM_SEQ_STEPS) seq_idx = 0;
         }
         //
 
@@ -433,7 +447,8 @@ void draw_screen(void) {
 
     if (pot_moved != -1) {
         draw_box(16,16,96,32);
-        sprintf(buf, "%d: %d", pot_moved, filtered_pot[pot_moved]);
+        int amount = filtered_pot[pot_moved] / 32;
+        sprintf(buf, "%d: %d", pot_moved, amount);
         draw_text_cen(64, 34, buf, 0);
     }
 

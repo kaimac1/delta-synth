@@ -436,7 +436,7 @@ inline void fill_buffer(void) {
                 }
                 
                 // Sum oscillators
-                mix += (osc == 0) ? ((1.0f - cfg.part[p].osc_balance) * s1) : (cfg.part[p].osc_balance * s1);
+                mix += cfg.part[p].osc[osc].gain * s1;
             }
 
             // Noise
@@ -659,13 +659,12 @@ void synth_start(void) {
 
     cfg.tempo = 90;
 
-    cfg.part[0].osc[0].waveform = WAVE_SQUARE;
-    cfg.part[0].osc[0].modifier = 0.0f;
-    cfg.part[0].osc[0].detune = 1.0f;
-    cfg.part[0].osc[1].waveform = WAVE_SQUARE;
-    cfg.part[0].osc[1].modifier = 0.0f;
-    cfg.part[0].osc[1].detune = 1.0f;    
-    cfg.part[0].osc_balance = 0.5f;
+    for (int o=0; o<NUM_OSCILLATOR; o++) {
+        cfg.part[0].osc[o].waveform = WAVE_SQUARE;
+        cfg.part[0].osc[o].modifier = 0.0f;
+        cfg.part[0].osc[o].detune = 1.0f;
+        cfg.part[0].osc[o].gain = 0.5f;
+    }
     cfg.part[0].noise_gain = 0.0f;
     cfg.part[0].lfo.rate = 0.0f;
     cfg.part[0].lfo.dest = DEST_AMP;

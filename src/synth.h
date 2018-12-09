@@ -40,6 +40,7 @@ typedef struct {
     Wave waveform;
     float modifier;
     float detune;
+    float gain;
 } Oscillator;
 
 // Envelope generator settings
@@ -65,7 +66,6 @@ typedef struct {
     bool trig;
 
     Oscillator osc[NUM_OSCILLATOR];
-    float osc_balance;
     float noise_gain;
     ADSR env[NUM_ENV];
 

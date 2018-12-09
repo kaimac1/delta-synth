@@ -66,7 +66,7 @@ void menu_lfo_draw(Menu *menu, int i);
 
 #define POT_UPDATE_THRESHOLD 50
 #define POTMAX 4095.0f
-#define DECAY_MIN 0.02f
+#define DECAY_MIN 0.060f
 #define LEAD_DECAY_CONST 0.000014f
 const float halfstep = 1.059463f;
 
@@ -105,7 +105,6 @@ void update_lead(void) {
         
             float amount = filtered_pot[i] / POTMAX;
             float temp;
-            int temp_int;
 
             switch (i) {
                 // Oscillator
@@ -286,14 +285,11 @@ void ui_update(void) {
             redraw = true;
         }
 
-        // Tune
+        // Tune mode
         if (buttons[BTN_OSC_TUNE] == BTN_DOWN) {
             tune_semitones = !tune_semitones;
             SAVE_POT(2);
-            //seq_idx++;
-            //if (seq_idx == NUM_SEQ_STEPS) seq_idx = 0;
         }
-        //
 
         // Envelope select
         if (buttons[BTN_ENV_SEL] == BTN_DOWN) {

@@ -107,50 +107,50 @@ void update_lead(void) {
             float temp;
 
             switch (i) {
-                // Oscillators
-                case 0:
+                // Oscillator
+                case 0: // Osc1/2 mix
                     synth.part[part].osc_balance = amount;
                     break;
-                case 1:
+                case 1: // Modifier
                     synth.part[part].osc[this_osc].modifier = amount;
                     break;
-                case 2:
+                case 2: // Tune
                     temp = 2 * (amount - 0.5f);
                     temp = pow(halfstep, temp);
                     synth.part[part].osc[this_osc].detune = temp;
                     break;
 
                 // Enevelope
-                case 3:
+                case 3: // Attack
                     temp = amount + MIN_ATTACK;
                     synth.part[part].env[this_env].attack = 1.0f/(temp * SAMPLE_RATE);
                     break;
-                case 4:
+                case 4: // Decay
                     temp = amount + DECAY_MIN;
                     synth.part[part].env[this_env].decay = LEAD_DECAY_CONST / (temp*temp*temp);
                     break;
-                case 5:
+                case 5: // Sustain
                     synth.part[part].env[this_env].sustain = amount;
                     break;
-                case 6:
+                case 6: // Release
                     temp = amount + DECAY_MIN;
                     synth.part[part].env[this_env].release = LEAD_DECAY_CONST / (temp*temp*temp);
                     break;
 
                 // Filter
-                case 9:
+                case 9: // Cutoff
                     synth.part[part].cutoff = amount;
                     break;
-                case 10:
+                case 10: // Resonance
                     synth.part[part].resonance = 3.99f * amount;
                     break;
-                case 11:
+                case 11: // Envelope cutoff modulation
                     synth.part[part].env_mod = amount;
                     break;
 
                 // LFO
-                case 7:
-                    synth.lfo[0].rate = 0.001f * amount;
+                case 7: // Rate
+                    synth.part[part].lfo.rate = 0.006f * amount;
                     break;
 
                 case 8:
@@ -167,8 +167,8 @@ void update_lead(void) {
     synth.part[part].env_amount[0] = input.env_amount[0] / 127.0f;
     synth.part[part].env_amount[1] = input.env_amount[1] / 127.0f;
 
-    synth.lfo[0].dest = input.lfo_dest;
-    synth.lfo[0].amount = input.lfo_amount / 127.0f;
+    synth.part[part].lfo.dest = input.lfo_dest;
+    synth.part[part].lfo.amount = input.lfo_amount / 127.0f;
 
 }
 

@@ -8,7 +8,6 @@
 #define NUM_PART 1
 #define NUM_OSCILLATOR 2
 #define NUM_ENV 2
-#define NUM_LFO 1
 
 // Envelope generator state
 typedef enum {
@@ -73,6 +72,7 @@ typedef struct {
     ModDest env_dest[NUM_ENV];
     float env_amount[NUM_ENV];
 
+    LFO lfo;
 
     // Filter
     float cutoff;       // fs
@@ -95,9 +95,6 @@ typedef struct {
 
     MonoSynth part[NUM_PART];
     
-    // LFO
-    LFO lfo[NUM_LFO];
-
     // FX
     float fx_damping;
     float fx_combg;

@@ -25,8 +25,7 @@ typedef struct {
 Filter filter[NUM_PART];
 Envelope env[NUM_PART][NUM_ENV];
 float nco[NUM_PART][NUM_OSCILLATOR];
-float lfo_nco[NUM_LFO];
-
+float lfo_nco[NUM_PART];
 
 uint32_t start_time;
 uint32_t loop_time;
@@ -382,20 +381,11 @@ inline void fill_buffer(void) {
     // Modulation routing
     float *deste0 = dests[cfg.part[0].env_dest[0]];
     float *deste1 = dests[cfg.part[0].env_dest[1]];
-    float *destl0 = dests[cfg.lfo[0].dest];
+    float *destl0 = dests[cfg.part[0].lfo.dest];
 
     for (int j=0; j<OUT_BUFFER_SAMPLES; j += 2) {
         
         float s = 0.0f;
-        float lfo_out = 0.0f;
-
-        // LFO
-        /*for (int id=0; id<NUM_LFO; id++) {
-            lfo_nco[id] += cfg.lfo[id].rate;
-            if (lfo_nco[id] > 1.0f) lfo_nco[id] -= 1.0f;
-            lfo_out = (lfo_nco[id] < 0.5f) ? lfo_nco[id] : 1.0f - lfo_nco[id];
-            lfo_out = cfg.lfo[id].amount*(4.0f * lfo_out - 1.0f);
-        }*/
 
         for (int p=0; p<NUM_PART; p++) {
             float mix = 0.0f;
@@ -404,6 +394,11 @@ inline void fill_buffer(void) {
             dest_amp = 0.0f;
             dest_noise = 0.0f;
 
+            // LFO
+            lfo_nco[p] += cfg.part[p].lfo.rate;
+            if (lfo_nco[p] > 1.0f) lfo_nco[p] -= 1.0f;
+            float lfo_out = (lfo_nco[p] < 0.5f) ? lfo_nco[p] : 1.0f - lfo_nco[p];
+            lfo_out = cfg.part[p].lfo.amount*(4.0f * lfo_out - 1.0f);
             *destl0 += lfo_out;
 
             // Update envelopes.
@@ -672,6 +667,12 @@ void synth_start(void) {
     cfg.part[0].osc[1].detune = 1.0f;    
     cfg.part[0].osc_balance = 0.5f;
     cfg.part[0].noise_gain = 0.0f;
+    cfg.part[0].lfo.rate = 0.0f;
+    cfg.part[0].lfo.dest = DEST_AMP;
+    cfg.part[0].lfo.amount = 0.0f;
+    cfg.part[0].cutoff  = 1.0f;
+    cfg.part[0].resonance = 0.0f;
+    cfg.part[0].env_mod = 0.0f;    
 
     for (int e=0; e<NUM_ENV; e++) {
         cfg.part[0].env[e].attack  = 0.0005;
@@ -681,20 +682,10 @@ void synth_start(void) {
         cfg.part[0].env_amount[e] = 1.0f;
     }
     
-    //cfg.part[0].env_dest[0] = DEST_AMP;
-    //cfg.part[0].env_dest[1] = DEST_FREQ;
-
-    cfg.part[0].cutoff  = 1.0f;
-    cfg.part[0].resonance = 0.0f;
-    cfg.part[0].env_mod = 0.0f;
-    
     cfg.fx_damping = 0.3f;
     cfg.fx_combg = 0.881678f;
     cfg.fx_wet = 0.5f;
 
-    cfg.lfo[0].rate = 0.0f;
-    cfg.lfo[0].dest = DEST_AMP;
-    cfg.lfo[0].amount = 0.0f;
 
     memcpy(&synth, &cfg, sizeof(SynthConfig));
 

@@ -3,13 +3,15 @@
 
 #define SAMPLE_RATE 44100
 #define ENV_OVERSHOOT 0.05f
-#define MIN_ATTACK 0.005f;
+#define MIN_ATTACK 0.005f
 
 #define NUM_PART 1
 #define NUM_OSCILLATOR 2
 #define NUM_ENV 2
 
-// Envelope generator state
+
+
+// Envelope state
 typedef enum {
     ENV_ATTACK,
     ENV_DECAY,
@@ -35,6 +37,8 @@ typedef enum {
     NUM_WAVE
 } Wave;
 
+
+
 // Oscillator settings
 typedef struct {
     Wave waveform;
@@ -57,6 +61,8 @@ typedef struct {
     float amount;
     ModDest dest;
 } LFO;
+
+
 
 // Single voice
 typedef struct {
@@ -83,10 +89,10 @@ typedef struct {
 
 
 
+// Whole synth config
 typedef struct {
-    bool busy;          // config being updated, don't copy
-
-    float volume;
+    bool busy;          // Struct is being updated, don't copy
+    float volume;       // 0-1
     bool legato;
 
     // Sequencer
@@ -102,6 +108,9 @@ typedef struct {
 
 } SynthConfig;
 
+
+
+
 typedef struct {
     float freq;
     float gate_length;
@@ -112,6 +121,9 @@ typedef struct {
     SeqStep step[NUM_SEQ_STEPS];
 } SeqConfig;
 
+
+
+
 extern SynthConfig cfg;
 extern SynthConfig synth;
 extern SeqConfig seq;
@@ -119,11 +131,7 @@ extern SeqConfig seq;
 extern uint32_t loop_time;
 extern uint32_t transfer_time;
 
-extern bool trig_bass;
-extern bool trig_snare;
-extern bool trig_clap;
-extern bool trig_hat_cl;
-extern bool trig_hat_op;
+
 
 void synth_start(void);
 float exp_lookup(float arg);

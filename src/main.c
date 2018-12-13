@@ -5,17 +5,29 @@
 #include "board.h"
 #include "synth.h"
 #include "ui.h"
-#include "stm32f4xx_ll_tim.h"
 
-void hardware_init(void);
 void SystemClock_Config(void);
 
 /******************************************************************************/
 int main(void) { 
 
     HAL_Init();
+    SystemClock_Config();
+
+    // Enable all GPIO clocks
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    __HAL_RCC_GPIOB_CLK_ENABLE();
+    __HAL_RCC_GPIOC_CLK_ENABLE();
+    __HAL_RCC_GPIOD_CLK_ENABLE();
+    __HAL_RCC_GPIOE_CLK_ENABLE();
+    __HAL_RCC_SYSCFG_CLK_ENABLE();
+
     build_font_index();
-    hardware_init();
+    display_init();
+    uart_init();
+    timer_init();
+    input_init();
+    
     gen_note_table();
     synth_start();
    
@@ -30,28 +42,7 @@ int main(void) {
  
 }
 
-
-void hardware_init(void) {
-
-    SystemClock_Config();
-
-    // Enable all GPIO clocks
-    __HAL_RCC_GPIOA_CLK_ENABLE();
-    __HAL_RCC_GPIOB_CLK_ENABLE();
-    __HAL_RCC_GPIOC_CLK_ENABLE();
-    __HAL_RCC_GPIOD_CLK_ENABLE();
-    __HAL_RCC_GPIOE_CLK_ENABLE();
-    __HAL_RCC_SYSCFG_CLK_ENABLE();
-
-    display_init();
-    uart_init();
-    timer_init();
-    input_init();
-    
-
-}
-
-
+// Set CPU to max (180 MHz)
 void SystemClock_Config(void) {
 
     RCC_ClkInitTypeDef RCC_ClkInitStruct;

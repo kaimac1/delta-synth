@@ -7,6 +7,7 @@
 #include "notes.h"
 #define PI 3.1415926f
 
+
 SynthConfig synth;
 SynthConfig cfg;
 
@@ -27,6 +28,7 @@ Envelope env[NUM_PART][NUM_ENV];
 float nco[NUM_PART][NUM_OSCILLATOR];
 float lfo_nco[NUM_PART];
 
+// profiling
 uint32_t start_time;
 uint32_t loop_time;
 uint32_t transfer_time;
@@ -113,6 +115,7 @@ inline void sequencer_update(void) {
     }
 
 }
+
 
 /******************************************************************************/
 // SYNTHESIS BLOCKS
@@ -485,156 +488,13 @@ inline void fill_buffer(void) {
 
 }
 
-/*bool trig_bass;
-bool trig_snare;
-bool trig_clap;
-bool trig_hat_cl;
-bool trig_hat_op;
 
-float nco_bass = 0.0f;
-bool bass_attack = false;
-float env_bass = 0.0f;
-float bass_gain = 3.0f;
-float bass_freq = 0.0f;
+/******************************************************************************/
+// SETUP
+/******************************************************************************/
 
-float nco_snare_lo = 0.0f;
-float nco_snare_hi = 0.0f;
-float env_snare_tone = 0.0f;
-float env_snare_noise = 0.0f;
-
-float env_clap = 0.0f;
-int clap_num = 0;
-int clap_ctr = 0;
-Filter fclap;
-
-float env_hat = 0.0f;
-bool hat_open;
-Filter fhat;
-
-inline float sample_drums(void) {
-
-    float s = 0.0f;
-    
-    // Bass
-
-    if (trig_bass) {
-        nco_bass = 0.0f;
-        env_bass = 0.0f;
-        trig_bass = false;
-        bass_attack = true;
-        bass_freq = cfg.bass_pitch;
-    }
-
-    nco_bass += bass_freq;
-    bass_freq *= (1.0f - cfg.bass_punch);
-    if (nco_bass > 1.0f) nco_bass -= 1.0f;
-    float part = (nco_bass < 0.5f) ? nco_bass : 1.0f - nco_bass;
-    part = 8.0f * part - 2.0f;
-    part *= bass_gain;
-
-    if (bass_attack) {
-        env_bass += cfg.bass_click;
-        if (env_bass > 1.0f) {
-            env_bass = 1.0f;
-            bass_attack = false;
-        }
-    } else {
-        env_bass -= cfg.bass_decay * (ENV_OVERSHOOT + env_bass);
-        if (env_bass < 0.0f) env_bass = 0.0f;        
-    }
-
-    s = part * env_bass;
-
-    // Snare
-
-    if (trig_snare) {
-        env_snare_tone = 1.0f;
-        env_snare_noise = 1.0f;
-        trig_snare = false;
-    }
-
-    // 180 Hz
-    nco_snare_lo += 0.00408f;
-    if (nco_snare_lo > 1.0f) nco_snare_lo -= 1.0f;
-    float snare_lo = (nco_snare_lo < 0.5f) ? nco_snare_lo : 1.0f - nco_snare_lo;
-    snare_lo = 8.0f * snare_lo - 2.0f;    
-
-    // 330 Hz
-    nco_snare_hi += 0.00748f;
-    if (nco_snare_hi > 1.0f) nco_snare_hi -= 1.0f;
-    float snare_hi = (nco_snare_hi < 0.5f) ? nco_snare_hi : 1.0f - nco_snare_hi;
-    snare_hi = 8.0f * snare_hi - 2.0f;
-
-    // Tone mix
-    part = cfg.snare_tone * snare_hi + (1.0f - cfg.snare_tone) * snare_lo;
-    env_snare_tone -= 2.0f * cfg.snare_decay * (ENV_OVERSHOOT + env_snare_tone);
-    if (env_snare_tone < 0.0f) env_snare_tone = 0.0f;        
-    s += part * env_snare_tone;
-
-    // Noise
-    env_snare_noise -= cfg.snare_decay * (ENV_OVERSHOOT + env_snare_noise);
-    if (env_snare_noise < 0.0f) env_snare_noise = 0.0f;            
-    s += whitenoise() * env_snare_noise;
-
-    // Clap
-
-    if (trig_clap) {
-        trig_clap = false;
-        env_clap = 1.0f;
-        clap_num = 0;
-        clap_ctr = 0;
-    }
-
-    env_clap -= cfg.clap_decay * (ENV_OVERSHOOT + env_clap);
-    float thresh = 0.4f / (cfg.clap_decay/0.0005f);
-    if (env_clap < 0.0f) env_clap = 0.0f;
-    if (clap_num < 3) {
-        clap_ctr++;
-        if (clap_ctr > thresh * SAMPLE_RATE * 0.05f) {
-            clap_ctr = 0;
-            clap_num++;
-            env_clap = 1.0f;
-        }
-    }
-
-    float c = 60.0f * bandpass(&fclap, whitenoise(), cfg.clap_filt);
-    s += c * env_clap;
-
-
-    // Hi hat (closed)
-
-    if (trig_hat_cl) {
-        trig_hat_cl = false;
-        hat_open = false;
-        env_hat = 1.0f;
-    }
-    else if (trig_hat_op) {
-        trig_hat_op = false;
-        hat_open = true;
-        env_hat = 1.0f;
-    }
-
-    float dec = hat_open ? 0.0004f : 0.002f;
-    env_hat -= dec * (ENV_OVERSHOOT + env_hat);
-    if (env_hat < 0.0f) env_hat = 0.0f;
-    //s += 0.5f * whitenoise() * env_hat;
-    s += 2.0f * bandpass(&fhat, whitenoise(), 15000.0f) * env_hat;
-
-    return s;
-
-}*/
-
-
-void create_tables(void) {
-
-    // Exp map
-    for (int i=0; i<EXP_TABLE_SIZE; i++) {
-        float arg = (float)i/EXP_TABLE_SIZE;
-        exp_table[i] = expf(arg);
-    }
-
-}
-
+// Fast exp() using a lookup table.
+// Domain is 0-1.
 float exp_lookup(float arg) {
 
     int idx = arg * EXP_TABLE_SIZE;
@@ -647,6 +507,16 @@ float exp_lookup(float arg) {
     return exp_table[idx];
 }
 
+// Create lookup tables.
+void create_tables(void) {
+
+    // Exp map
+    for (int i=0; i<EXP_TABLE_SIZE; i++) {
+        float arg = (float)i/EXP_TABLE_SIZE;
+        exp_table[i] = expf(arg);
+    }
+
+}
 
 void synth_start(void) {
 
@@ -656,39 +526,36 @@ void synth_start(void) {
     cfg.busy    = false;
     cfg.volume  = 0;
     cfg.legato  = false;
+    cfg.tempo   = 90;
 
-    cfg.tempo = 90;
-
-    for (int o=0; o<NUM_OSCILLATOR; o++) {
-        cfg.part[0].osc[o].waveform = WAVE_SQUARE;
-        cfg.part[0].osc[o].modifier = 0.0f;
-        cfg.part[0].osc[o].detune = 1.0f;
-        cfg.part[0].osc[o].gain = 0.5f;
-    }
-    cfg.part[0].noise_gain = 0.0f;
-    cfg.part[0].lfo.rate = 0.0f;
-    cfg.part[0].lfo.dest = DEST_AMP;
-    cfg.part[0].lfo.amount = 0.0f;
-    cfg.part[0].cutoff  = 1.0f;
-    cfg.part[0].resonance = 0.0f;
-    cfg.part[0].env_mod = 0.0f;    
-
-    for (int e=0; e<NUM_ENV; e++) {
-        cfg.part[0].env[e].attack  = 0.0005;
-        cfg.part[0].env[e].decay   = 0.005;
-        cfg.part[0].env[e].sustain = 1.0;
-        cfg.part[0].env[e].release = 0.0005;
-        cfg.part[0].env_amount[e] = 1.0f;
+    for (int p=0; p<NUM_PART; p++) {
+        for (int o=0; o<NUM_OSCILLATOR; o++) {
+            cfg.part[p].osc[o].waveform = WAVE_SQUARE;
+            cfg.part[p].osc[o].modifier = 0.0f;
+            cfg.part[p].osc[o].detune = 1.0f;
+            cfg.part[p].osc[o].gain = 0.5f;
+        }
+        for (int e=0; e<NUM_ENV; e++) {
+            cfg.part[p].env[e].attack  = 0.0005;
+            cfg.part[p].env[e].decay   = 0.005;
+            cfg.part[p].env[e].sustain = 1.0;
+            cfg.part[p].env[e].release = 0.0005;
+            cfg.part[p].env_amount[e] = 1.0f;
+        }
+        cfg.part[p].noise_gain = 0.0f;
+        cfg.part[p].lfo.rate = 0.0f;
+        cfg.part[p].lfo.dest = DEST_AMP;
+        cfg.part[p].lfo.amount = 0.0f;
+        cfg.part[p].cutoff  = 1.0f;
+        cfg.part[p].resonance = 0.0f;
+        cfg.part[p].env_mod = 0.0f;    
     }
     
     cfg.fx_damping = 0.3f;
     cfg.fx_combg = 0.881678f;
     cfg.fx_wet = 0.5f;
 
-
     memcpy(&synth, &cfg, sizeof(SynthConfig));
-
-    
     fill_buffer();
 
     audio_init(SAMPLE_RATE);

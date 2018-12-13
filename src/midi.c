@@ -1,19 +1,16 @@
 #include "main.h"
+#include "board.h"
 #include "notes.h"
 #include "synth.h"
-#include "board.h"
 #include "ui.h"
-#include <math.h>
-
-#define CONTROLLER_1    0x0E
-#define CONTROLLER_2    0x0F
-#define CONTROLLER_3    0x10
-#define CONTROLLER_4    0x11
 
 void midi_process_command(void);
+void note_on(float freq);
+void note_off(float freq);
 
 uint8_t command[3];
 bool midi_event;
+
 
 // Called from the MIDI UART interrupt handler
 void midi_process_byte(uint8_t byte) {
@@ -24,6 +21,7 @@ void midi_process_byte(uint8_t byte) {
         // Status byte
         command[0] = byte;
         data_bytes = ((byte & 0xE0) == 0xC0) ? 1 : 2;
+
     } else {
         // Data byte
         if (data_bytes > 0) {
@@ -34,6 +32,75 @@ void midi_process_byte(uint8_t byte) {
     }
     
 }
+
+void midi_process_command(void) {
+
+    switch (command[0]) {
+
+        // Note on
+        case 0x90:
+            note_on(note[command[1]]);
+            // Retrigger on new note in normal mode
+            // if (!synth.legato && (note[command[1]] != cfg.freq)) {
+            //     synth.env_retrigger = true;
+            // }
+            break;
+
+        // Note off
+        case 0x80:
+            note_off(note[command[1]]);
+            break;
+
+        default:
+            // printf("%02x %02x %02x\r\n", command[0], command[1], command[2]);
+            break;
+            
+    }
+
+    midi_event = true;
+
+}
+
+
+
+
+void mono_add(float freq) {
+    synth.busy = true;
+    synth.part[0].freq = freq;
+    synth.part[0].gate = true;
+    synth.part[0].trig = true;
+    synth.busy = false;
+}
+
+void mono_del(float freq) {
+    if (freq == synth.part[0].freq) {
+        synth.busy = true;
+        synth.part[0].gate = false;
+        synth.part[0].trig = false;
+        synth.busy = false;
+    }
+}
+
+void note_on(float freq) {
+
+    if (seq_record) {
+        seq_note_on(freq);
+    } else {
+        mono_add(freq);
+    }
+
+}
+void note_off(float freq) {
+
+    if (seq_record) {
+        seq_note_off(freq);
+    } else {
+        mono_del(freq);
+    }
+
+}
+
+
 
 
 /*void poly_add(float freq) {
@@ -84,91 +151,3 @@ void poly_del(float freq) {
 
 }*/
 
-void mono_add(float freq) {
-    synth.busy = true;
-    synth.part[0].freq = freq;
-    synth.part[0].gate = true;
-    synth.part[0].trig = true;
-    synth.busy = false;
-}
-
-void mono_del(float freq) {
-    if (freq == synth.part[0].freq) {
-        synth.busy = true;
-        synth.part[0].gate = false;
-        synth.part[0].trig = false;
-        synth.busy = false;
-    }
-}
-
-void note_on(float freq) {
-
-    if (seq_record) {
-        seq_note_on(freq);
-    } else {
-        mono_add(freq);
-    }
-
-}
-void note_off(float freq) {
-
-    if (seq_record) {
-        seq_note_off(freq);
-    } else {
-        mono_del(freq);
-    }
-
-}
-
-
-
-
-void midi_process_command(void) {
-
-    switch(command[0]) {
-
-        // Note on
-        case 0x90:
-            note_on(note[command[1]]);
-            // Retrigger on new note in normal mode
-            // if (!synth.legato && (note[command[1]] != cfg.freq)) {
-            //     synth.env_retrigger = true;
-            // }
-            break;
-
-        // Note off
-        case 0x80:
-            note_off(note[command[1]]);
-            break;
-
-        // value = (float)(command[2]) / 0x7F;
-        // switch (ctrlcfg) {
-        //     case CTRL_MAIN:
-        //         switch (command[1]) {
-        //             // Master volume
-        //             case CONTROLLER_1:
-        //                 synth.volume = 100 * value;
-        //                 printf("volume = %d\r\n", synth.volume);
-        //                 break;
-
-        //             case CONTROLLER_2:
-        //                 synth.tempo = 160 * value;
-        //                 printf("tempo = %d\r\n", synth.tempo);
-        //                 break;
-
-        //             case CONTROLLER_3:
-        //                 synth.detune = 1.0f + 1.5f * value;
-        //                 //printf("detune = %f\r\n", synth.detune);
-        //                 break;
-        //         }
-        //         break;
-        // }
-
-        default:
-            break;
-            //printf("%02x %02x %02x\r\n", command[0], command[1], command[2]);
-    }
-
-    midi_event = true;
-
-}

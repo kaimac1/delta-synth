@@ -1,11 +1,8 @@
 TARGET = synth
-DEBUG = 1
 OPT = -O3
 
 BUILD_DIR = build
 
-######################################
-# source
 ######################################
 C_SOURCES =  \
 src/main.c \
@@ -46,9 +43,6 @@ board/display.c \
 board/input.c \
 board/timer.c \
 
-
-
-
 C_INCLUDES =  \
 -Isrc \
 -Ilib \
@@ -57,13 +51,9 @@ C_INCLUDES =  \
 -Istm32/hal/Inc \
 -Iboard \
 
-
-# ASM sources
 ASM_SOURCES = stm32/startup_stm32f446xx.s
 
 
-#######################################
-# binaries
 #######################################
 BINPATH = /usr/bin/
 PREFIX = arm-none-eabi-
@@ -76,8 +66,6 @@ HEX = $(CP) -O ihex
 BIN = $(CP) -O binary -S
 
 #######################################
-# CFLAGS
-#######################################
 MCU = -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard
 
 # C defines
@@ -89,24 +77,13 @@ C_DEFS =  \
 ASFLAGS = $(MCU) $(OPT) -Wall -fdata-sections -ffunction-sections
 CFLAGS = $(MCU) $(C_DEFS) $(C_INCLUDES) $(OPT) -Wall -fdata-sections -ffunction-sections -Wdouble-promotion
 
-ifeq ($(DEBUG), 1)
-CFLAGS += -g -gdwarf-2
-endif
-
-
 # Generate dependency information
 CFLAGS += -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)"
 
 
-#######################################
-# LDFLAGS
-#######################################
-# link script
-LDSCRIPT = STM32F446RETx_FLASH.ld
 
-# libraries
+LDSCRIPT = STM32F446RETx_FLASH.ld
 LIBS = -lc -lm -lnosys
-#LIBDIR = lib/libPDMFilter_CM4F_GCC.a
 LDFLAGS = $(MCU) -specs=nano.specs -T$(LDSCRIPT) $(LIBS) -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--cref -Wl,--gc-sections  -u _printf_float
 
 
@@ -114,8 +91,6 @@ OBJECTS = $(addprefix $(BUILD_DIR)/,$(notdir $(C_SOURCES:.c=.o)))
 OBJECTS += $(addprefix $(BUILD_DIR)/,$(notdir $(ASM_SOURCES:.s=.o)))
 vpath %.c $(sort $(dir $(C_SOURCES)))
 vpath %.s $(sort $(dir $(ASM_SOURCES)))
-
-
 
 ################################################################################
 

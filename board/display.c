@@ -31,6 +31,8 @@ uint16_t font_index[FONT_CHARS];
 int dma_page = 0;
 
 
+// Initialise DMA to transfer the given page.
+// A page is a 128x8 row of pixels - there are 8 pages.
 void dma_setup(int page) {
 
     const int page_size = 128;
@@ -56,12 +58,17 @@ void dma_setup(int page) {
 
 }
 
-void set_page(int page) {
+// Start a DMA transfer of the given page.
+void start_page_write(int page) {
 
+    dma_setup(page);
+
+    // Set page
     ssd1306_command(0xB0 | page);
     ssd1306_command(0x02);
     ssd1306_command(0x10);
 
+    // I2C page data preamble
     while(LL_I2C_IsActiveFlag_BUSY(DISPLAY_I2C));
 
     LL_I2C_GenerateStartCondition(DISPLAY_I2C);
@@ -76,10 +83,10 @@ void set_page(int page) {
     LL_I2C_TransmitData8(DISPLAY_I2C, 0x40);
     while(!LL_I2C_IsActiveFlag_TXE(DISPLAY_I2C));  
 
+    // Start
     LL_DMA_EnableStream(DMA1, LL_DMA_STREAM_6);
 
 }
-
 
 void display_init(void) {
 
@@ -139,38 +146,8 @@ bool display_draw(void) {
     if (display_busy) return false;
     display_busy = true;
 
-    /*LL_ADC_Disable(ADC1);
-    LL_DMA_DisableStream(DMA2, LL_DMA_STREAM_0); 
-    LL_DMA_ClearFlag_HT0(DMA2);
-    LL_DMA_ClearFlag_TC0(DMA2);
-    LL_DMA_ClearFlag_TE0(DMA2);    */
-
-    //ssd1306_command(SSD1306_COLUMNADDR);
-    //ssd1306_command(0);   // Column start address
-    //ssd1306_command(127); // Column end address
-    //ssd1306_command(SSD1306_PAGEADDR);
-    //ssd1306_command(0); // Page start address
-    //ssd1306_command(7); // Page end address
-
     dma_page = 0;
-    dma_setup(dma_page);
-    set_page(dma_page);
-
-
-
-    //LL_DMA_EnableStream(DMA1, LL_DMA_STREAM_6);
-    //for (int page=0; page<1; page++) {
-
-
-
-        // for (int i=0; i<128; i++) {
-        //     LL_I2C_TransmitData8(DISPLAY_I2C, dbuf[128*page + i]);
-        //     while(!LL_I2C_IsActiveFlag_TXE(DISPLAY_I2C));          
-        // }
-
-        //LL_I2C_GenerateStopCondition(DISPLAY_I2C);
-    //}
-    //display_busy = false;
+    start_page_write(dma_page);
 
     return true;
 }
@@ -187,19 +164,19 @@ void DMA1_Stream6_IRQHandler(void) {
 
     dma_page++;
     if (dma_page == 8) {
+        // Last page - finished
         dma_page = 0;
         display_busy = false;
     } else {
-        dma_setup(dma_page);
-        set_page(dma_page);
+        // Start the next page
+        start_page_write(dma_page);
     }
 
-    // Re-enable ADCs
-    /*LL_DMA_EnableStream(DMA2, LL_DMA_STREAM_0);  
-    LL_ADC_Enable(ADC1);
-    LL_ADC_REG_StartConversionSWStart(ADC1);   */
-
 }
+
+
+
+
 
 void draw_pixel(uint16_t x, uint16_t y, bool col) {
 

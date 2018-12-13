@@ -14,38 +14,20 @@ void SystemClock_Config(void);
 int main(void) { 
 
     HAL_Init();
-    hardware_init();
-    printf("Running.\r\n");
     build_font_index();
+    hardware_init();
     gen_note_table();
-    create_wave_tables();
     synth_start();
-
-    cfgnew.volume = 70;
-
+   
     pin_cfg_output(GPIOA, 1<<5);    // Nucleo LED
     pin_set(GPIOA, 1<<5, 1);
+
+    ui_init();
 
     while (1) {
         ui_update();
     }
-
-        //         // Legato
-        //         case 'l': cfgnew.legato ^= 1; break;
-        //         // arpeggio
-        //         case 'a':
-        //             cfgnew.arp++;
-        //             cfgnew.arp %= 4;
-        //             printf("arp=%d\r\n", cfgnew.arp);
-        //             break;
-        //         // sync
-        //         case 's':
-        //             cfgnew.sync ^= 1; break;
-        //printf("***\r\n");
-        // for (int i=0; i<MAX_ARP; i++) {
-        //     printf("arp[%d] = %lu\r\n", i, cfgnew.arp_freqs[i]);
-        // }
-  
+ 
 }
 
 
@@ -61,10 +43,11 @@ void hardware_init(void) {
     __HAL_RCC_GPIOE_CLK_ENABLE();
     __HAL_RCC_SYSCFG_CLK_ENABLE();
 
-    uart_init();
-    input_init();
-    timer_init();
     display_init();
+    uart_init();
+    timer_init();
+    input_init();
+    
 
 }
 

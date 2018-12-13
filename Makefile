@@ -31,7 +31,9 @@ stm32/hal/Src/stm32f4xx_ll_usart.c \
 stm32/hal/Src/stm32f4xx_ll_gpio.c \
 stm32/hal/Src/stm32f4xx_ll_exti.c \
 stm32/hal/Src/stm32f4xx_ll_spi.c \
+stm32/hal/Src/stm32f4xx_ll_rcc.c \
 stm32/hal/Src/stm32f4xx_ll_adc.c \
+stm32/hal/Src/stm32f4xx_ll_i2c.c \
 board/gpio.c \
 board/uart.c \
 src/synth.c  \

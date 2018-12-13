@@ -36,70 +36,92 @@ void midi_process_byte(uint8_t byte) {
 }
 
 
-void poly_add(float freq) {
+/*void poly_add(float freq) {
+
+    static int st = 0;
+
     int idx = -1;
-    cfgnew.busy = true;
+    synth.busy = true;
     for (int i=0; i<NUM_VOICE; i++) {
-        if (cfgnew.key[i] == false) idx = i;
-        if (cfgnew.key[i] && cfgnew.freq[i] == freq) {
+        int n = i + st;
+        n %= NUM_VOICE;
+
+        if (synth.key[n] == false) {
+            idx = n;
+            break;
+        }
+        if (synth.key[n] && synth.freq[n] == freq) {
             // Note already on
-            idx = i;
+            idx = n;
             break;
         }
     }
-    if (idx >= 0) {
-        cfgnew.freq[idx] = freq;
-        cfgnew.key[idx] = true;
+    if (idx < 0) {
+        idx = st;
+        synth.key_retrigger[idx] = true;
     }
-    cfgnew.busy = false;
+    if (idx >= 0) {
+        synth.freq[idx] = freq;
+        synth.key[idx] = true;
+        synth.key_retrigger[idx] = true;
+        st++;
+        st %= NUM_VOICE;
+    }
+    synth.busy = false;
+
 }
 
 void poly_del(float freq) {
-    cfgnew.busy = true;
+
+    synth.busy = true;
     for (int i=0; i<NUM_VOICE; i++) {
-        if (cfgnew.freq[i] == freq) {
-            cfgnew.key[i] = false;
+        if (synth.freq[i] == freq) {
+            synth.key[i] = false;
+            synth.key_retrigger[i] = false;
         }
     }
-    cfgnew.busy = false;
+    synth.busy = false;
+
+}*/
+
+void mono_add(float freq) {
+    synth.busy = true;
+    synth.part[0].freq = freq;
+    synth.part[0].gate = true;
+    synth.part[0].trig = true;
+    synth.busy = false;
+}
+
+void mono_del(float freq) {
+    if (freq == synth.part[0].freq) {
+        synth.busy = true;
+        synth.part[0].gate = false;
+        synth.part[0].trig = false;
+        synth.busy = false;
+    }
+}
+
+void note_on(float freq) {
+
+    if (seq_record) {
+        seq_note_on(freq);
+    } else {
+        mono_add(freq);
+    }
+
+}
+void note_off(float freq) {
+
+    if (seq_record) {
+        seq_note_off(freq);
+    } else {
+        mono_del(freq);
+    }
+
 }
 
 
-void arp_add(uint32_t freq) {
 
-    cfgnew.busy = true;
-    for (int i=0; i<MAX_ARP; i++) {
-        if (cfgnew.arp_freqs[i] > freq) {
-            for (int j=MAX_ARP-2; j>=i; j--) {
-                cfgnew.arp_freqs[j+1] = cfgnew.arp_freqs[j];
-            }
-            cfgnew.arp_freqs[i] = freq;
-            break;
-        }
-        if (cfgnew.arp_freqs[i] == 0) {
-            cfgnew.arp_freqs[i] = freq;
-            break;
-        }
-    }
-    cfgnew.busy = false;
-
-}
-
-void arp_del(uint32_t freq) {
-
-    cfgnew.busy = true;
-    for (int i=0; i<MAX_ARP; i++) {
-        if (cfgnew.arp_freqs[i] == freq) {
-            for (int j=i; j<MAX_ARP-1; j++) {
-                cfgnew.arp_freqs[j] = cfgnew.arp_freqs[j+1];
-            }
-            cfgnew.arp_freqs[MAX_ARP-1] = 0;
-            break;
-        }
-    }
-    cfgnew.busy = false;
-
-}
 
 void midi_process_command(void) {
 
@@ -107,38 +129,16 @@ void midi_process_command(void) {
 
         // Note on
         case 0x90:
-            //printf("ON     %d\r\n", command[1]);
-            if (cfgnew.seq_play) {
-                seq_note_input = note[command[1]];
-            } else {
-                poly_add(note[command[1]]);
-            }
-            // if (cfgnew.arp != ARP_OFF) {
-            //     arp_add(note[command[1]]);
-            //     break;
-            // }
+            note_on(note[command[1]]);
             // Retrigger on new note in normal mode
-            // if (!cfgnew.legato && (note[command[1]] != cfg.freq)) {
-            //     cfgnew.env_retrigger = true;
+            // if (!synth.legato && (note[command[1]] != cfg.freq)) {
+            //     synth.env_retrigger = true;
             // }
-            // cfgnew.freq = note[command[1]];
             break;
 
         // Note off
         case 0x80:
-            //printf("   OFF %d\r\n", command[1]);
-            if (cfgnew.seq_play) {
-                seq_note_input = 0.0f;
-            } else {
-                poly_del(note[command[1]]);
-            }
-            // if (cfgnew.arp != ARP_OFF) {
-            //     arp_del(note[command[1]]);
-            //     break;
-            // }
-            // if (note[command[1]] == cfgnew.freq) {
-            //     cfgnew.key = false;
-            // }
+            note_off(note[command[1]]);
             break;
 
         // value = (float)(command[2]) / 0x7F;
@@ -147,25 +147,26 @@ void midi_process_command(void) {
         //         switch (command[1]) {
         //             // Master volume
         //             case CONTROLLER_1:
-        //                 cfgnew.volume = 100 * value;
-        //                 printf("volume = %d\r\n", cfgnew.volume);
+        //                 synth.volume = 100 * value;
+        //                 printf("volume = %d\r\n", synth.volume);
         //                 break;
 
         //             case CONTROLLER_2:
-        //                 cfgnew.tempo = 160 * value;
-        //                 printf("tempo = %d\r\n", cfgnew.tempo);
+        //                 synth.tempo = 160 * value;
+        //                 printf("tempo = %d\r\n", synth.tempo);
         //                 break;
 
         //             case CONTROLLER_3:
-        //                 cfgnew.detune = 1.0f + 1.5f * value;
-        //                 //printf("detune = %f\r\n", cfgnew.detune);
+        //                 synth.detune = 1.0f + 1.5f * value;
+        //                 //printf("detune = %f\r\n", synth.detune);
         //                 break;
         //         }
         //         break;
         // }
 
         default:
-            printf("%02x %02x %02x\r\n", command[0], command[1], command[2]);
+            break;
+            //printf("%02x %02x %02x\r\n", command[0], command[1], command[2]);
     }
 
     midi_event = true;

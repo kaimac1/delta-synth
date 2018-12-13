@@ -1,79 +1,262 @@
 #include "board.h"
 #include "stm32f4xx_hal.h"
 #include "stm32f4xx_ll_system.h"
+#include "stm32f4xx_ll_spi.h"
 #include "stm32f4xx_ll_exti.h"
 #include "stm32f4xx_ll_adc.h"
+#include "stm32f4xx_ll_dma.h"
 
-int enc_states[16] = {0, -1, 1, 0, 1, 0, 0, -1, -1, 0, 0, 1, 0, 1, -1, 0};
-uint8_t enc_history[NUM_ENCODERS];
 
-GPIO_TypeDef* button_ports[NUM_BUTTONS];
-uint32_t      button_pins[NUM_BUTTONS];
-GPIO_TypeDef* encoder_ports[NUM_ENCODERS];
-uint32_t      encoder_pin_a[NUM_ENCODERS];
-uint32_t      encoder_pin_b[NUM_ENCODERS];
 
-ButtonState buttons[NUM_BUTTONS];
-EncoderState encoders[NUM_ENCODERS];
-
+void gpio_init(void);
+void encoder_init(void);
+void adc_init(void);
 
 // Initialise input hardware.
 void input_init(void) {
 
-    // buttons
-    button_ports[BUTTON_OSC]      = GPIOA;
-    button_pins[BUTTON_OSC]       = LL_GPIO_PIN_2;
-    button_ports[BUTTON_FILTER]   = GPIOA;
-    button_pins[BUTTON_FILTER]    = LL_GPIO_PIN_10;
-    button_ports[BUTTON_ENVELOPE] = GPIOB;
-    button_pins[BUTTON_ENVELOPE]  = LL_GPIO_PIN_3;
+    gpio_init();
+    encoder_init();
+    adc_init();
 
+}
+
+
+/******************************************************************************/
+// GPIO expander
+
+#define SWITCH_SPI  SPI2
+#define SPI_CLK_EN  __HAL_RCC_SPI2_CLK_ENABLE
+#define CS_PORT     GPIOB
+#define CS_PIN      LL_GPIO_PIN_12
+#define SCK_PORT    GPIOB
+#define SCK_PIN     LL_GPIO_PIN_13
+#define MISO_PORT   GPIOB
+#define MISO_PIN    LL_GPIO_PIN_14
+#define MOSI_PORT   GPIOB
+#define MOSI_PIN    LL_GPIO_PIN_15
+
+#define BTN_ENC_PORT GPIOC
+#define BTN_ENC_PIN  LL_GPIO_PIN_6
+
+ButtonState buttons[NUM_BUTTONS];
+
+uint8_t spi_tx(uint8_t byte) {
+    while (!LL_SPI_IsActiveFlag_TXE(SWITCH_SPI));
+    SWITCH_SPI->DR = byte;
+    while (!LL_I2S_IsActiveFlag_RXNE(SWITCH_SPI));
+    return SWITCH_SPI->DR;
+}
+
+
+uint8_t read_reg(uint8_t reg) {
+
+    uint8_t value;
+
+    pin_set(CS_PORT, CS_PIN, 0);
+    delay_us(100);
+    spi_tx(0x41); // Read
+    spi_tx(reg);
+    value = spi_tx(0x00);
+    pin_set(CS_PORT, CS_PIN, 1);
+
+    return value;
+
+}
+
+void write_reg(uint8_t reg, uint8_t value) {
+
+    pin_set(CS_PORT, CS_PIN, 0);
+    spi_tx(0x40); // Write
+    spi_tx(reg);
+    spi_tx(value);
+    pin_set(CS_PORT, CS_PIN, 1);    
+
+}
+
+void gpio_init(void) {
+
+    SPI_CLK_EN();
+
+    // Pin init
+    pin_cfg_output(CS_PORT, CS_PIN);
+    pin_set(CS_PORT, CS_PIN, 1);
+    pin_cfg_af(SCK_PORT, SCK_PIN, 5);
+    pin_cfg_af(MOSI_PORT, MOSI_PIN, 5);
+    pin_cfg_af(MISO_PORT, MISO_PIN, 5);
+
+    pin_cfg_input(BTN_ENC_PORT, BTN_ENC_PIN, LL_GPIO_PULL_UP);
+
+    // SPI init
+    LL_SPI_InitTypeDef spi;
+    spi.TransferDirection = LL_SPI_FULL_DUPLEX;
+    spi.Mode            = LL_SPI_MODE_MASTER;
+    spi.DataWidth       = LL_SPI_DATAWIDTH_8BIT;
+    spi.ClockPolarity   = LL_SPI_POLARITY_LOW;
+    spi.ClockPhase      = LL_SPI_PHASE_1EDGE;
+    spi.NSS             = LL_SPI_NSS_SOFT;
+    spi.BaudRate        = LL_SPI_BAUDRATEPRESCALER_DIV16;
+    spi.BitOrder        = LL_SPI_MSB_FIRST; 
+    spi.CRCCalculation  = LL_SPI_CRCCALCULATION_DISABLE;
+    spi.CRCPoly         = 0;
+    LL_SPI_Init(SWITCH_SPI, &spi);
+    LL_SPI_Enable(SWITCH_SPI);    
+
+    // Set pull-ups
+    write_reg(0x0C, 0xFF);
+    write_reg(0x0D, 0xFF);
+
+}
+
+// Read each button and update its state.
+// Returns true if any buttons have changed state.
+bool read_buttons(void) {
+
+    // HACK:
+    // Disable ADC readings while reading the GPIOs.
+    // Otherwise the readings are noisy (to be fixed with proper PCB layout)
+    LL_ADC_Disable(ADC1);
+    LL_DMA_DisableStream(DMA2, LL_DMA_STREAM_0); 
+    LL_DMA_ClearFlag_HT0(DMA2);
+    LL_DMA_ClearFlag_TC0(DMA2);
+    LL_DMA_ClearFlag_TE0(DMA2);
+
+    uint16_t switches = ~((read_reg(0x13) << 8) | read_reg(0x12));
+    bool changed = false;
 
     for (int i=0; i<NUM_BUTTONS; i++) {
-        pin_cfg_input(button_ports[i], button_pins[i], LL_GPIO_PULL_DOWN);
+        bool pressed;
+
+        if (i < 16) {
+            pressed = switches & (1 << i);
+        } else if (i == 16) {
+            pressed = !pin_read(BTN_ENC_PORT, BTN_ENC_PIN);
+        }
+
+        switch (buttons[i]) {
+            case BTN_OFF:
+                if (pressed) {
+                    buttons[i] = BTN_DOWN;
+                    changed = true;
+                }
+                break;
+            case BTN_DOWN:
+                buttons[i] = pressed ? BTN_HELD : BTN_UP;
+                changed = true;
+                break;
+            case BTN_HELD:
+                if (!pressed) {
+                    buttons[i] = BTN_UP;
+                    changed = true;
+                }
+                break;
+            case BTN_UP:
+                buttons[i] = BTN_OFF;
+                changed = true;
+                break;
+        }
     }
 
-    // encoders
-    encoder_ports[0] = GPIOB;   // Green
-    encoder_pin_a[0] = LL_GPIO_PIN_5;
-    encoder_pin_b[0] = LL_GPIO_PIN_14;
-    encoder_ports[1] = GPIOA;   // Red
-    encoder_pin_a[1] = LL_GPIO_PIN_6;
-    encoder_pin_b[1] = LL_GPIO_PIN_7;
-    encoder_ports[2] = GPIOB;   // Blue
-    encoder_pin_a[2] = LL_GPIO_PIN_9;
-    encoder_pin_b[2] = LL_GPIO_PIN_8;
-    encoder_ports[3] = GPIOA;   // White
-    encoder_pin_a[3] = LL_GPIO_PIN_12;
-    encoder_pin_b[3] = LL_GPIO_PIN_11;
+    // Re-enable ADCs
+    LL_DMA_EnableStream(DMA2, LL_DMA_STREAM_0);  
+    LL_ADC_Enable(ADC1);
+    LL_ADC_REG_StartConversionSWStart(ADC1);   
 
-    for (int i=0; i<NUM_ENCODERS; i++) {
-        pin_cfg_exti(encoder_ports[i], encoder_pin_a[i],  LL_GPIO_PULL_UP, LL_EXTI_TRIGGER_RISING_FALLING);
-        pin_cfg_exti(encoder_ports[i], encoder_pin_b[i],  LL_GPIO_PULL_UP, LL_EXTI_TRIGGER_RISING_FALLING);
-        enc_history[i] = (pin_read(encoder_ports[i], encoder_pin_b[i]) << 1) | pin_read(encoder_ports[i], encoder_pin_a[i]);
-    }
+    return changed;
 
-    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTB, LL_SYSCFG_EXTI_LINE5);
-    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTB, LL_SYSCFG_EXTI_LINE14);
+}
+
+
+
+
+/******************************************************************************/
+// Encoder
+
+#define ENCODER_PORT    GPIOA
+#define ENCODER_PIN_A   LL_GPIO_PIN_11
+#define ENCODER_PIN_B   LL_GPIO_PIN_12
+
+
+int enc_states[16] = {0, -1, 1, 0, 1, 0, 0, -1, -1, 0, 0, 1, 0, 1, -1, 0};
+uint8_t enc_history;
+EncoderState encoder;
+
+
+void encoder_init(void) {
+
+    pin_cfg_exti(ENCODER_PORT, ENCODER_PIN_A,  LL_GPIO_PULL_UP, LL_EXTI_TRIGGER_RISING_FALLING);
+    pin_cfg_exti(ENCODER_PORT, ENCODER_PIN_B,  LL_GPIO_PULL_UP, LL_EXTI_TRIGGER_RISING_FALLING);
+    enc_history = (pin_read(ENCODER_PORT, ENCODER_PIN_B) << 1) | pin_read(ENCODER_PORT, ENCODER_PIN_A);
+
     LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTA, LL_SYSCFG_EXTI_LINE11);
     LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTA, LL_SYSCFG_EXTI_LINE12);
-    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTB, LL_SYSCFG_EXTI_LINE8);
-    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTB, LL_SYSCFG_EXTI_LINE9);
-    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTA, LL_SYSCFG_EXTI_LINE6);
-    LL_SYSCFG_SetEXTISource(LL_SYSCFG_EXTI_PORTA, LL_SYSCFG_EXTI_LINE7);
-    HAL_NVIC_SetPriority(EXTI9_5_IRQn,   PRIORITY_ENCODER, 0);
     HAL_NVIC_SetPriority(EXTI15_10_IRQn, PRIORITY_ENCODER, 0);
-    HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
     HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
+}
 
-    // adc
-    pin_cfg_an(GPIOB, LL_GPIO_PIN_0);
+// Update the delta for the encoder.
+// Returns true if it has moved.
+bool read_encoder(void) {
+
+    bool changed = false;
+
+    int ev = encoder.value;
+
+    encoder.delta = ev - encoder.last_value;
+    encoder.half_delta = (ev/2) - (encoder.last_value/2);
+    if (encoder.delta != 0) changed = true;
+    encoder.last_value = ev;
+
+    return changed;
+
+}
+
+void EXTI15_10_IRQHandler(void) {
+
+    uint32_t port = ENCODER_PORT->IDR;
+
+    if (LL_EXTI_IsActiveFlag_0_31(LL_EXTI_LINE_11)) LL_EXTI_ClearFlag_0_31(LL_EXTI_LINE_11);
+    if (LL_EXTI_IsActiveFlag_0_31(LL_EXTI_LINE_12)) LL_EXTI_ClearFlag_0_31(LL_EXTI_LINE_12);
+
+    int inca = !!(port & ENCODER_PIN_A);
+    int incb = !!(port & ENCODER_PIN_B);
+    enc_history <<= 2;
+    enc_history |= ((incb << 1) | inca);
+    encoder.value += enc_states[enc_history & 0x0F];
+
+}
+
+
+
+/******************************************************************************/
+// ADC
+
+uint16_t pots[NUM_POTS];
+#define CYCLES LL_ADC_SAMPLINGTIME_480CYCLES
+
+void adc_init(void) {
+
+    pin_cfg_an(GPIOA, LL_GPIO_PIN_0);   // ch0  Osc1
+    pin_cfg_an(GPIOA, LL_GPIO_PIN_1);   // ch1  Osc2
+    pin_cfg_an(GPIOC, LL_GPIO_PIN_0);   // ch10 Noise
+    pin_cfg_an(GPIOC, LL_GPIO_PIN_1);   // ch11 Env1 attack
+    pin_cfg_an(GPIOC, LL_GPIO_PIN_2);   // ch12 Env1 
+    pin_cfg_an(GPIOC, LL_GPIO_PIN_3);   // ch13 Env1
+    pin_cfg_an(GPIOB, LL_GPIO_PIN_0);   // ch8
+    pin_cfg_an(GPIOA, LL_GPIO_PIN_4);   // ch4
+    pin_cfg_an(GPIOB, LL_GPIO_PIN_1);   // ch9
+    pin_cfg_an(GPIOC, LL_GPIO_PIN_4);   // ch14 Filt cutoff
+    pin_cfg_an(GPIOA, LL_GPIO_PIN_2);   // ch2  Filt res
+    pin_cfg_an(GPIOA, LL_GPIO_PIN_3);   // ch3 
+
+
 
     __HAL_RCC_ADC1_CLK_ENABLE();
+    __HAL_RCC_DMA2_CLK_ENABLE();
 
     LL_ADC_CommonInitTypeDef adc_common;
-    adc_common.CommonClock = LL_ADC_CLOCK_SYNC_PCLK_DIV4;
+    adc_common.CommonClock = LL_ADC_CLOCK_SYNC_PCLK_DIV8;
     adc_common.Multimode = LL_ADC_MULTI_INDEPENDENT;
     adc_common.MultiDMATransfer = LL_ADC_MULTI_REG_DMA_EACH_ADC;
     adc_common.MultiTwoSamplingDelay = LL_ADC_MULTI_TWOSMP_DELAY_5CYCLES;
@@ -82,104 +265,66 @@ void input_init(void) {
     LL_ADC_InitTypeDef adc;
     adc.Resolution = LL_ADC_RESOLUTION_12B;
     adc.DataAlignment = LL_ADC_DATA_ALIGN_RIGHT;
-    adc.SequencersScanMode = LL_ADC_SEQ_SCAN_DISABLE;
+    adc.SequencersScanMode = LL_ADC_SEQ_SCAN_ENABLE;
     LL_ADC_Init(ADC1, &adc);
 
     LL_ADC_REG_InitTypeDef reg;
     reg.TriggerSource = LL_ADC_REG_TRIG_SOFTWARE;
-    reg.SequencerLength = 0;
+    reg.SequencerLength = LL_ADC_REG_SEQ_SCAN_ENABLE_12RANKS;
     reg.SequencerDiscont = LL_ADC_REG_SEQ_DISCONT_DISABLE;
-    reg.ContinuousMode = LL_ADC_REG_CONV_SINGLE;
-    reg.DMATransfer = LL_ADC_REG_DMA_TRANSFER_NONE;
+    reg.ContinuousMode = LL_ADC_REG_CONV_CONTINUOUS;
+    reg.DMATransfer = LL_ADC_REG_DMA_TRANSFER_UNLIMITED;
     LL_ADC_REG_Init(ADC1, &reg);
 
-    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_1, LL_ADC_CHANNEL_8);
-    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_8, LL_ADC_SAMPLINGTIME_480CYCLES);
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_1, LL_ADC_CHANNEL_0);
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_2, LL_ADC_CHANNEL_1);
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_3, LL_ADC_CHANNEL_10);
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_4, LL_ADC_CHANNEL_11);
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_5, LL_ADC_CHANNEL_12);
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_6, LL_ADC_CHANNEL_13);
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_7, LL_ADC_CHANNEL_8);
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_8, LL_ADC_CHANNEL_4);
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_9, LL_ADC_CHANNEL_9);
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_10, LL_ADC_CHANNEL_14);
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_11, LL_ADC_CHANNEL_2);
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_12, LL_ADC_CHANNEL_3);    
+
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_0, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_1, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_10, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_11, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_12, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_13, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_8, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_4, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_9, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_14, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_2, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_3, CYCLES);
 
     LL_ADC_Enable(ADC1);
 
+    // DMA init
+    LL_DMA_InitTypeDef ddma;
+    ddma.PeriphOrM2MSrcAddress  = (uint32_t)&(ADC1->DR);
+    ddma.MemoryOrM2MDstAddress  = (uint32_t)&pots;
+    ddma.Direction              = LL_DMA_DIRECTION_PERIPH_TO_MEMORY;
+    ddma.Mode                   = LL_DMA_MODE_CIRCULAR;
+    ddma.PeriphOrM2MSrcIncMode  = LL_DMA_PERIPH_NOINCREMENT;
+    ddma.MemoryOrM2MDstIncMode  = LL_DMA_MEMORY_INCREMENT;
+    ddma.PeriphOrM2MSrcDataSize = LL_DMA_PDATAALIGN_HALFWORD;
+    ddma.MemoryOrM2MDstDataSize = LL_DMA_MDATAALIGN_HALFWORD;
+    ddma.NbData                 = NUM_POTS;
+    ddma.Channel                = LL_DMA_CHANNEL_0;
+    ddma.Priority               = LL_DMA_PRIORITY_LOW;
+    ddma.FIFOMode               = LL_DMA_FIFOMODE_DISABLE;
+    ddma.FIFOThreshold          = LL_DMA_FIFOTHRESHOLD_1_4;
+    ddma.MemBurst               = LL_DMA_MBURST_SINGLE;
+    ddma.PeriphBurst            = LL_DMA_PBURST_SINGLE;
+    LL_DMA_Init(DMA2, LL_DMA_STREAM_0, &ddma);
+    LL_DMA_EnableStream(DMA2, LL_DMA_STREAM_0);  
 
+    LL_ADC_REG_StartConversionSWStart(ADC1);
 
-}
-
-
-// Read each button and update its state.
-// Returns true if any buttons have changed state.
-bool read_buttons(void) {
-
-    bool changed = false;
-
-    for (int i=0; i<NUM_BUTTONS; i++) {
-        bool pressed = pin_read(button_ports[i], button_pins[i]);
-
-        switch (buttons[i]) {
-            case BTN_OFF:
-                if (pressed) {
-                    buttons[i] = BTN_PRESSED;
-                    changed = true;
-                }
-                break;
-            case BTN_PRESSED:
-                buttons[i] = pressed ? BTN_HELD : BTN_RELEASED;
-                changed = true;
-                break;
-            case BTN_HELD:
-                if (!pressed) {
-                    buttons[i] = BTN_RELEASED;
-                    changed = true;
-                }
-                break;
-            case BTN_RELEASED:
-                buttons[i] = BTN_OFF;
-                changed = true;
-                break;
-        }
-    }
-
-    return changed;
-
-}
-
-
-// Update the delta for each encoder.
-// Returns true if any encoders have moved.
-bool read_encoders(void) {
-
-    bool changed = false;
-
-    for (int i=0; i<NUM_ENCODERS; i++) {
-        encoders[i].delta = encoders[i].value - encoders[i].last_value;
-        if (encoders[i].delta != 0) changed = true;
-        encoders[i].last_value = encoders[i].value;
-    }
-
-    return changed;
-
-}
-
-void encoder_irq(void) {
-
-    uint32_t port;
-
-    for (int i=0; i<NUM_ENCODERS; i++) {
-        port = encoder_ports[i]->IDR;
-        int inca = !!(port & encoder_pin_a[i]);
-        int incb = !!(port & encoder_pin_b[i]);
-
-        enc_history[i] <<= 2;
-        enc_history[i] |= ((incb << 1) | inca);
-        encoders[i].value += enc_states[enc_history[i] & 0x0F];
-    }
-
-}
-
-void EXTI9_5_IRQHandler(void) {
-    LL_EXTI_ClearFlag_0_31(LL_EXTI_LINE_ALL);
-    encoder_irq();
-}
-
-void EXTI15_10_IRQHandler(void) {
-    LL_EXTI_ClearFlag_0_31(LL_EXTI_LINE_ALL);
-    encoder_irq();
 }
 

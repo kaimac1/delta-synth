@@ -46,7 +46,7 @@ uint16_t *out_buffer = out_buffer_1;
 #define EXP_TABLE_SIZE 1024
 float exp_table[EXP_TABLE_SIZE];
 
-//inline void sequencer_update(void);
+inline void sequencer_update(void);
 inline void fill_buffer(void);
 
 
@@ -77,7 +77,7 @@ void HAL_I2S_TxCpltCallback(I2S_HandleTypeDef *hi2s) {
         // }
     }
 
-    //sequencer_update();
+    sequencer_update();
     fill_buffer();
     pin_set(GPIOA, 1<<5, 0);
 
@@ -91,7 +91,7 @@ void HAL_I2S_TxCpltCallback(I2S_HandleTypeDef *hi2s) {
 }
 
 // many things broken
-/*inline void sequencer_update(void) {
+inline void sequencer_update(void) {
 
     if (start_time > next_beat) {
         next_beat += 15000000/cfg.tempo;
@@ -107,12 +107,12 @@ void HAL_I2S_TxCpltCallback(I2S_HandleTypeDef *hi2s) {
 
     if (cfg.seq_play) {
         if (seq.step[seq_step].freq != 0.0f) {
-            cfg.key[0] = true;
-            cfg.freq[0] = seq.step[seq_step].freq;
+            cfg.part[0].gate = true;
+            cfg.part[0].freq = seq.step[seq_step].freq;
         }
     }
 
-}*/
+}
 
 /******************************************************************************/
 // SYNTHESIS BLOCKS
@@ -460,10 +460,10 @@ inline void fill_buffer(void) {
         s += whitenoise() * 0.001f;
 
         // Effects
-        s = reverb(s);
+        //s = reverb(s);
 
         // Delay
-        // fx = DELAY_LINE_GET(delay1);
+        // float fx = DELAY_LINE_GET(delay1);
         // DELAY_LINE_PUT(delay1, s + fx * 0.75f);
         // s += fx;
 

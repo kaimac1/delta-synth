@@ -33,7 +33,7 @@ int encoder_start = 0;
 int pot_moved = -1;
 int pot_show_timer;
 
-bool tune_semitones;
+bool tune_semitones = true;
 
 typedef struct {
     int reverb_amount;
@@ -47,6 +47,8 @@ InputSettings input;
 
 unsigned int seq_idx;
 float seq_note_input;
+
+bool seq_record;
 
 Menu menu_fx;
 Menu menu_env;
@@ -69,6 +71,15 @@ void menu_lfo_draw(Menu *menu, int i);
 #define DECAY_MIN 0.060f
 #define LEAD_DECAY_CONST 0.000014f
 const float halfstep = 1.059463f;
+
+
+void seq_note_on(float freq) {
+    seq.step[seq_idx].freq = freq;
+}
+void seq_note_off(float freq) {
+    seq_idx++;
+    if (seq_idx >= NUM_SEQ_STEPS) seq_idx = 0;
+}
 
 
 void set_reverb(void) {
@@ -153,7 +164,7 @@ void update_lead(void) {
                     synth.part[part].cutoff = amount;
                     break;
                 case 10: // Resonance
-                    synth.part[part].resonance = 3.99f * amount;
+                    synth.part[part].resonance = 4.00f * amount;
                     break;
                 case 11: // Envelope cutoff modulation
                     synth.part[part].env_mod = amount;
@@ -220,7 +231,8 @@ void ui_init(void) {
     input.lfo_amount = 0;
     set_reverb();
 
-    //synth.seq_play = true;
+    seq_record = true;
+    synth.seq_play = true;
 
 }
 

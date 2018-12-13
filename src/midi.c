@@ -101,19 +101,35 @@ void mono_del(float freq) {
     }
 }
 
+void note_on(float freq) {
+
+    if (seq_record) {
+        seq_note_on(freq);
+    } else {
+        mono_add(freq);
+    }
+
+}
+void note_off(float freq) {
+
+    if (seq_record) {
+        seq_note_off(freq);
+    } else {
+        mono_del(freq);
+    }
+
+}
+
+
+
+
 void midi_process_command(void) {
 
     switch(command[0]) {
 
         // Note on
         case 0x90:
-            //printf("ON     %d\r\n", command[1]);
-            if (synth.seq_play) {
-                seq_note_input = note[command[1]];
-            } else {
-                //poly_add(note[command[1]]);
-                mono_add(note[command[1]]);
-            }
+            note_on(note[command[1]]);
             // Retrigger on new note in normal mode
             // if (!synth.legato && (note[command[1]] != cfg.freq)) {
             //     synth.env_retrigger = true;
@@ -122,13 +138,7 @@ void midi_process_command(void) {
 
         // Note off
         case 0x80:
-            //printf("   OFF %d\r\n", command[1]);
-            if (synth.seq_play) {
-                seq_note_input = 0.0f;
-            } else {
-                //poly_del(note[command[1]]);
-                mono_del(note[command[1]]);
-            }
+            note_off(note[command[1]]);
             break;
 
         // value = (float)(command[2]) / 0x7F;
@@ -155,7 +165,8 @@ void midi_process_command(void) {
         // }
 
         default:
-            printf("%02x %02x %02x\r\n", command[0], command[1], command[2]);
+            break;
+            //printf("%02x %02x %02x\r\n", command[0], command[1], command[2]);
     }
 
     midi_event = true;

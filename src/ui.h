@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+
 typedef struct {
     char name[16];
 } MenuItem;
@@ -24,3 +25,6 @@ void draw_menu(Menu menu);
 
 extern float seq_note_input;
 
+extern bool seq_record;
+void seq_note_on(float freq);
+void seq_note_off(float freq);

@@ -14,6 +14,7 @@
 #define _swap_int16_t(a, b) { int16_t t = a; a = b; b = t; }
 #define abs(x) (((x) > 0) ? (x) : (-(x)))
 
+void ssd1306_command(uint8_t byte);
 void display_reset(void);
 
 #define DISPLAY_I2C I2C1
@@ -27,6 +28,57 @@ void display_reset(void);
 uint8_t dbuf[1024];
 volatile bool display_busy;
 uint16_t font_index[FONT_CHARS];
+int dma_page = 0;
+
+
+void dma_setup(int page) {
+
+    const int page_size = 128;
+    uint32_t addr = (uint32_t)&dbuf + page_size*page;
+
+    LL_DMA_InitTypeDef ddma;
+    ddma.PeriphOrM2MSrcAddress  = (uint32_t)&(DISPLAY_I2C->DR);
+    ddma.MemoryOrM2MDstAddress  = addr;
+    ddma.Direction              = LL_DMA_DIRECTION_MEMORY_TO_PERIPH;
+    ddma.Mode                   = LL_DMA_MODE_NORMAL;
+    ddma.PeriphOrM2MSrcIncMode  = LL_DMA_PERIPH_NOINCREMENT;
+    ddma.MemoryOrM2MDstIncMode  = LL_DMA_MEMORY_INCREMENT;
+    ddma.PeriphOrM2MSrcDataSize = LL_DMA_PDATAALIGN_BYTE;
+    ddma.MemoryOrM2MDstDataSize = LL_DMA_MDATAALIGN_BYTE;
+    ddma.NbData                 = page_size;
+    ddma.Channel                = LL_DMA_CHANNEL_1;
+    ddma.Priority               = LL_DMA_PRIORITY_LOW;
+    ddma.FIFOMode               = LL_DMA_FIFOMODE_DISABLE;
+    ddma.FIFOThreshold          = LL_DMA_FIFOTHRESHOLD_1_4;
+    ddma.MemBurst               = LL_DMA_MBURST_SINGLE;
+    ddma.PeriphBurst            = LL_DMA_PBURST_SINGLE;
+    LL_DMA_Init(DMA1, LL_DMA_STREAM_6, &ddma);
+
+}
+
+void set_page(int page) {
+
+    ssd1306_command(0xB0 | page);
+    ssd1306_command(0x02);
+    ssd1306_command(0x10);
+
+    while(LL_I2C_IsActiveFlag_BUSY(DISPLAY_I2C));
+
+    LL_I2C_GenerateStartCondition(DISPLAY_I2C);
+    while(!LL_I2C_IsActiveFlag_SB(DISPLAY_I2C));
+
+    LL_I2C_TransmitData8(DISPLAY_I2C, DISPLAY_ADDRESS);
+    while(!LL_I2C_IsActiveFlag_ADDR(DISPLAY_I2C));
+
+    LL_I2C_ClearFlag_ADDR(DISPLAY_I2C);
+    while(!LL_I2C_IsActiveFlag_TXE(DISPLAY_I2C));
+
+    LL_I2C_TransmitData8(DISPLAY_I2C, 0x40);
+    while(!LL_I2C_IsActiveFlag_TXE(DISPLAY_I2C));  
+
+    LL_DMA_EnableStream(DMA1, LL_DMA_STREAM_6);
+
+}
 
 
 void display_init(void) {
@@ -43,38 +95,17 @@ void display_init(void) {
     LL_I2C_Disable(DISPLAY_I2C);
     LL_RCC_ClocksTypeDef rcc_clocks;
     LL_RCC_GetSystemClocksFreq(&rcc_clocks);
-    LL_I2C_ConfigSpeed(I2C1, rcc_clocks.PCLK1_Frequency, 400000, LL_I2C_DUTYCYCLE_2);    
+    LL_I2C_ConfigSpeed(I2C1, rcc_clocks.PCLK1_Frequency, 1000000, LL_I2C_DUTYCYCLE_2);    
     LL_I2C_Enable(DISPLAY_I2C);
 
     // DMA init
     HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, PRIORITY_DISPLAY, 0);
     HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
-    LL_DMA_InitTypeDef ddma;
-    ddma.PeriphOrM2MSrcAddress  = (uint32_t)&(DISPLAY_I2C->DR);
-    ddma.MemoryOrM2MDstAddress  = (uint32_t)&dbuf;
-    ddma.Direction              = LL_DMA_DIRECTION_MEMORY_TO_PERIPH;
-    ddma.Mode                   = LL_DMA_MODE_NORMAL;
-    ddma.PeriphOrM2MSrcIncMode  = LL_DMA_PERIPH_NOINCREMENT;
-    ddma.MemoryOrM2MDstIncMode  = LL_DMA_MEMORY_INCREMENT;
-    ddma.PeriphOrM2MSrcDataSize = LL_DMA_PDATAALIGN_BYTE;
-    ddma.MemoryOrM2MDstDataSize = LL_DMA_MDATAALIGN_BYTE;
-    ddma.NbData                 = 1024;
-    ddma.Channel                = LL_DMA_CHANNEL_1;
-    ddma.Priority               = LL_DMA_PRIORITY_LOW;
-    ddma.FIFOMode               = LL_DMA_FIFOMODE_DISABLE;
-    ddma.FIFOThreshold          = LL_DMA_FIFOTHRESHOLD_1_4;
-    ddma.MemBurst               = LL_DMA_MBURST_SINGLE;
-    ddma.PeriphBurst            = LL_DMA_PBURST_SINGLE;
-    LL_DMA_Init(DMA1, LL_DMA_STREAM_6, &ddma);
+    dma_setup(0);
     LL_DMA_EnableIT_TC(DMA1, LL_DMA_STREAM_6);
     LL_I2C_EnableDMAReq_TX(DISPLAY_I2C);
 
     display_reset();
-
-    // draw_rect(0, 0, 128, 64, 0);
-    // draw_text_cen(64,24,"D E L T A", 1);
-    // display_draw();
-    // HAL_Delay(500);
 
 }
 
@@ -114,28 +145,32 @@ bool display_draw(void) {
     LL_DMA_ClearFlag_TC0(DMA2);
     LL_DMA_ClearFlag_TE0(DMA2);    */
 
-    ssd1306_command(SSD1306_COLUMNADDR);
-    ssd1306_command(0);   // Column start address
-    ssd1306_command(127); // Column end address
-    ssd1306_command(SSD1306_PAGEADDR);
-    ssd1306_command(0); // Page start address
-    ssd1306_command(7); // Page end address
+    //ssd1306_command(SSD1306_COLUMNADDR);
+    //ssd1306_command(0);   // Column start address
+    //ssd1306_command(127); // Column end address
+    //ssd1306_command(SSD1306_PAGEADDR);
+    //ssd1306_command(0); // Page start address
+    //ssd1306_command(7); // Page end address
 
-    while(LL_I2C_IsActiveFlag_BUSY(DISPLAY_I2C));
+    dma_page = 0;
+    dma_setup(dma_page);
+    set_page(dma_page);
 
-    LL_I2C_GenerateStartCondition(DISPLAY_I2C);
-    while(!LL_I2C_IsActiveFlag_SB(DISPLAY_I2C));
 
-    LL_I2C_TransmitData8(DISPLAY_I2C, DISPLAY_ADDRESS);
-    while(!LL_I2C_IsActiveFlag_ADDR(DISPLAY_I2C));
 
-    LL_I2C_ClearFlag_ADDR(DISPLAY_I2C);
-    while(!LL_I2C_IsActiveFlag_TXE(DISPLAY_I2C));
+    //LL_DMA_EnableStream(DMA1, LL_DMA_STREAM_6);
+    //for (int page=0; page<1; page++) {
 
-    LL_I2C_TransmitData8(DISPLAY_I2C, 0x40);
-    while(!LL_I2C_IsActiveFlag_TXE(DISPLAY_I2C));  
 
-    LL_DMA_EnableStream(DMA1, LL_DMA_STREAM_6);  
+
+        // for (int i=0; i<128; i++) {
+        //     LL_I2C_TransmitData8(DISPLAY_I2C, dbuf[128*page + i]);
+        //     while(!LL_I2C_IsActiveFlag_TXE(DISPLAY_I2C));          
+        // }
+
+        //LL_I2C_GenerateStopCondition(DISPLAY_I2C);
+    //}
+    //display_busy = false;
 
     return true;
 }
@@ -148,15 +183,21 @@ void DMA1_Stream6_IRQHandler(void) {
     LL_DMA_ClearFlag_TC6(DMA1);
     LL_DMA_ClearFlag_TE6(DMA1);
     
-    LL_I2C_GenerateStopCondition(DISPLAY_I2C);    
+    LL_I2C_GenerateStopCondition(DISPLAY_I2C);
+
+    dma_page++;
+    if (dma_page == 8) {
+        dma_page = 0;
+        display_busy = false;
+    } else {
+        dma_setup(dma_page);
+        set_page(dma_page);
+    }
 
     // Re-enable ADCs
     /*LL_DMA_EnableStream(DMA2, LL_DMA_STREAM_0);  
     LL_ADC_Enable(ADC1);
     LL_ADC_REG_StartConversionSWStart(ADC1);   */
-
-    
-    display_busy = false;
 
 }
 
@@ -347,7 +388,8 @@ void display_reset(void) {
     ssd1306_command(SSD1306_CHARGEPUMP);                    // 0x8D
     ssd1306_command(0x14);
     ssd1306_command(SSD1306_MEMORYMODE);                    // 0x20
-    ssd1306_command(0x00);                                  // 0x0 act like ks0108
+    //ssd1306_command(0x00);                                  // 0x0 act like ks0108
+    ssd1306_command(0x10); // White display
     ssd1306_command(SSD1306_SEGREMAP | 0x1);
     ssd1306_command(SSD1306_COMSCANDEC);
     ssd1306_command(SSD1306_SETCOMPINS);                    // 0xDA

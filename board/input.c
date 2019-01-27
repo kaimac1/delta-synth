@@ -38,6 +38,14 @@ void input_init(void) {
 
 #define BTN_ENC_PORT GPIOC
 #define BTN_ENC_PIN  LL_GPIO_PIN_6
+#define BTN_M1_PORT  GPIOB
+#define BTN_M1_PIN   LL_GPIO_PIN_3
+#define BTN_M2_PORT  GPIOB
+#define BTN_M2_PIN   LL_GPIO_PIN_5
+#define BTN_M3_PORT  GPIOB
+#define BTN_M3_PIN   LL_GPIO_PIN_4
+#define BTN_M4_PORT  GPIOB
+#define BTN_M4_PIN   LL_GPIO_PIN_10
 
 ButtonState buttons[NUM_BUTTONS];
 
@@ -86,6 +94,10 @@ void gpio_init(void) {
     pin_cfg_af(MISO_PORT, MISO_PIN, 5);
 
     pin_cfg_input(BTN_ENC_PORT, BTN_ENC_PIN, LL_GPIO_PULL_UP);
+    pin_cfg_input(BTN_M1_PORT, BTN_M1_PIN, LL_GPIO_PULL_UP);
+    pin_cfg_input(BTN_M2_PORT, BTN_M2_PIN, LL_GPIO_PULL_UP);
+    pin_cfg_input(BTN_M3_PORT, BTN_M3_PIN, LL_GPIO_PULL_UP);
+    pin_cfg_input(BTN_M4_PORT, BTN_M4_PIN, LL_GPIO_PULL_UP);
 
     // SPI init
     LL_SPI_InitTypeDef spi;
@@ -131,6 +143,14 @@ bool read_buttons(void) {
             pressed = switches & (1 << i);
         } else if (i == 16) {
             pressed = !pin_read(BTN_ENC_PORT, BTN_ENC_PIN);
+        } else if (i == 17) {
+            pressed = !pin_read(BTN_M1_PORT, BTN_M1_PIN);
+        } else if (i == 18) {
+            pressed = !pin_read(BTN_M2_PORT, BTN_M2_PIN);
+        } else if (i == 19) {
+            pressed = !pin_read(BTN_M3_PORT, BTN_M3_PIN);
+        } else if (i == 20) {
+            pressed = !pin_read(BTN_M4_PORT, BTN_M4_PIN);
         }
 
         switch (buttons[i]) {

@@ -363,13 +363,14 @@ float yn1 = 0.0f;
 // SAMPLE GENERATION
 /******************************************************************************/
 
-inline void fill_buffer(void) {
+float dest_amp;
+float dest_freq;
+float dest_mod;
+float dest_mod1;
+float dest_res;
+float *dests[] = {&dest_amp, &dest_freq, &dest_mod, &dest_mod1, &dest_res};
 
-    float dest_freq;
-    float dest_mod;
-    float dest_amp;
-    float dest_noise;
-    float *dests[] = {&dest_amp, &dest_freq, &dest_mod, &dest_noise};
+inline void fill_buffer(void) {
 
     // Envelope retrigger
     for (int p=0; p<NUM_PART; p++) {
@@ -386,6 +387,9 @@ inline void fill_buffer(void) {
     float *deste1 = dests[cfg.part[0].env_dest[1]];
     float *destl0 = dests[cfg.part[0].lfo.dest];
 
+    // If neither envelope goes to the amp, the amp is gated
+    bool gate_mode = ((deste0 != &dest_amp) && (deste1 != &dest_amp));
+
     for (int j=0; j<OUT_BUFFER_SAMPLES; j += 2) {
         
         float s = 0.0f;
@@ -394,15 +398,9 @@ inline void fill_buffer(void) {
             float mix = 0.0f;
             dest_freq = 1.0f;
             dest_mod = 0.0f;
+            dest_mod1 = 0.0f;
             dest_amp = 0.0f;
-            dest_noise = 0.0f;
-
-            // LFO
-            lfo_nco[p] += cfg.part[p].lfo.rate;
-            if (lfo_nco[p] > 1.0f) lfo_nco[p] -= 1.0f;
-            float lfo_out = (lfo_nco[p] < 0.5f) ? lfo_nco[p] : 1.0f - lfo_nco[p];
-            lfo_out = cfg.part[p].lfo.amount*(4.0f * lfo_out - 1.0f);
-            *destl0 += lfo_out;
+            dest_res = 0.0f;
 
             // Update envelopes.
             // Route envelopes to their destinations.
@@ -410,6 +408,19 @@ inline void fill_buffer(void) {
             *deste0 += env[p][0].level * cfg.part[p].env_amount[0];
             envelope(&env[p][1], cfg.part[p].gate, &cfg.part[p].env[1]);
             *deste1 += env[p][1].level * cfg.part[p].env_amount[1];
+
+            if (gate_mode) dest_amp = 1.0f * cfg.part[p].gate;
+
+            // LFO
+            lfo_nco[p] += cfg.part[p].lfo.rate;
+            if (lfo_nco[p] > 1.0f) lfo_nco[p] -= 1.0f;
+            float lfo_out = (lfo_nco[p] < 0.5f) ? lfo_nco[p] : 1.0f - lfo_nco[p];
+            lfo_out = cfg.part[p].lfo.amount*(4.0f * lfo_out - 1.0f);
+            if (destl0 == &dest_amp) {
+                *destl0 *= (1.0f + lfo_out);
+            } else {
+                *destl0 += lfo_out;
+            }
 
             // Oscillators
             for (int osc=0; osc<NUM_OSCILLATOR; osc++) {
@@ -421,6 +432,7 @@ inline void fill_buffer(void) {
                 float s1 = 0.0f;
 
                 float mod = dest_mod + cfg.part[p].osc[osc].modifier;
+                if (osc == 1) mod += dest_mod1;
                 if (mod > 1.0f) mod = 1.0f;
                 if (mod < 0.0f) mod = 0.0f;
 
@@ -434,6 +446,8 @@ inline void fill_buffer(void) {
                     case WAVE_TRI:
                         s1 = oscillator_tri(phase, freq, mod);
                         break;
+                    case WAVE_NOISE:
+                        s1 = whitenoise();
                     default:
                         break;
                 }
@@ -442,17 +456,20 @@ inline void fill_buffer(void) {
                 mix += cfg.part[p].osc[osc].gain * s1;
             }
 
-            // Noise
-            float noise = whitenoise();
-            mix += noise * (cfg.part[p].noise_gain + dest_noise);
-
             // Filter
             float fc = cfg.part[p].cutoff + cfg.part[p].env_mod * env[p][1].level;
             fc = 5000.0f * fc * exp_lookup(fc);
-            mix = ladder_filter(&filter[p], mix, fc, cfg.part[p].resonance);
+            float res = cfg.part[p].resonance + 4.0f * dest_res;
+            if (res > 4.0f) res = 4.0f;
+            else if (res < 0.0f) res = 0.0f;
+            mix = ladder_filter(&filter[p], mix, fc, res);
 
             // Amp
             mix *= dest_amp;
+            // if (destl0 == &dest_amp) {
+            //     mix *= (1.0f + lfo_out);
+            // }
+
             s += mix;
 
         }
@@ -542,7 +559,6 @@ void synth_start(void) {
             cfg.part[p].env[e].release = 0.0005;
             cfg.part[p].env_amount[e] = 1.0f;
         }
-        cfg.part[p].noise_gain = 0.0f;
         cfg.part[p].lfo.rate = 0.0f;
         cfg.part[p].lfo.dest = DEST_AMP;
         cfg.part[p].lfo.amount = 0.0f;

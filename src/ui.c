@@ -46,19 +46,13 @@ typedef struct {
 InputSettings input;
 
 unsigned int seq_idx;
-float seq_note_input;
-
 bool seq_record;
-
 Menu menu_fx;
-Menu menu_env;
-Menu menu_lfo;
-
 bool redraw = true;
+
 
 void draw_screen(void);
 void menu_fx_draw(Menu *menu, int i);
-void menu_env_draw(Menu *menu, int i);
 void menu_lfo_draw(Menu *menu, int i);
 
 #define ADD_CLAMP(x, y, max) {(x) += (y); if ((x) > (max)) (x) = (max); if ((x) < 0) (x) = 0;}
@@ -119,14 +113,14 @@ void update_lead(void) {
 
             switch (i) {
                 // Oscillator
-                case 0: // Osc1/2 mix
+                case POT_OSCMIX:
                     synth.part[part].osc[0].gain = 1.0f - amount;
                     synth.part[part].osc[1].gain = amount;
                     break;
-                case 1: // Modifier
+                case POT_MOD:
                     synth.part[part].osc[this_osc].modifier = amount;
                     break;
-                case 2: // Tune
+                case POT_TUNE:
                     if (tune_semitones) {
                         // +/- 1 octave, semitone steps
                         temp = 24 * (amount - 0.5f);
@@ -143,46 +137,44 @@ void update_lead(void) {
                     break;
 
                 // Enevelope
-                case 3: // Attack
+                case POT_ATTACK:
                     temp = amount + MIN_ATTACK;
                     synth.part[part].env[this_env].attack = 1.0f/(temp * SAMPLE_RATE);
                     break;
-                case 4: // Decay
+                case POT_DECAY:
                     temp = amount + DECAY_MIN;
                     synth.part[part].env[this_env].decay = LEAD_DECAY_CONST / (temp*temp*temp);
                     break;
-                case 5: // Sustain
+                case POT_SUSTAIN:
                     synth.part[part].env[this_env].sustain = amount;
                     break;
-                case 6: // Release
+                case POT_RELEASE:
                     temp = amount + DECAY_MIN;
                     synth.part[part].env[this_env].release = LEAD_DECAY_CONST / (temp*temp*temp);
                     break;
 
                 // Filter
-                case 9: // Cutoff
+                case POT_CUTOFF:
                     synth.part[part].cutoff = amount;
                     break;
-                case 10: // Resonance
+                case POT_RESONANCE:
                     synth.part[part].resonance = 4.00f * amount;
                     break;
-                case 11: // Envelope cutoff modulation
+                case POT_ENVMOD:
                     synth.part[part].env_mod = amount;
                     break;
 
                 // LFO
-                case 7: // Rate
-                    synth.part[part].lfo.rate = 0.006f * amount;
+                case POT_LFORATE:
+                    synth.part[part].lfo.rate = 0.002f * amount;
                     break;
 
-                case 8:
+                case POT_VOL:
                     synth.volume = amount;
                     break;
             }
         }
     }
-
-    synth.part[part].noise_gain = 0.0f;//pots[2] / POTMAX;
 
     synth.part[part].env_dest[0] = input.env_dest[0];
     synth.part[part].env_dest[1] = input.env_dest[1];
@@ -208,18 +200,6 @@ void ui_init(void) {
     menu_fx.num_items = 2;
     strcpy(menu_fx.items[0].name, "Reverb amt");
     strcpy(menu_fx.items[1].name, "Wet level");
-    
-    menu_env.draw = (void*)menu_env_draw;
-    menu_env.num_items = 4;
-    strcpy(menu_env.items[0].name, "Env 1 dest");
-    strcpy(menu_env.items[1].name, "Env 1 amt");
-    strcpy(menu_env.items[2].name, "Env 2 dest");
-    strcpy(menu_env.items[3].name, "Env 2 amt");
-
-    menu_lfo.draw = (void*)menu_lfo_draw;
-    menu_lfo.num_items = 2;
-    strcpy(menu_lfo.items[0].name, "LFO dest");
-    strcpy(menu_lfo.items[1].name, "LFO amt");
 
     input.reverb_amount = 64;
     input.wet_level = 0;
@@ -231,8 +211,8 @@ void ui_init(void) {
     input.lfo_amount = 0;
     set_reverb();
 
-    seq_record = true;
-    synth.seq_play = true;
+    //seq_record = true;
+    //synth.seq_play = true;
 
 }
 
@@ -285,8 +265,8 @@ void ui_update(void) {
         if (buttons[BTN_OSC_SEL] == BTN_DOWN) {
             this_osc++;
             this_osc %= NUM_OSCILLATOR;
-            SAVE_POT(1);
-            SAVE_POT(2);
+            SAVE_POT(POT_MOD);
+            SAVE_POT(POT_TUNE);
             redraw = true;
         }
 
@@ -300,17 +280,17 @@ void ui_update(void) {
         // Tune mode
         if (buttons[BTN_OSC_TUNE] == BTN_DOWN) {
             tune_semitones = !tune_semitones;
-            SAVE_POT(2);
+            SAVE_POT(POT_TUNE);
         }
 
         // Envelope select
         if (buttons[BTN_ENV_SEL] == BTN_DOWN) {
             this_env++;
             this_env %= NUM_ENV;
-            SAVE_POT(3);
-            SAVE_POT(4);
-            SAVE_POT(5);
-            SAVE_POT(6);
+            SAVE_POT(POT_ATTACK);
+            SAVE_POT(POT_DECAY);
+            SAVE_POT(POT_SUSTAIN);
+            SAVE_POT(POT_RELEASE);
             redraw = true;
         }
 
@@ -327,7 +307,6 @@ void ui_update(void) {
 
     // Handle encoder movements
     if (enc) {
-
         switch (page) {
             case UI_DEFAULT:
                 break;
@@ -353,40 +332,12 @@ void ui_update(void) {
                 break;
 
             case UI_ENV_MENU:
-                if (buttons[BTN_EDIT] == BTN_HELD) {
-                    switch (menu_env.selected_item) {
-                        case 0:
-                            ADD_CLAMP(input.env_dest[0], encoder.half_delta, NUM_DEST-1);
-                            break;
-                        case 1:
-                            ADD_CLAMP_MINMAX(input.env_amount[0], encoder.delta, -127, 127);
-                            break;
-                        case 2:
-                        ADD_CLAMP(input.env_dest[1], encoder.half_delta, NUM_DEST-1);
-                            break;
-                        case 3:
-                            ADD_CLAMP_MINMAX(input.env_amount[1], encoder.delta, -127, 127);
-                            break;
-                    }
-                } else {
-                    menu_scroll(&menu_env);
-                }
+                ADD_CLAMP_MINMAX(input.env_amount[this_env], encoder.delta, -127, 127);
                 redraw = true;
                 break;
 
             case UI_LFO_MENU:
-                if (buttons[BTN_EDIT] == BTN_HELD) {
-                    switch (menu_lfo.selected_item) {
-                        case 0:
-                            ADD_CLAMP(input.lfo_dest, encoder.half_delta, NUM_DEST-1);
-                            break;
-                        case 1:
-                            ADD_CLAMP_MINMAX(input.lfo_amount, encoder.delta, -127, 127);
-                            break;
-                    }
-                } else {
-                    menu_scroll(&menu_lfo);
-                }
+                ADD_CLAMP_MINMAX(input.lfo_amount, encoder.delta, -127, 127);
                 redraw = true;
                 break;
 
@@ -397,18 +348,50 @@ void ui_update(void) {
     }
 
     update_lead();
-    if (seq_note_input > 0.0f) {
-        seq.step[seq_idx].freq = seq_note_input;
-    }
 
-    // Briefly show that pot is synced
-    if (pot_moved != -1) {
-        pot_show_timer++;
-        if (pot_show_timer == 100) {
-            pot_show_timer = 0;
+    // Handle pot movements.
+    // In the ENV and LFO dest modes, moving a pot changes the modulation dest.
+    // Outside of those modes we want a notification on the screen showing the value of 
+    // the updated pot.
+    if (pot_moved >= 0) {
+        if (page == UI_ENV_MENU) {
+            // Change destination
+            if (pot_moved == POT_MOD) {
+                if (buttons[BTN_EDIT] == BTN_HELD) {
+                    input.env_dest[this_env] = DEST_MOD1;
+                } else {
+                    input.env_dest[this_env] = DEST_MOD;
+                }
+            }
+            else if (pot_moved == POT_VOL) input.env_dest[this_env] = DEST_AMP;
+            else if (pot_moved == POT_TUNE) input.env_dest[this_env] = DEST_FREQ;
+            else if (pot_moved == POT_RESONANCE) input.env_dest[this_env] = DEST_RES;
             pot_moved = -1;
-            redraw = true;
+
+        } else if (page == UI_LFO_MENU) {
+            // Change destination
+            if (pot_moved == POT_MOD) {
+                if (buttons[BTN_EDIT] == BTN_HELD) {
+                    input.lfo_dest = DEST_MOD1;
+                } else {
+                    input.lfo_dest = DEST_MOD;
+                }
+            }
+            else if (pot_moved == POT_VOL) input.lfo_dest = DEST_AMP;
+            else if (pot_moved == POT_TUNE) input.lfo_dest = DEST_FREQ;
+            else if (pot_moved == POT_RESONANCE) input.lfo_dest = DEST_RES;
+            pot_moved = -1;            
+
+        } else {
+            // Show control update
+            pot_show_timer++;
+            if (pot_show_timer == 100) {
+                pot_show_timer = 0;
+                pot_moved = -1;
+                redraw = true;
+            }
         }
+
     }
     
     // Redraw display if required
@@ -429,7 +412,8 @@ void ui_update(void) {
 }
 
 
-
+void draw_envdest(void);
+void draw_lfo(void);
 
 
 void draw_screen(void) {
@@ -443,11 +427,11 @@ void draw_screen(void) {
         return;
     }
     if (page == UI_ENV_MENU) {
-        draw_menu(menu_env);
+        draw_envdest();
         return;
     }
     if (page == UI_LFO_MENU) {
-        draw_menu(menu_lfo);
+        draw_lfo();
         return;
     }
 
@@ -467,6 +451,7 @@ void draw_screen(void) {
             case WAVE_SAW: osc_img[i] = saw; break;
             case WAVE_SQUARE: osc_img[i] = square; break;
             case WAVE_TRI: osc_img[i] = tri; break;
+            case WAVE_NOISE: osc_img[i] = (uint8_t*)&synth; break; // TODO
             default: break;        
         }
     }
@@ -484,6 +469,37 @@ void draw_screen(void) {
     sprintf(buf, "load %.1f", (double)load);
     draw_text(0, 48, buf, 0);
 #endif
+
+}
+
+char *dest_str[] = {"Amp", "Osc freq", "Osc mod", "Osc2 mod", "Peak"};
+
+void draw_envdest(void) {
+
+    char buf[32];
+
+    sprintf(buf, "Env%d", this_env+1);
+    draw_text_cen(64, 16, buf, 0);
+
+    sprintf(buf, "%s", dest_str[input.env_dest[this_env]]);
+    draw_text_cen(64, 32, buf, 0);
+
+    sprintf(buf, "%d", input.env_amount[this_env]);
+    draw_text_cen(64, 48, buf, 0);
+
+}
+
+void draw_lfo(void) {
+
+    char buf[32];
+
+    draw_text_cen(64, 16, "LFO", 0);
+
+    sprintf(buf, "%s", dest_str[input.lfo_dest]);
+    draw_text_cen(64, 32, buf, 0);
+
+    sprintf(buf, "%d", input.lfo_amount);
+    draw_text_cen(64, 48, buf, 0);
 
 }
 
@@ -514,46 +530,4 @@ void menu_fx_draw(Menu *menu, int i) {
             strcpy(menu->value, "");
             break;
     }
-}
-
-void menu_env_draw(Menu *menu, int i) {
-
-    char *dests[] = {"Amp", "Osc freq", "Osc mod", "Noise"};
-
-    switch (i) {
-        case 0:
-            sprintf(menu->value, "%s", dests[input.env_dest[0]]);
-            break;
-        case 1:
-            sprintf(menu->value, "%d", input.env_amount[0]);
-            break;
-        case 2:
-            sprintf(menu->value, "%s", dests[input.env_dest[1]]);
-            break;
-        case 3:
-            sprintf(menu->value, "%d", input.env_amount[1]);
-            break;
-        default:
-            strcpy(menu->value, "");
-            break;            
-    }
-
-}
-
-void menu_lfo_draw(Menu *menu, int i) {
-
-    char *dests[] = {"Amp", "Osc freq", "Osc mod", "Noise"};
-
-    switch (i) {
-        case 0:
-            sprintf(menu->value, "%s", dests[input.lfo_dest]);
-            break;
-        case 1:
-            sprintf(menu->value, "%d", input.lfo_amount);
-            break;
-        default:
-            strcpy(menu->value, "");
-            break;            
-    }
-
 }

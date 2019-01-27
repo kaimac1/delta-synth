@@ -21,11 +21,11 @@ typedef enum {
 
 // Modulation destination
 typedef enum {
-    //ENVDEST_DUMMY = -1, // So that the enum is signed.
-    DEST_AMP = 0,
+    DEST_AMP,
     DEST_FREQ,
     DEST_MOD,
-    DEST_NOISE,
+    DEST_MOD1,
+    DEST_RES,
     NUM_DEST
 } ModDest;
 
@@ -34,6 +34,7 @@ typedef enum {
     WAVE_TRI,
     WAVE_SQUARE,
     WAVE_SAW,
+    WAVE_NOISE,
     NUM_WAVE
 } Wave;
 
@@ -72,7 +73,6 @@ typedef struct {
     bool trig;
 
     Oscillator osc[NUM_OSCILLATOR];
-    float noise_gain;
     ADSR env[NUM_ENV];
 
     ModDest env_dest[NUM_ENV];

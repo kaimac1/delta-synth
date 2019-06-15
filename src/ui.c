@@ -17,6 +17,7 @@ typedef enum {
     UI_FX,
     UI_ENV_MENU,
     UI_LFO_MENU,
+    UI_KBD_TRACK
 } UIPage;
 
 // UI state
@@ -42,6 +43,7 @@ typedef struct {
     int env_amount[NUM_ENV];
     ModDest lfo_dest;
     int lfo_amount;
+    int keyboard_track;
 } InputSettings;
 InputSettings input;
 
@@ -112,6 +114,28 @@ void update_lead(void) {
             float temp;
 
             switch (i) {
+                
+                case POT_VOL:
+                    synth.volume = amount;
+                    break;                
+
+                // Enevelope
+                case POT_ATTACK:
+                    temp = amount + MIN_ATTACK;
+                    synth.part[part].env[this_env].attack = 1.0f/(temp * SAMPLE_RATE);
+                    break;
+                case POT_DECAY:
+                    temp = amount + DECAY_MIN;
+                    synth.part[part].env[this_env].decay = LEAD_DECAY_CONST / (temp*temp*temp);
+                    break;
+                case POT_SUSTAIN:
+                    synth.part[part].env[this_env].sustain = amount;
+                    break;
+                case POT_RELEASE:
+                    temp = amount + DECAY_MIN;
+                    synth.part[part].env[this_env].release = LEAD_DECAY_CONST / (temp*temp*temp);
+                    break;                    
+
                 // Oscillator
                 case POT_OSCMIX:
                     synth.part[part].osc[0].gain = 1.0f - amount;
@@ -136,23 +160,6 @@ void update_lead(void) {
                     synth.part[part].osc[this_osc].detune = temp;
                     break;
 
-                // Enevelope
-                case POT_ATTACK:
-                    temp = amount + MIN_ATTACK;
-                    synth.part[part].env[this_env].attack = 1.0f/(temp * SAMPLE_RATE);
-                    break;
-                case POT_DECAY:
-                    temp = amount + DECAY_MIN;
-                    synth.part[part].env[this_env].decay = LEAD_DECAY_CONST / (temp*temp*temp);
-                    break;
-                case POT_SUSTAIN:
-                    synth.part[part].env[this_env].sustain = amount;
-                    break;
-                case POT_RELEASE:
-                    temp = amount + DECAY_MIN;
-                    synth.part[part].env[this_env].release = LEAD_DECAY_CONST / (temp*temp*temp);
-                    break;
-
                 // Filter
                 case POT_CUTOFF:
                     synth.part[part].cutoff = amount;
@@ -169,9 +176,7 @@ void update_lead(void) {
                     synth.part[part].lfo.rate = 0.002f * amount;
                     break;
 
-                case POT_VOL:
-                    synth.volume = amount;
-                    break;
+
             }
         }
     }
@@ -183,6 +188,8 @@ void update_lead(void) {
 
     synth.part[part].lfo.dest = input.lfo_dest;
     synth.part[part].lfo.amount = input.lfo_amount / 127.0f;
+
+    synth.part[part].keyboard_track = input.keyboard_track / 127.0f;
 
 }
 
@@ -294,14 +301,12 @@ void ui_update(void) {
             redraw = true;
         }
 
-        // Envelope menu
-        check_button_for_page(BTN_ENV_MENU, UI_ENV_MENU);
+        check_button_for_page(BTN_ENV_DEST, UI_ENV_MENU);
+        check_button_for_page(BTN_LFO_DEST, UI_LFO_MENU);        
+        check_button_for_page(BTN_KBD_TRACK, UI_KBD_TRACK);
+        check_button_for_page(10, UI_FX);
 
-        // FX menu
-        check_button_for_page(5, UI_FX);
 
-        // LFO menu
-        check_button_for_page(6, UI_LFO_MENU);
 
     }
 
@@ -316,7 +321,7 @@ void ui_update(void) {
                 break;
 
             case UI_FX:
-                if (buttons[BTN_EDIT] == BTN_HELD) {
+                if (buttons[BTN_SEQ_EDIT] == BTN_HELD) {
                     if (menu_fx.selected_item == 0) {
                         ADD_CLAMP(input.reverb_amount, encoder.delta, 127);
                         set_reverb();
@@ -341,6 +346,11 @@ void ui_update(void) {
                 redraw = true;
                 break;
 
+            case UI_KBD_TRACK:
+                ADD_CLAMP(input.keyboard_track, encoder.delta, 127);
+                redraw = true;
+                break;
+
             default:
                 break;
         }
@@ -357,7 +367,7 @@ void ui_update(void) {
         if (page == UI_ENV_MENU) {
             // Change destination
             if (pot_moved == POT_MOD) {
-                if (buttons[BTN_EDIT] == BTN_HELD) {
+                if (buttons[BTN_SEQ_EDIT] == BTN_HELD) {
                     input.env_dest[this_env] = DEST_MOD1;
                 } else {
                     input.env_dest[this_env] = DEST_MOD;
@@ -366,12 +376,13 @@ void ui_update(void) {
             else if (pot_moved == POT_VOL) input.env_dest[this_env] = DEST_AMP;
             else if (pot_moved == POT_TUNE) input.env_dest[this_env] = DEST_FREQ;
             else if (pot_moved == POT_RESONANCE) input.env_dest[this_env] = DEST_RES;
+            else if (pot_moved == POT_OSCMIX) input.env_dest[this_env] = DEST_OSC1;
             pot_moved = -1;
 
         } else if (page == UI_LFO_MENU) {
             // Change destination
             if (pot_moved == POT_MOD) {
-                if (buttons[BTN_EDIT] == BTN_HELD) {
+                if (buttons[BTN_SEQ_EDIT] == BTN_HELD) {
                     input.lfo_dest = DEST_MOD1;
                 } else {
                     input.lfo_dest = DEST_MOD;
@@ -380,6 +391,8 @@ void ui_update(void) {
             else if (pot_moved == POT_VOL) input.lfo_dest = DEST_AMP;
             else if (pot_moved == POT_TUNE) input.lfo_dest = DEST_FREQ;
             else if (pot_moved == POT_RESONANCE) input.lfo_dest = DEST_RES;
+            else if (pot_moved == POT_CUTOFF) input.lfo_dest = DEST_CUTOFF;
+            else if (pot_moved == POT_OSCMIX) input.lfo_dest = DEST_OSC1;
             pot_moved = -1;            
 
         } else {
@@ -414,6 +427,7 @@ void ui_update(void) {
 
 void draw_envdest(void);
 void draw_lfo(void);
+void draw_kbd_track(void);
 
 
 void draw_screen(void) {
@@ -432,6 +446,10 @@ void draw_screen(void) {
     }
     if (page == UI_LFO_MENU) {
         draw_lfo();
+        return;
+    }
+    if (page == UI_KBD_TRACK) {
+        draw_kbd_track();
         return;
     }
 
@@ -472,7 +490,7 @@ void draw_screen(void) {
 
 }
 
-char *dest_str[] = {"Amp", "Osc freq", "Osc mod", "Osc2 mod", "Peak"};
+char *dest_str[] = {"Amp", "Osc freq", "Osc mod", "Osc1 mod", "Peak", "Cutoff", "Osc1 gain"};
 
 void draw_envdest(void) {
 
@@ -500,6 +518,17 @@ void draw_lfo(void) {
 
     sprintf(buf, "%d", input.lfo_amount);
     draw_text_cen(64, 48, buf, 0);
+
+}
+
+void draw_kbd_track(void) {
+
+    char buf[32];
+
+    draw_text_cen(64, 16, "Keyboard track", 0);
+
+    sprintf(buf, "%d", input.keyboard_track);
+    draw_text_cen(64, 32, buf, 0);
 
 }
 

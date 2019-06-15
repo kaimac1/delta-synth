@@ -26,6 +26,8 @@ typedef enum {
     DEST_MOD,
     DEST_MOD1,
     DEST_RES,
+    DEST_CUTOFF,
+    DEST_OSC1,
     NUM_DEST
 } ModDest;
 
@@ -84,6 +86,7 @@ typedef struct {
     float cutoff;       // fs
     float resonance;    // 0-4
     float env_mod;      // Hz
+    float keyboard_track;
 
 } MonoSynth;
 

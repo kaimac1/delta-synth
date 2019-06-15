@@ -81,7 +81,6 @@ void HAL_I2S_TxCpltCallback(I2S_HandleTypeDef *hi2s) {
 
     sequencer_update();
     fill_buffer();
-    pin_set(GPIOA, 1<<5, 0);
 
     if (i++ > 50) {
         ltime = NOW_US() - start_time;
@@ -101,7 +100,6 @@ inline void sequencer_update(void) {
         if (cfg.seq_play) {
             env[0][0].state = ENV_RELEASE;
             env[0][1].state = ENV_RELEASE;
-            pin_set(GPIOA, 1<<5, 1);
             seq_step++;
             if (seq_step == NUM_SEQ_STEPS) seq_step = 0;
         }
@@ -123,11 +121,11 @@ inline void sequencer_update(void) {
 
 /******************************************************************************/
 // 4-pole low-pass filter.
-// cutoff is in Hz.
-// peak : 0-3.99 (resonance)
+// cutoff: 0-1 (normalised freq)
+// peak : 0-4 (resonance)
 inline float ladder_filter(Filter * f, float in, float cutoff, float peak) {
 
-    float a = PI * cutoff/SAMPLE_RATE;
+    float a = PI * cutoff;
     float ria = 1.0f / (1.0f + a);
     float g = a * ria;
     float gg = g * g;
@@ -368,7 +366,9 @@ float dest_freq;
 float dest_mod;
 float dest_mod1;
 float dest_res;
-float *dests[] = {&dest_amp, &dest_freq, &dest_mod, &dest_mod1, &dest_res};
+float dest_cutoff;
+float dest_osc1;
+float *dests[] = {&dest_amp, &dest_freq, &dest_mod, &dest_mod1, &dest_res, &dest_cutoff, &dest_osc1};
 
 inline void fill_buffer(void) {
 
@@ -401,6 +401,8 @@ inline void fill_buffer(void) {
             dest_mod1 = 0.0f;
             dest_amp = 0.0f;
             dest_res = 0.0f;
+            dest_cutoff = 0.0f;
+            dest_osc1 = 0.0f;
 
             // Update envelopes.
             // Route envelopes to their destinations.
@@ -432,7 +434,7 @@ inline void fill_buffer(void) {
                 float s1 = 0.0f;
 
                 float mod = dest_mod + cfg.part[p].osc[osc].modifier;
-                if (osc == 1) mod += dest_mod1;
+                if (osc == 0) mod += dest_mod1;
                 if (mod > 1.0f) mod = 1.0f;
                 if (mod < 0.0f) mod = 0.0f;
 
@@ -453,12 +455,15 @@ inline void fill_buffer(void) {
                 }
                 
                 // Sum oscillators
-                mix += cfg.part[p].osc[osc].gain * s1;
+                float gain = cfg.part[p].osc[osc].gain;
+                if (osc == 0) gain += dest_osc1;
+                mix += gain * s1;
             }
 
             // Filter
-            float fc = cfg.part[p].cutoff + cfg.part[p].env_mod * env[p][1].level;
-            fc = 5000.0f * fc * exp_lookup(fc);
+            float fc = cfg.part[p].cutoff + cfg.part[p].env_mod * env[p][1].level + dest_cutoff;
+            fc = 0.15f * fc * exp_lookup(fc);
+            //fc = 2.0f * cfg.part[p].freq * cfg.part[p].keyboard_track;
             float res = cfg.part[p].resonance + 4.0f * dest_res;
             if (res > 4.0f) res = 4.0f;
             else if (res < 0.0f) res = 0.0f;
@@ -466,10 +471,6 @@ inline void fill_buffer(void) {
 
             // Amp
             mix *= dest_amp;
-            // if (destl0 == &dest_amp) {
-            //     mix *= (1.0f + lfo_out);
-            // }
-
             s += mix;
 
         }
@@ -512,13 +513,14 @@ inline void fill_buffer(void) {
 
 // Fast exp() using a lookup table.
 // Domain is 0-1.
+// RETURNS ZERO FOR NEGATIVE ARGS!
 float exp_lookup(float arg) {
 
     int idx = arg * EXP_TABLE_SIZE;
     if (idx > EXP_TABLE_SIZE-1) {
         idx = EXP_TABLE_SIZE-1;
     } else if (idx < 0) {
-        idx = 0;
+        return 0.0f;
     }
 
     return exp_table[idx];
@@ -541,7 +543,7 @@ void synth_start(void) {
 
     // Initial config
     cfg.busy    = false;
-    cfg.volume  = 0;
+    cfg.volume  = 0.1f;
     cfg.legato  = false;
     cfg.tempo   = 90;
 
@@ -565,6 +567,7 @@ void synth_start(void) {
         cfg.part[p].cutoff  = 1.0f;
         cfg.part[p].resonance = 0.0f;
         cfg.part[p].env_mod = 0.0f;    
+        cfg.part[p].keyboard_track = 0.0f;
     }
     
     cfg.fx_damping = 0.3f;

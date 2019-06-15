@@ -31,15 +31,25 @@ void pin_set(GPIO_TypeDef *port, uint32_t pin, bool state);
 bool pin_read(GPIO_TypeDef *port, uint32_t pin);
 
 // input
-#define NUM_BUTTONS 21
+#define NUM_BUTTONS 22
 typedef enum {
     BTN_OSC_SEL = 0,
     BTN_OSC_WAVE,
     BTN_OSC_TUNE,
     BTN_ENV_SEL,
-    BTN_ENV_MENU,
-    BTN_EDIT = 15,
-    BTN_ENCODER = 16,
+    BTN_ENV_DEST,
+    BTN_LFO_DEST,
+    BTN_FX,
+    BTN_KBD_TRACK,
+    BTN_POLY,
+    BTN_GLIDE,
+
+    BTN_SHIFT = 16,
+    BTN_REC_SAVE,
+    BTN_PLAY_LOAD,
+    BTN_SEQ_EDIT,
+    BTN_SYNTH_MENU,
+    BTN_ENCODER,
 } ButtonName;
 
 typedef enum {
@@ -58,27 +68,48 @@ typedef struct {
 } EncoderState;
 extern EncoderState encoder;
 
+// typedef enum {
+//     POT_OSCMIX = 0,
+//     POT_MOD = 1,
+//     POT_TUNE = 2,
+//     POT_ATTACK = 3,
+//     POT_DECAY = 4,
+//     POT_SUSTAIN = 5,
+//     POT_RELEASE = 6,
+//     POT_LFORATE = 7,
+//     POT_VOL = 8,
+//     POT_CUTOFF = 9,
+//     POT_RESONANCE = 10,
+//     POT_ENVMOD = 11
+// } PotName;
+
 typedef enum {
-    POT_OSCMIX = 0,
-    POT_MOD = 1,
-    POT_TUNE = 2,
-    POT_ATTACK = 3,
-    POT_DECAY = 4,
-    POT_SUSTAIN = 5,
-    POT_RELEASE = 6,
-    POT_LFORATE = 7,
-    POT_VOL = 8,
-    POT_CUTOFF = 9,
+    POT_VOL     = 0,
+    POT_OSCMIX  = 1, // Osc1
+    POT_MOD     = 2,
+    POT_ATTACK  = 3,
+    POT_OSC2    = 4, // unused
+    POT_TUNE    = 5,
+    POT_DECAY   = 6,
+    POT_CUTOFF  = 7,
+    POT_LFORATE = 8,
+    POT_SUSTAIN = 9,
     POT_RESONANCE = 10,
-    POT_ENVMOD = 11
+    POT_USERA   = 11,
+    POT_RELEASE = 12,
+    POT_ENVMOD  = 13,
+    POT_USERB   = 14
 } PotName;
 
-#define NUM_POTS 12
+#define NUM_POTS 15
 extern uint16_t pots[NUM_POTS];
+
+extern bool leds[16];
 
 void input_init(void);
 bool read_buttons(void);
 bool read_encoder(void);
+void update_leds(void);
 
 // display
 void display_init(void);

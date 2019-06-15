@@ -6,7 +6,14 @@
 #include "synth.h"
 #include "ui.h"
 
+#include <string.h>
+
 void SystemClock_Config(void);
+
+extern uint8_t command[3];
+
+void note_on(float freq);
+void note_off(float freq);
 
 /******************************************************************************/
 int main(void) { 
@@ -30,10 +37,6 @@ int main(void) {
     
     gen_note_table();
     synth_start();
-   
-    pin_cfg_output(GPIOA, 1<<5);    // Nucleo LED
-    pin_set(GPIOA, 1<<5, 1);
-
     ui_init();
 
     while (1) {

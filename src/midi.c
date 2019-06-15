@@ -16,16 +16,18 @@ bool midi_event;
 void midi_process_byte(uint8_t byte) {
 
     static uint8_t data_bytes = 0;
+    static int idx = 0;
 
     if (byte & 0x80) {
         // Status byte
-        command[0] = byte;
+        idx = 0;
+        command[idx++] = byte;
         data_bytes = ((byte & 0xE0) == 0xC0) ? 1 : 2;
 
     } else {
         // Data byte
         if (data_bytes > 0) {
-            command[3 - data_bytes] = byte;
+            command[idx++] = byte;
             data_bytes--;
             if (data_bytes == 0) midi_process_command();
         }

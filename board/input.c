@@ -1,12 +1,12 @@
 #include "board.h"
 #include "stm32f4xx_hal.h"
 #include "stm32f4xx_ll_system.h"
-#include "stm32f4xx_ll_spi.h"
+#include "stm32f4xx_ll_i2c.h"
+#include "stm32f4xx_ll_rcc.h"
 #include "stm32f4xx_ll_exti.h"
 #include "stm32f4xx_ll_adc.h"
 #include "stm32f4xx_ll_dma.h"
-
-
+#include <string.h>
 
 void gpio_init(void);
 void encoder_init(void);
@@ -23,100 +23,162 @@ void input_init(void) {
 
 
 /******************************************************************************/
-// GPIO expander
-
-#define SWITCH_SPI  SPI2
-#define SPI_CLK_EN  __HAL_RCC_SPI2_CLK_ENABLE
-#define CS_PORT     GPIOB
-#define CS_PIN      LL_GPIO_PIN_12
-#define SCK_PORT    GPIOB
-#define SCK_PIN     LL_GPIO_PIN_13
-#define MISO_PORT   GPIOB
-#define MISO_PIN    LL_GPIO_PIN_14
-#define MOSI_PORT   GPIOB
-#define MOSI_PIN    LL_GPIO_PIN_15
-
-#define BTN_ENC_PORT GPIOC
-#define BTN_ENC_PIN  LL_GPIO_PIN_6
-#define BTN_M1_PORT  GPIOB
-#define BTN_M1_PIN   LL_GPIO_PIN_3
-#define BTN_M2_PORT  GPIOB
-#define BTN_M2_PIN   LL_GPIO_PIN_5
-#define BTN_M3_PORT  GPIOB
-#define BTN_M3_PIN   LL_GPIO_PIN_4
-#define BTN_M4_PORT  GPIOB
-#define BTN_M4_PIN   LL_GPIO_PIN_10
+// GPIO - buttons/LEDs
 
 ButtonState buttons[NUM_BUTTONS];
+bool leds[16];
+static bool leds_current[16];
 
-uint8_t spi_tx(uint8_t byte) {
-    while (!LL_SPI_IsActiveFlag_TXE(SWITCH_SPI));
-    SWITCH_SPI->DR = byte;
-    while (!LL_I2S_IsActiveFlag_RXNE(SWITCH_SPI));
-    return SWITCH_SPI->DR;
-}
+#define GPIO_I2C_SPEED 100000
+#define GPIO_I2C    I2C3
+#define GPIO_I2C_CLK_EN __HAL_RCC_I2C3_CLK_ENABLE
+#define GPIO_SDA_PORT GPIOC
+#define GPIO_SDA_PIN  LL_GPIO_PIN_9
+#define GPIO_SCL_PORT GPIOA
+#define GPIO_SCL_PIN  LL_GPIO_PIN_8
 
+#define GPIO_BANK1 0x48 // U7
+#define GPIO_BANK2 0x40 // U6
 
-uint8_t read_reg(uint8_t reg) {
+// Extra buttons wired directly to MCU
+#define BTN_ENC_PORT GPIOC
+#define BTN_ENC_PIN  LL_GPIO_PIN_6
+#define BTN_MS1_PORT GPIOC
+#define BTN_MS1_PIN  LL_GPIO_PIN_0
+#define BTN_MS2_PORT GPIOC
+#define BTN_MS2_PIN  LL_GPIO_PIN_15
+#define BTN_MS3_PORT GPIOC
+#define BTN_MS3_PIN  LL_GPIO_PIN_14
+#define BTN_MS4_PORT GPIOC
+#define BTN_MS4_PIN  LL_GPIO_PIN_13
+#define BTN_MS5_PORT GPIOB
+#define BTN_MS5_PIN  LL_GPIO_PIN_7
 
-    uint8_t value;
+uint8_t read_reg(uint8_t addr, uint8_t reg) {
 
-    pin_set(CS_PORT, CS_PIN, 0);
-    delay_us(100);
-    spi_tx(0x41); // Read
-    spi_tx(reg);
-    value = spi_tx(0x00);
-    pin_set(CS_PORT, CS_PIN, 1);
+    uint8_t value = 0;
+
+    // delay_us(100);
+
+    while(LL_I2C_IsActiveFlag_BUSY(GPIO_I2C));
+
+    // Start
+    LL_I2C_GenerateStartCondition(GPIO_I2C);
+    while(!LL_I2C_IsActiveFlag_SB(GPIO_I2C));
+
+    // Send address (tx)
+    LL_I2C_TransmitData8(GPIO_I2C, addr);
+    while(!LL_I2C_IsActiveFlag_ADDR(GPIO_I2C));
+    LL_I2C_ClearFlag_ADDR(GPIO_I2C);
+    
+    // Send register
+    while(!LL_I2C_IsActiveFlag_TXE(GPIO_I2C));
+    LL_I2C_TransmitData8(GPIO_I2C, reg);
+
+    // RX
+    LL_I2C_GenerateStartCondition(GPIO_I2C);
+    while(!LL_I2C_IsActiveFlag_SB(GPIO_I2C));
+
+    // Send address (rx)
+    LL_I2C_TransmitData8(GPIO_I2C, addr+1);
+    while(!LL_I2C_IsActiveFlag_ADDR(GPIO_I2C));
+    LL_I2C_ClearFlag_ADDR(GPIO_I2C);
+
+    // Read value
+    while(!LL_I2C_IsActiveFlag_RXNE(GPIO_I2C));
+    value = LL_I2C_ReceiveData8(GPIO_I2C);
+
+    LL_I2C_GenerateStopCondition(GPIO_I2C);
 
     return value;
 
 }
 
-void write_reg(uint8_t reg, uint8_t value) {
+void write_reg(uint8_t addr, uint8_t reg, uint8_t value) {
 
-    pin_set(CS_PORT, CS_PIN, 0);
-    spi_tx(0x40); // Write
-    spi_tx(reg);
-    spi_tx(value);
-    pin_set(CS_PORT, CS_PIN, 1);    
+    while(LL_I2C_IsActiveFlag_BUSY(GPIO_I2C));
+
+    LL_I2C_GenerateStartCondition(GPIO_I2C);
+    while(!LL_I2C_IsActiveFlag_SB(GPIO_I2C));
+
+    LL_I2C_TransmitData8(GPIO_I2C, addr);
+    while(!LL_I2C_IsActiveFlag_ADDR(GPIO_I2C));
+    LL_I2C_ClearFlag_ADDR(GPIO_I2C);
+    while(!LL_I2C_IsActiveFlag_TXE(GPIO_I2C));
+
+    LL_I2C_TransmitData8(GPIO_I2C, reg);
+    while(!LL_I2C_IsActiveFlag_TXE(GPIO_I2C));        
+
+    LL_I2C_TransmitData8(GPIO_I2C, value);
+    while(!LL_I2C_IsActiveFlag_TXE(GPIO_I2C));
+
+    LL_I2C_GenerateStopCondition(GPIO_I2C);
 
 }
 
 void gpio_init(void) {
 
-    SPI_CLK_EN();
-
     // Pin init
-    pin_cfg_output(CS_PORT, CS_PIN);
-    pin_set(CS_PORT, CS_PIN, 1);
-    pin_cfg_af(SCK_PORT, SCK_PIN, 5);
-    pin_cfg_af(MOSI_PORT, MOSI_PIN, 5);
-    pin_cfg_af(MISO_PORT, MISO_PIN, 5);
-
+    pin_cfg_i2c(GPIO_SCL_PORT, GPIO_SCL_PIN);
+    pin_cfg_i2c(GPIO_SDA_PORT, GPIO_SDA_PIN);
     pin_cfg_input(BTN_ENC_PORT, BTN_ENC_PIN, LL_GPIO_PULL_UP);
-    pin_cfg_input(BTN_M1_PORT, BTN_M1_PIN, LL_GPIO_PULL_UP);
-    pin_cfg_input(BTN_M2_PORT, BTN_M2_PIN, LL_GPIO_PULL_UP);
-    pin_cfg_input(BTN_M3_PORT, BTN_M3_PIN, LL_GPIO_PULL_UP);
-    pin_cfg_input(BTN_M4_PORT, BTN_M4_PIN, LL_GPIO_PULL_UP);
+    pin_cfg_input(BTN_MS1_PORT, BTN_MS1_PIN, LL_GPIO_PULL_UP);
+    pin_cfg_input(BTN_MS2_PORT, BTN_MS2_PIN, LL_GPIO_PULL_UP);
+    pin_cfg_input(BTN_MS3_PORT, BTN_MS3_PIN, LL_GPIO_PULL_UP);
+    pin_cfg_input(BTN_MS4_PORT, BTN_MS4_PIN, LL_GPIO_PULL_UP);
+    pin_cfg_input(BTN_MS5_PORT, BTN_MS5_PIN, LL_GPIO_PULL_UP);
 
-    // SPI init
-    LL_SPI_InitTypeDef spi;
-    spi.TransferDirection = LL_SPI_FULL_DUPLEX;
-    spi.Mode            = LL_SPI_MODE_MASTER;
-    spi.DataWidth       = LL_SPI_DATAWIDTH_8BIT;
-    spi.ClockPolarity   = LL_SPI_POLARITY_LOW;
-    spi.ClockPhase      = LL_SPI_PHASE_1EDGE;
-    spi.NSS             = LL_SPI_NSS_SOFT;
-    spi.BaudRate        = LL_SPI_BAUDRATEPRESCALER_DIV16;
-    spi.BitOrder        = LL_SPI_MSB_FIRST; 
-    spi.CRCCalculation  = LL_SPI_CRCCALCULATION_DISABLE;
-    spi.CRCPoly         = 0;
-    LL_SPI_Init(SWITCH_SPI, &spi);
-    LL_SPI_Enable(SWITCH_SPI);    
+    // I2C init
+    GPIO_I2C_CLK_EN();
+    LL_I2C_Disable(GPIO_I2C);
+    LL_RCC_ClocksTypeDef rcc_clocks;
+    LL_RCC_GetSystemClocksFreq(&rcc_clocks);
+    LL_I2C_ConfigSpeed(GPIO_I2C, rcc_clocks.PCLK1_Frequency, GPIO_I2C_SPEED, LL_I2C_DUTYCYCLE_2);
+    LL_I2C_Enable(GPIO_I2C);
 
     // Set pull-ups
-    write_reg(0x0C, 0xFF);
-    write_reg(0x0D, 0xFF);
+    write_reg(GPIO_BANK1, 0x0C, 0xFF);
+    write_reg(GPIO_BANK1, 0x0D, 0xFF);
+    write_reg(GPIO_BANK2, 0x0C, 0xFF);
+    write_reg(GPIO_BANK2, 0x0D, 0xFF);
+
+    // Set output direction
+    write_reg(GPIO_BANK1, 0x00, 0xAA);
+    write_reg(GPIO_BANK1, 0x01, 0x55);
+    write_reg(GPIO_BANK2, 0x00, 0xAA);
+    write_reg(GPIO_BANK2, 0x01, 0x55);
+
+}
+
+// Update the state of a single button.
+static bool update_button(int b, bool pressed) {
+
+    bool changed = false;
+
+    switch (buttons[b]) {
+        case BTN_OFF:
+            if (pressed) {
+                buttons[b] = BTN_DOWN;
+                changed = true;
+            }
+            break;
+        case BTN_DOWN:
+            buttons[b] = pressed ? BTN_HELD : BTN_UP;
+            changed = true;
+            break;
+        case BTN_HELD:
+            if (!pressed) {
+                buttons[b] = BTN_UP;
+                changed = true;
+            }
+            break;
+        case BTN_UP:
+            buttons[b] = BTN_OFF;
+            changed = true;
+            break;
+    }    
+
+    return changed;
 
 }
 
@@ -127,62 +189,73 @@ bool read_buttons(void) {
     // HACK:
     // Disable ADC readings while reading the GPIOs.
     // Otherwise the readings are noisy (to be fixed with proper PCB layout)
-    LL_ADC_Disable(ADC1);
-    LL_DMA_DisableStream(DMA2, LL_DMA_STREAM_0); 
-    LL_DMA_ClearFlag_HT0(DMA2);
-    LL_DMA_ClearFlag_TC0(DMA2);
-    LL_DMA_ClearFlag_TE0(DMA2);
+    //LL_ADC_Disable(ADC1);
+    //LL_DMA_DisableStream(DMA2, LL_DMA_STREAM_0); 
+    //LL_DMA_ClearFlag_HT0(DMA2);
+    //LL_DMA_ClearFlag_TC0(DMA2);
+    //LL_DMA_ClearFlag_TE0(DMA2);
 
-    uint16_t switches = ~((read_reg(0x13) << 8) | read_reg(0x12));
     bool changed = false;
 
-    for (int i=0; i<NUM_BUTTONS; i++) {
-        bool pressed;
+    // Read keys 1-16 via I2C
+    uint8_t b1a = ~read_reg(GPIO_BANK1, 0x12);
+    uint8_t b1b = ~read_reg(GPIO_BANK1, 0x13);
+    uint8_t b2a = ~read_reg(GPIO_BANK2, 0x12);
+    uint8_t b2b = ~read_reg(GPIO_BANK2, 0x13);
 
-        if (i < 16) {
-            pressed = switches & (1 << i);
-        } else if (i == 16) {
-            pressed = !pin_read(BTN_ENC_PORT, BTN_ENC_PIN);
-        } else if (i == 17) {
-            pressed = !pin_read(BTN_M1_PORT, BTN_M1_PIN);
-        } else if (i == 18) {
-            pressed = !pin_read(BTN_M2_PORT, BTN_M2_PIN);
-        } else if (i == 19) {
-            pressed = !pin_read(BTN_M3_PORT, BTN_M3_PIN);
-        } else if (i == 20) {
-            pressed = !pin_read(BTN_M4_PORT, BTN_M4_PIN);
-        }
+    changed |= update_button(0,  b1b & 0x01);
+    changed |= update_button(1,  b1b & 0x04);
+    changed |= update_button(2,  b1b & 0x10);
+    changed |= update_button(3,  b1b & 0x40);
+    changed |= update_button(4,  b1a & 0x80);
+    changed |= update_button(5,  b1a & 0x20);
+    changed |= update_button(6,  b1a & 0x08);
+    changed |= update_button(7,  b1a & 0x02);
+    changed |= update_button(8,  b2b & 0x01);
+    changed |= update_button(9,  b2b & 0x04);
+    changed |= update_button(10, b2b & 0x10);
+    changed |= update_button(11, b2b & 0x40);
+    changed |= update_button(12, b2a & 0x80);
+    changed |= update_button(13, b2a & 0x20);
+    changed |= update_button(14, b2a & 0x08);
+    changed |= update_button(15, b2a & 0x02);
 
-        switch (buttons[i]) {
-            case BTN_OFF:
-                if (pressed) {
-                    buttons[i] = BTN_DOWN;
-                    changed = true;
-                }
-                break;
-            case BTN_DOWN:
-                buttons[i] = pressed ? BTN_HELD : BTN_UP;
-                changed = true;
-                break;
-            case BTN_HELD:
-                if (!pressed) {
-                    buttons[i] = BTN_UP;
-                    changed = true;
-                }
-                break;
-            case BTN_UP:
-                buttons[i] = BTN_OFF;
-                changed = true;
-                break;
-        }
-    }
+    // Function keys
+    changed |= update_button(BTN_SHIFT,     !pin_read(BTN_MS5_PORT, BTN_MS5_PIN));
+    changed |= update_button(BTN_REC_SAVE,  !pin_read(BTN_MS4_PORT, BTN_MS4_PIN));
+    changed |= update_button(BTN_PLAY_LOAD, !pin_read(BTN_MS3_PORT, BTN_MS3_PIN));
+    changed |= update_button(BTN_SEQ_EDIT,  !pin_read(BTN_MS2_PORT, BTN_MS2_PIN));
+    changed |= update_button(BTN_SYNTH_MENU,!pin_read(BTN_MS1_PORT, BTN_MS1_PIN));
+    changed |= update_button(BTN_ENCODER,   !pin_read(BTN_ENC_PORT, BTN_ENC_PIN));
 
     // Re-enable ADCs
-    LL_DMA_EnableStream(DMA2, LL_DMA_STREAM_0);  
-    LL_ADC_Enable(ADC1);
-    LL_ADC_REG_StartConversionSWStart(ADC1);   
+    //LL_DMA_EnableStream(DMA2, LL_DMA_STREAM_0);  
+    //LL_ADC_Enable(ADC1);
+    //LL_ADC_REG_StartConversionSWStart(ADC1);   
 
     return changed;
+
+}
+
+void update_leds(void) {
+
+    uint8_t porta, portb;
+
+    // Update LEDs over I2C if any have changed
+    if (memcmp(leds, leds_current, sizeof(leds))) {
+        porta = leds[15] | (leds[14] << 2) | (leds[13] << 4) | (leds[12] << 6);
+        portb = (leds[8] << 1) | (leds[9] << 3) | (leds[10] << 5) | (leds[11] << 7);
+        write_reg(GPIO_BANK2, 0x12, porta);
+        write_reg(GPIO_BANK2, 0x13, portb);
+
+        porta = leds[7] | (leds[6] << 2) | (leds[5] << 4) | (leds[4] << 6);
+        portb = (leds[0] << 1) | (leds[1] << 3) | (leds[2] << 5) | (leds[3] << 7);
+        write_reg(GPIO_BANK1, 0x12, porta);
+        write_reg(GPIO_BANK1, 0x13, portb);
+
+        memcpy(leds_current, leds, sizeof(leds));
+
+    }
 
 }
 
@@ -193,8 +266,8 @@ bool read_buttons(void) {
 // Encoder
 
 #define ENCODER_PORT    GPIOA
-#define ENCODER_PIN_A   LL_GPIO_PIN_11
-#define ENCODER_PIN_B   LL_GPIO_PIN_12
+#define ENCODER_PIN_A   LL_GPIO_PIN_12
+#define ENCODER_PIN_B   LL_GPIO_PIN_11
 
 
 int enc_states[16] = {0, -1, 1, 0, 1, 0, 0, -1, -1, 0, 0, 1, 0, 1, -1, 0};
@@ -257,20 +330,21 @@ uint16_t pots[NUM_POTS];
 
 void adc_init(void) {
 
-    pin_cfg_an(GPIOA, LL_GPIO_PIN_0);   // ch0  Osc1
-    pin_cfg_an(GPIOA, LL_GPIO_PIN_1);   // ch1  Osc2
-    pin_cfg_an(GPIOC, LL_GPIO_PIN_0);   // ch10 Noise
-    pin_cfg_an(GPIOC, LL_GPIO_PIN_1);   // ch11 Env1 attack
-    pin_cfg_an(GPIOC, LL_GPIO_PIN_2);   // ch12 Env1 
-    pin_cfg_an(GPIOC, LL_GPIO_PIN_3);   // ch13 Env1
-    pin_cfg_an(GPIOB, LL_GPIO_PIN_0);   // ch8
-    pin_cfg_an(GPIOA, LL_GPIO_PIN_4);   // ch4
     pin_cfg_an(GPIOB, LL_GPIO_PIN_1);   // ch9
-    pin_cfg_an(GPIOC, LL_GPIO_PIN_4);   // ch14 Filt cutoff
-    pin_cfg_an(GPIOA, LL_GPIO_PIN_2);   // ch2  Filt res
-    pin_cfg_an(GPIOA, LL_GPIO_PIN_3);   // ch3 
-
-
+    pin_cfg_an(GPIOA, LL_GPIO_PIN_6);   // ch6
+    pin_cfg_an(GPIOA, LL_GPIO_PIN_1);   // ch1
+    pin_cfg_an(GPIOB, LL_GPIO_PIN_0);   // ch8
+    pin_cfg_an(GPIOA, LL_GPIO_PIN_5);   // ch5
+    pin_cfg_an(GPIOA, LL_GPIO_PIN_0);   // ch0
+    pin_cfg_an(GPIOC, LL_GPIO_PIN_5);   // ch15
+    pin_cfg_an(GPIOA, LL_GPIO_PIN_4);   // ch4
+    pin_cfg_an(GPIOC, LL_GPIO_PIN_3);   // ch13
+    pin_cfg_an(GPIOC, LL_GPIO_PIN_4);   // ch14
+    pin_cfg_an(GPIOA, LL_GPIO_PIN_3);   // ch3
+    pin_cfg_an(GPIOC, LL_GPIO_PIN_2);   // ch12
+    pin_cfg_an(GPIOA, LL_GPIO_PIN_7);   // ch7
+    pin_cfg_an(GPIOA, LL_GPIO_PIN_2);   // ch2
+    pin_cfg_an(GPIOC, LL_GPIO_PIN_1);   // ch11
 
     __HAL_RCC_ADC1_CLK_ENABLE();
     __HAL_RCC_DMA2_CLK_ENABLE();
@@ -290,37 +364,45 @@ void adc_init(void) {
 
     LL_ADC_REG_InitTypeDef reg;
     reg.TriggerSource = LL_ADC_REG_TRIG_SOFTWARE;
-    reg.SequencerLength = LL_ADC_REG_SEQ_SCAN_ENABLE_12RANKS;
+    reg.SequencerLength = LL_ADC_REG_SEQ_SCAN_ENABLE_15RANKS;
     reg.SequencerDiscont = LL_ADC_REG_SEQ_DISCONT_DISABLE;
     reg.ContinuousMode = LL_ADC_REG_CONV_CONTINUOUS;
     reg.DMATransfer = LL_ADC_REG_DMA_TRANSFER_UNLIMITED;
     LL_ADC_REG_Init(ADC1, &reg);
 
-    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_1, LL_ADC_CHANNEL_0);
-    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_2, LL_ADC_CHANNEL_1);
-    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_3, LL_ADC_CHANNEL_10);
-    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_4, LL_ADC_CHANNEL_11);
-    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_5, LL_ADC_CHANNEL_12);
-    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_6, LL_ADC_CHANNEL_13);
-    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_7, LL_ADC_CHANNEL_8);
-    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_8, LL_ADC_CHANNEL_4);
-    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_9, LL_ADC_CHANNEL_9);
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_1,  LL_ADC_CHANNEL_9);
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_2,  LL_ADC_CHANNEL_6);
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_3,  LL_ADC_CHANNEL_1);
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_4,  LL_ADC_CHANNEL_8);
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_5,  LL_ADC_CHANNEL_5);
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_6,  LL_ADC_CHANNEL_0);
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_7,  LL_ADC_CHANNEL_15);
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_8,  LL_ADC_CHANNEL_4);
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_9,  LL_ADC_CHANNEL_13);
     LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_10, LL_ADC_CHANNEL_14);
-    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_11, LL_ADC_CHANNEL_2);
-    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_12, LL_ADC_CHANNEL_3);    
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_11, LL_ADC_CHANNEL_3);
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_12, LL_ADC_CHANNEL_12);
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_13, LL_ADC_CHANNEL_7);    
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_14, LL_ADC_CHANNEL_2);    
+    LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_15, LL_ADC_CHANNEL_11);
 
     LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_0, CYCLES);
     LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_1, CYCLES);
-    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_10, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_2, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_3, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_4, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_5, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_6, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_7, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_8, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_9, CYCLES);
     LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_11, CYCLES);
     LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_12, CYCLES);
     LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_13, CYCLES);
-    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_8, CYCLES);
-    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_4, CYCLES);
-    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_9, CYCLES);
     LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_14, CYCLES);
-    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_2, CYCLES);
-    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_3, CYCLES);
+    LL_ADC_SetChannelSamplingTime(ADC1, LL_ADC_CHANNEL_15, CYCLES);
+    
+    
 
     LL_ADC_Enable(ADC1);
 

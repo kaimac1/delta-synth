@@ -12,7 +12,6 @@ UART_HandleTypeDef h_uart_midi;
 #define DEBUG_AF 7
 
 #define MIDI_PORT   GPIOC
-#define MIDI_TX_PIN LL_GPIO_PIN_6
 #define MIDI_RX_PIN LL_GPIO_PIN_7
 #define MIDI_AF 8
 
@@ -26,7 +25,15 @@ void HAL_UART_MspInit(UART_HandleTypeDef *huart) {
     } else if (huart == &h_uart_midi) {
         __HAL_RCC_USART6_CLK_ENABLE();
 
-        pin_cfg_af(MIDI_PORT, MIDI_RX_PIN, MIDI_AF);
+        LL_GPIO_InitTypeDef gpio;
+        gpio.Mode       = LL_GPIO_MODE_ALTERNATE;
+        gpio.Speed      = LL_GPIO_SPEED_FREQ_MEDIUM;
+        gpio.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
+        gpio.Alternate  = MIDI_AF;
+        gpio.Pull       = LL_GPIO_PULL_UP;
+        gpio.Pin        = MIDI_RX_PIN;
+        LL_GPIO_Init(MIDI_PORT, &gpio);        
+
         HAL_NVIC_SetPriority(USART6_IRQn, PRIORITY_MIDI, 0);
         HAL_NVIC_EnableIRQ(USART6_IRQn);        
     }

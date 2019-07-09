@@ -11,6 +11,7 @@
 SynthConfig synth;
 SynthConfig cfg;
 
+// Osc/env/filter state:
 typedef struct {
     float z1;
     float z2;
@@ -28,15 +29,10 @@ Envelope env[NUM_PART][NUM_ENV];
 float nco[NUM_PART][NUM_OSCILLATOR];
 float lfo_nco[NUM_PART];
 
-// profiling
+// Profiling
 uint32_t start_time;
 uint32_t loop_time;
 uint32_t transfer_time;
-
-// Sequencer
-SeqConfig seq;
-uint32_t next_beat = 0;
-int seq_step = 0;
 
 // Output buffer
 #define OUT_BUFFER_SAMPLES 512
@@ -48,7 +44,6 @@ uint16_t *out_buffer = out_buffer_1;
 #define EXP_TABLE_SIZE 1024
 float exp_table[EXP_TABLE_SIZE];
 
-inline void sequencer_update(void);
 inline void fill_buffer(void);
 
 
@@ -72,14 +67,8 @@ void HAL_I2S_TxCpltCallback(I2S_HandleTypeDef *hi2s) {
     // Copy new settings: synth -> cfg
     if (!synth.busy) {
         memcpy(&cfg, &synth, sizeof(SynthConfig));
-        // if (cfg.env_retrigger) {
-        //     cfgnew.env_retrigger = false;
-        //     cfg.env_retrigger = false;
-        //     env_state = ENV_RELEASE;
-        // }
     }
 
-    sequencer_update();
     fill_buffer();
 
     if (i++ > 50) {
@@ -87,29 +76,6 @@ void HAL_I2S_TxCpltCallback(I2S_HandleTypeDef *hi2s) {
         loop_time = ltime;
         transfer_time = txtime;
         i = 0;
-    }
-
-}
-
-// many things broken
-inline void sequencer_update(void) {
-
-    if (start_time > next_beat) {
-        next_beat += 15000000/cfg.tempo;
-
-        if (cfg.seq_play) {
-            env[0][0].state = ENV_RELEASE;
-            env[0][1].state = ENV_RELEASE;
-            seq_step++;
-            if (seq_step == seq.length) seq_step = 0;
-        }
-    }
-
-    if (cfg.seq_play) {
-        if (seq.step[seq_step].freq != 0.0f) {
-            cfg.part[0].gate = true;
-            cfg.part[0].freq = seq.step[seq_step].freq;
-        }
     }
 
 }
@@ -545,7 +511,6 @@ void synth_start(void) {
     cfg.busy    = false;
     cfg.volume  = 0.1f;
     cfg.legato  = false;
-    cfg.tempo   = 90;
 
     for (int p=0; p<NUM_PART; p++) {
         for (int o=0; o<NUM_OSCILLATOR; o++) {

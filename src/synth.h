@@ -98,10 +98,6 @@ typedef struct {
     float volume;       // 0-1
     bool legato;
 
-    // Sequencer
-    int tempo;          // bpm
-    bool seq_play;
-
     MonoSynth part[NUM_PART];
     
     // FX
@@ -111,32 +107,11 @@ typedef struct {
 
 } SynthConfig;
 
-
-
-// Sequencer:
-
-typedef struct {
-    float freq;
-    float gate_length;
-} SeqStep;
-
-#define MAX_STEPS 64
-typedef struct {
-    int length;
-    SeqStep step[MAX_STEPS];
-} SeqConfig;
-
-
-
-
 extern SynthConfig cfg;
 extern SynthConfig synth;
-extern SeqConfig seq;
 
 extern uint32_t loop_time;
 extern uint32_t transfer_time;
-
-
 
 void synth_start(void);
 float exp_lookup(float arg);

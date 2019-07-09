@@ -58,8 +58,6 @@ uint8_t read_reg(uint8_t addr, uint8_t reg) {
 
     uint8_t value = 0;
 
-    // delay_us(100);
-
     while(LL_I2C_IsActiveFlag_BUSY(GPIO_I2C));
 
     // Start

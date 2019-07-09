@@ -446,6 +446,11 @@ void draw_envdest(void);
 void draw_lfo(void);
 void draw_kbd_track(void);
 
+// Names for pot moved box
+const char *pot_names[NUM_POTS] = {
+    "Volume", "Osc 1", "Modifier", "Attack", "Osc 2", "Osc tune", "Decay",
+    "Cutoff", "LFO rate", "Sustain", "Peak", "User A", "Release", "Env mod", "User B"
+};
 
 void draw_screen(void) {
 
@@ -477,10 +482,13 @@ void draw_screen(void) {
 
     char buf[32];
 
+    // Show pot name/value on move
     if (pot_moved != -1) {
         draw_box(16,16,96,32);
         int amount = filtered_pot[pot_moved] / 32;
-        sprintf(buf, "%d: %d", pot_moved, amount);
+        sprintf(buf, "%s", pot_names[pot_moved]);
+        draw_text_cen(64, 20, buf, 0);
+        sprintf(buf, "%d", amount);
         draw_text_cen(64, 34, buf, 0);
     }
 

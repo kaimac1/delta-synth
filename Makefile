@@ -37,6 +37,7 @@ src/synth.c  \
 src/midi.c   \
 src/notes.c  \
 src/ui.c \
+src/sequencer.c \
 board/audio.c \
 board/display.c \
 board/input.c \

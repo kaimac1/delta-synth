@@ -85,7 +85,7 @@ void mono_del(float freq) {
 
 void note_on(float freq) {
 
-    if (seq_record) {
+    if (mode == MODE_REC) {
         seq_note_on(freq);
     } else {
         mono_add(freq);
@@ -94,7 +94,7 @@ void note_on(float freq) {
 }
 void note_off(float freq) {
 
-    if (seq_record) {
+    if (mode == MODE_REC) {
         seq_note_off(freq);
     } else {
         mono_del(freq);

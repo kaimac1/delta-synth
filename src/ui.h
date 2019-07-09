@@ -4,6 +4,17 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+#define ADD_CLAMP(x, y, max) {(x) += (y); if ((x) > (max)) (x) = (max); if ((x) < 0) (x) = 0;}
+#define ADD_CLAMP_MINMAX(x, y, min, max) {(x) += (y); if ((x) > (max)) (x) = (max); if ((x) < (min)) (x) = (min);}
+#define ABS(a,b) ((a) > (b) ? ((a)-(b)) : ((b)-(a)))
+
+typedef enum {
+    MODE_LIVE,
+    MODE_PLAY,
+    MODE_REC
+} PlaybackMode;
+
+
 
 typedef struct {
     char name[16];
@@ -24,7 +35,8 @@ void ui_update(void);
 void draw_menu(Menu menu);
 
 extern float seq_note_input;
+extern PlaybackMode mode;
+extern bool redraw;
 
-extern bool seq_record;
 void seq_note_on(float freq);
 void seq_note_off(float freq);

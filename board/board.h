@@ -68,27 +68,12 @@ typedef struct {
 } EncoderState;
 extern EncoderState encoder;
 
-// typedef enum {
-//     POT_OSCMIX = 0,
-//     POT_MOD = 1,
-//     POT_TUNE = 2,
-//     POT_ATTACK = 3,
-//     POT_DECAY = 4,
-//     POT_SUSTAIN = 5,
-//     POT_RELEASE = 6,
-//     POT_LFORATE = 7,
-//     POT_VOL = 8,
-//     POT_CUTOFF = 9,
-//     POT_RESONANCE = 10,
-//     POT_ENVMOD = 11
-// } PotName;
-
 typedef enum {
     POT_VOL     = 0,
-    POT_OSCMIX  = 1, // Osc1
+    POT_OSC1    = 1,
     POT_MOD     = 2,
     POT_ATTACK  = 3,
-    POT_OSC2    = 4, // unused
+    POT_OSC2    = 4,
     POT_TUNE    = 5,
     POT_DECAY   = 6,
     POT_CUTOFF  = 7,

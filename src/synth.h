@@ -113,15 +113,17 @@ typedef struct {
 
 
 
+// Sequencer:
 
 typedef struct {
     float freq;
     float gate_length;
 } SeqStep;
 
-#define NUM_SEQ_STEPS 16
+#define MAX_STEPS 64
 typedef struct {
-    SeqStep step[NUM_SEQ_STEPS];
+    int length;
+    SeqStep step[MAX_STEPS];
 } SeqConfig;
 
 

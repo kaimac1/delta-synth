@@ -101,7 +101,7 @@ inline void sequencer_update(void) {
             env[0][0].state = ENV_RELEASE;
             env[0][1].state = ENV_RELEASE;
             seq_step++;
-            if (seq_step == NUM_SEQ_STEPS) seq_step = 0;
+            if (seq_step == seq.length) seq_step = 0;
         }
     }
 

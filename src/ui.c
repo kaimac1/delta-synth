@@ -1,4 +1,5 @@
 #include "ui.h"
+#include "sequencer.h"
 #include "bitmaps.h"
 #include "main.h"
 #include "midi.h"
@@ -20,11 +21,18 @@ typedef enum {
     UI_KBD_TRACK
 } UIPage;
 
+typedef enum {
+    UIMODE_SYNTH,
+    UIMODE_SEQUENCER
+} UIMode;
+
 // UI state
 int part;
 int this_osc;
 int this_env;
 UIPage page;
+UIMode uimode = UIMODE_SYNTH;
+PlaybackMode mode;
 
 
 uint16_t filtered_pot[NUM_POTS];
@@ -47,8 +55,6 @@ typedef struct {
 } InputSettings;
 InputSettings input;
 
-unsigned int seq_idx;
-bool seq_record;
 Menu menu_fx;
 bool redraw = true;
 
@@ -57,9 +63,6 @@ void draw_screen(void);
 void menu_fx_draw(Menu *menu, int i);
 void menu_lfo_draw(Menu *menu, int i);
 
-#define ADD_CLAMP(x, y, max) {(x) += (y); if ((x) > (max)) (x) = (max); if ((x) < 0) (x) = 0;}
-#define ADD_CLAMP_MINMAX(x, y, min, max) {(x) += (y); if ((x) > (max)) (x) = (max); if ((x) < (min)) (x) = (min);}
-#define ABS(a,b) ((a) > (b) ? ((a)-(b)) : ((b)-(a)))
 #define SAVE_POT(i) {saved_pot[(i)] = filtered_pot[(i)]; pot_sync[(i)] = 0;}
 
 #define POT_UPDATE_THRESHOLD 50
@@ -67,15 +70,6 @@ void menu_lfo_draw(Menu *menu, int i);
 #define DECAY_MIN 0.060f
 #define LEAD_DECAY_CONST 0.000014f
 const float halfstep = 1.059463f;
-
-
-void seq_note_on(float freq) {
-    seq.step[seq_idx].freq = freq;
-}
-void seq_note_off(float freq) {
-    seq_idx++;
-    if (seq_idx >= NUM_SEQ_STEPS) seq_idx = 0;
-}
 
 
 void set_reverb(void) {
@@ -87,8 +81,6 @@ void set_reverb(void) {
     synth.fx_wet = input.wet_level / 127.0f;
 
 }
-
-
 
 void update_lead(void) {
 
@@ -114,7 +106,7 @@ void update_lead(void) {
             float temp;
 
             switch (i) {
-                
+
                 case POT_VOL:
                     synth.volume = amount;
                     break;                
@@ -137,10 +129,13 @@ void update_lead(void) {
                     break;                    
 
                 // Oscillator
-                case POT_OSCMIX:
-                    synth.part[part].osc[0].gain = 1.0f - amount;
+                case POT_OSC1:
+                    synth.part[part].osc[0].gain = amount;
+                    break;
+                case POT_OSC2:
                     synth.part[part].osc[1].gain = amount;
                     break;
+
                 case POT_MOD:
                     synth.part[part].osc[this_osc].modifier = amount;
                     break;
@@ -194,7 +189,6 @@ void update_lead(void) {
 }
 
 
-
 void ui_init(void) {
 
     for (int i=0; i<NUM_POTS; i++) {
@@ -218,7 +212,6 @@ void ui_init(void) {
     input.lfo_amount = 0;
     set_reverb();
 
-    //seq_record = true;
     //synth.seq_play = true;
 
 }
@@ -257,60 +250,51 @@ void menu_scroll(Menu *menu) {
 
 }
 
+void update_synth(void) {
 
-void ui_update(void) {
-
-    static int ctr;
-
-    bool btn = read_buttons();
     bool enc = read_encoder();
 
-    // Handle button presses
-    if (btn) {
+    // Keys:
 
-        // Oscillator select
-        if (buttons[BTN_OSC_SEL] == BTN_DOWN) {
-            this_osc++;
-            this_osc %= NUM_OSCILLATOR;
-            SAVE_POT(POT_MOD);
-            SAVE_POT(POT_TUNE);
-            redraw = true;
-        }
-
-        // Oscillator waveform
-        if (buttons[BTN_OSC_WAVE] == BTN_DOWN) {
-            Wave new = (synth.part[part].osc[this_osc].waveform + 1) % NUM_WAVE;
-            synth.part[part].osc[this_osc].waveform = new;
-            redraw = true;
-        }
-
-        // Tune mode
-        if (buttons[BTN_OSC_TUNE] == BTN_DOWN) {
-            tune_semitones = !tune_semitones;
-            SAVE_POT(POT_TUNE);
-        }
-
-        // Envelope select
-        if (buttons[BTN_ENV_SEL] == BTN_DOWN) {
-            this_env++;
-            this_env %= NUM_ENV;
-            SAVE_POT(POT_ATTACK);
-            SAVE_POT(POT_DECAY);
-            SAVE_POT(POT_SUSTAIN);
-            SAVE_POT(POT_RELEASE);
-            redraw = true;
-        }
-
-        check_button_for_page(BTN_ENV_DEST, UI_ENV_MENU);
-        check_button_for_page(BTN_LFO_DEST, UI_LFO_MENU);        
-        check_button_for_page(BTN_KBD_TRACK, UI_KBD_TRACK);
-        check_button_for_page(10, UI_FX);
-
-
-
+    // Oscillator select
+    if (buttons[BTN_OSC_SEL] == BTN_DOWN) {
+        this_osc++;
+        this_osc %= NUM_OSCILLATOR;
+        SAVE_POT(POT_MOD);
+        SAVE_POT(POT_TUNE);
+        redraw = true;
     }
 
-    // Handle encoder movements
+    // Oscillator waveform
+    if (buttons[BTN_OSC_WAVE] == BTN_DOWN) {
+        Wave new = (synth.part[part].osc[this_osc].waveform + 1) % NUM_WAVE;
+        synth.part[part].osc[this_osc].waveform = new;
+        redraw = true;
+    }
+
+    // Tune mode
+    if (buttons[BTN_OSC_TUNE] == BTN_DOWN) {
+        tune_semitones = !tune_semitones;
+        SAVE_POT(POT_TUNE);
+    }
+
+    // Envelope select
+    if (buttons[BTN_ENV_SEL] == BTN_DOWN) {
+        this_env++;
+        this_env %= NUM_ENV;
+        SAVE_POT(POT_ATTACK);
+        SAVE_POT(POT_DECAY);
+        SAVE_POT(POT_SUSTAIN);
+        SAVE_POT(POT_RELEASE);
+        redraw = true;
+    }
+
+    check_button_for_page(BTN_ENV_DEST, UI_ENV_MENU);
+    check_button_for_page(BTN_LFO_DEST, UI_LFO_MENU);        
+    check_button_for_page(BTN_KBD_TRACK, UI_KBD_TRACK);
+    check_button_for_page(10, UI_FX);
+
+    // Encoder movement
     if (enc) {
         switch (page) {
             case UI_DEFAULT:
@@ -355,7 +339,40 @@ void ui_update(void) {
                 break;
         }
 
+    }    
+
+}
+
+
+
+void ui_update(void) {
+
+    static int ctr;
+
+    bool btn = read_buttons();
+
+    if (btn) {
+        // Switch between SYNTH/SEQ modes
+        if (buttons[BTN_SYNTH_MENU] == BTN_DOWN) {
+            uimode = UIMODE_SYNTH;
+            redraw = true;
+        } else if (buttons[BTN_SEQ_EDIT] == BTN_DOWN) {
+            uimode = UIMODE_SEQUENCER;
+            redraw = true;
+        }
     }
+
+    switch (uimode) {
+        case UIMODE_SYNTH:
+            update_synth();
+            break;
+
+        case UIMODE_SEQUENCER:
+            update_sequencer();
+            break;
+    }
+
+
 
     update_lead();
 
@@ -376,7 +393,7 @@ void ui_update(void) {
             else if (pot_moved == POT_VOL) input.env_dest[this_env] = DEST_AMP;
             else if (pot_moved == POT_TUNE) input.env_dest[this_env] = DEST_FREQ;
             else if (pot_moved == POT_RESONANCE) input.env_dest[this_env] = DEST_RES;
-            else if (pot_moved == POT_OSCMIX) input.env_dest[this_env] = DEST_OSC1;
+            else if (pot_moved == POT_OSC1) input.env_dest[this_env] = DEST_OSC1;
             pot_moved = -1;
 
         } else if (page == UI_LFO_MENU) {
@@ -392,7 +409,7 @@ void ui_update(void) {
             else if (pot_moved == POT_TUNE) input.lfo_dest = DEST_FREQ;
             else if (pot_moved == POT_RESONANCE) input.lfo_dest = DEST_RES;
             else if (pot_moved == POT_CUTOFF) input.lfo_dest = DEST_CUTOFF;
-            else if (pot_moved == POT_OSCMIX) input.lfo_dest = DEST_OSC1;
+            else if (pot_moved == POT_OSC1) input.lfo_dest = DEST_OSC1;
             pot_moved = -1;            
 
         } else {
@@ -434,6 +451,11 @@ void draw_screen(void) {
 
     if (display_busy) return;
     draw_rect(0, 0, 128, 64, 0);
+
+    if (uimode == UIMODE_SEQUENCER) {
+        draw_sequencer();
+        return;
+    }
 
     // Menus
     if (page == UI_FX) {

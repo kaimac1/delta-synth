@@ -26,22 +26,32 @@ typedef enum {
     UIMODE_SEQUENCER
 } UIMode;
 
-// UI state
-int part;
+// UI state.
+// `part` is the currently selected voice.
+// `this_osc` is the selected oscillator.
+// `this_env` is the selected envelope.
+int part = 0;
 int this_osc;
 int this_env;
 UIPage page;
 UIMode uimode = UIMODE_SYNTH;
 PlaybackMode mode;
 
-
+// Pot values are low-pass filtered and stored in filtered_pot[].
+// When pot_sync[] is true, that pot affects its parameter in real time.
+// When a pot is saved, its value is stored in saved_pot[] and it stops affecting
+// its parameter until it moves a small distance away from the saved value.
 uint16_t filtered_pot[NUM_POTS];
 uint16_t saved_pot[NUM_POTS];
 bool pot_sync[NUM_POTS];
-int encoder_start = 0;
-int pot_moved = -1;
-int pot_show_timer;
 
+// When a pot is moved, its name and value is briefly shown on the display.
+// pot_moved, if >=0, is the number of the last moved pot.
+int pot_moved = -1;
+int pot_show_ctr;
+const int pot_show_ticks = 100;
+
+int encoder_start = 0;
 bool tune_semitones = true;
 
 typedef struct {
@@ -292,7 +302,7 @@ void update_synth(void) {
     check_button_for_page(BTN_ENV_DEST, UI_ENV_MENU);
     check_button_for_page(BTN_LFO_DEST, UI_LFO_MENU);        
     check_button_for_page(BTN_KBD_TRACK, UI_KBD_TRACK);
-    check_button_for_page(10, UI_FX);
+    check_button_for_page(BTN_FX, UI_FX);
 
     // Encoder movement
     if (enc) {
@@ -305,7 +315,7 @@ void update_synth(void) {
                 break;
 
             case UI_FX:
-                if (buttons[BTN_SEQ_EDIT] == BTN_HELD) {
+                if (buttons[BTN_SHIFT] == BTN_HELD) {
                     if (menu_fx.selected_item == 0) {
                         ADD_CLAMP(input.reverb_amount, encoder.delta, 127);
                         set_reverb();
@@ -344,6 +354,19 @@ void update_synth(void) {
 }
 
 
+void change_part(void) {
+
+    // Next part
+    part = (part + 1) % NUM_PART;
+
+    // Save all pots
+    for (int i=0; i<NUM_POTS; i++) {
+        SAVE_POT(i);
+    }
+
+}
+
+
 
 void ui_update(void) {
 
@@ -355,6 +378,7 @@ void ui_update(void) {
         // Switch between SYNTH/SEQ modes
         if (buttons[BTN_SYNTH_MENU] == BTN_DOWN) {
             uimode = UIMODE_SYNTH;
+            change_part();
             redraw = true;
         } else if (buttons[BTN_SEQ_EDIT] == BTN_DOWN) {
             uimode = UIMODE_SEQUENCER;
@@ -414,9 +438,9 @@ void ui_update(void) {
 
         } else {
             // Show control update
-            pot_show_timer++;
-            if (pot_show_timer == 100) {
-                pot_show_timer = 0;
+            pot_show_ctr++;
+            if (pot_show_ctr == pot_show_ticks) {
+                pot_show_ctr = 0;
                 pot_moved = -1;
                 redraw = true;
             }
@@ -512,9 +536,13 @@ void draw_screen(void) {
     sprintf(buf, "Env%d", this_env+1);
     draw_text(65, 3, buf, 0);
 
+    // Part
+    sprintf(buf, "P%d", part);
+    draw_text(100, 3, buf, 0);
+
 #ifdef PERFDEBUG
     float load = 100 * (float)(loop_time) / transfer_time;
-    sprintf(buf, "load %.1f", (double)load);
+    sprintf(buf, "CPU %.1f%%", (double)load);
     draw_text(0, 48, buf, 0);
 #endif
 

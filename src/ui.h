@@ -34,7 +34,7 @@ void ui_init(void);
 void ui_update(void);
 void draw_menu(Menu menu);
 
-extern float seq_note_input;
+extern int part;
 extern PlaybackMode mode;
 extern bool redraw;
 

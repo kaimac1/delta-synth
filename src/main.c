@@ -10,11 +10,6 @@
 
 void SystemClock_Config(void);
 
-extern uint8_t command[3];
-
-void note_on(float freq);
-void note_off(float freq);
-
 /******************************************************************************/
 int main(void) { 
 

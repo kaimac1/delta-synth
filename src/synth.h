@@ -5,7 +5,7 @@
 #define ENV_OVERSHOOT 0.05f
 #define MIN_ATTACK 0.005f
 
-#define NUM_PART 1
+#define NUM_PART 3
 #define NUM_OSCILLATOR 2
 #define NUM_ENV 2
 

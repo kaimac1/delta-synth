@@ -68,17 +68,17 @@ void midi_process_command(void) {
 
 void mono_add(float freq) {
     synth.busy = true;
-    synth.part[0].freq = freq;
-    synth.part[0].gate = true;
-    synth.part[0].trig = true;
+    synth.part[part].freq = freq;
+    synth.part[part].gate = true;
+    synth.part[part].trig = true;
     synth.busy = false;
 }
 
 void mono_del(float freq) {
-    if (freq == synth.part[0].freq) {
+    if (freq == synth.part[part].freq) {
         synth.busy = true;
-        synth.part[0].gate = false;
-        synth.part[0].trig = false;
+        synth.part[part].gate = false;
+        synth.part[part].trig = false;
         synth.busy = false;
     }
 }

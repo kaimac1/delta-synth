@@ -447,12 +447,12 @@ inline void fill_buffer(void) {
         s += whitenoise() * 0.001f;
 
         // Effects
-        //s = reverb(s);
+        s = reverb(s);
 
         // Delay
-        // float fx = DELAY_LINE_GET(delay1);
-        // DELAY_LINE_PUT(delay1, s + fx * 0.75f);
-        // s += fx;
+        //float fx = DELAY_LINE_GET(delay1);
+        //DELAY_LINE_PUT(delay1, s + fx * 0.75f);
+        //s += fx;
 
         // DC filter
         const float r = 0.997f;
